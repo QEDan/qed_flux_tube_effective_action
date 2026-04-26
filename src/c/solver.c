@@ -91,7 +91,8 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     curr = sinf;
     for (int i = N - 1; i > 0; i--) {
         double h = profile.rho[i-1] - profile.rho[i];
-        curr = rk4_step(profile.rho[i], h, curr, params, profile, i);
+        // Use i-1 to be consistent with forward pass for the same interval
+        curr = rk4_step(profile.rho[i], h, curr, params, profile, i-1);
         uinf[i-1] = curr.u;
     }
     double complex duinf_first = curr.du;

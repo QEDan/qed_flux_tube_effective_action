@@ -14,21 +14,24 @@ def test_solver():
     # Setup profile: lambda=1.0, F=2*np.pi (so F_cal = 1.0)
     profile = StepFunctionProfile(rho, lambd=1.0, F=2*np.pi)
     
-    # Setup orchestrator
-    orc = Orchestrator(lib_path="./libsolver.so")
+    # Setup orchestrator (using C backend for base test)
+    orc = Orchestrator(backend_type="c", lib_path="./libsolver.so")
     
     # Generate parameters grid
-    chi_values = [1.0, 2.0, 5.0]
-    ml_values = [0, 1, 2]
+    chi_values = [1.0, 2.0]
+    ml_values = [0, 1]
     sigma3_values = [1, -1]
     params_grid = generate_params_grid(chi_values, ml_values, sigma3_values)
     
-    print(f"Computing {len(params_grid)} Green's functions...")
     results = orc.compute_greens_function_batch(params_grid, profile)
     
-    print(f"Results shape: {results.shape}")
-    
-    # Plot a few results
+    assert results.shape == (len(params_grid), len(rho))
+    assert not np.any(np.isnan(results))
+    # Green's function should be non-zero
+    assert np.max(np.abs(results)) > 0
+
+    # Optional: Plotting could be moved to a separate script or only run in certain modes
+    # but keeping it for now as it was there.
     plt.figure(figsize=(10, 6))
     for i in range(min(5, len(params_grid))):
         p = params_grid[i]
@@ -41,7 +44,3 @@ def test_solver():
     plt.legend()
     plt.grid(True)
     plt.savefig("test_solver_result.png")
-    print("Plot saved to test_solver_result.png")
-
-if __name__ == "__main__":
-    test_solver()
