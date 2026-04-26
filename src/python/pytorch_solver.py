@@ -31,10 +31,11 @@ class PyTorchSolver:
         params_list: list of dicts (converted to batch tensors)
         field_profile: FieldProfile object
         """
-        rho_np, a_phi_np, da_phi_np = field_profile.get_arrays()
-        rho = torch.from_numpy(rho_np).to(self.device).to(torch.float64)
-        a_phi = torch.from_numpy(a_phi_np).to(self.device).to(torch.float64)
-        da_phi = torch.from_numpy(da_phi_np).to(self.device).to(torch.float64)
+        # Get tensors without detaching to preserve gradients
+        rho, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
+        rho = rho.to(self.device)
+        a_phi = a_phi.to(self.device)
+        da_phi = da_phi.to(self.device)
         
         n_batch = len(params_list)
         n_points = len(rho)

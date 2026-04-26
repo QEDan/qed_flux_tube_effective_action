@@ -1,12 +1,20 @@
 import numpy as np
+import torch
 
 class FieldProfile:
     def __init__(self, rho):
-        self.rho = rho
-        self.a_phi = np.zeros_like(rho)
-        self.da_phi = np.zeros_like(rho)
+        if isinstance(rho, np.ndarray):
+            self.rho = torch.from_numpy(rho).to(torch.float64)
+        else:
+            self.rho = rho
+        self.a_phi = torch.zeros_like(self.rho)
+        self.da_phi = torch.zeros_like(self.rho)
 
-    def get_arrays(self):
+    def get_arrays(self, as_numpy=True):
+        if as_numpy:
+            return self.rho.detach().cpu().numpy(), \
+                   self.a_phi.detach().cpu().numpy(), \
+                   self.da_phi.detach().cpu().numpy()
         return self.rho, self.a_phi, self.da_phi
 
 class StepFunctionProfile(FieldProfile):
@@ -15,15 +23,33 @@ class StepFunctionProfile(FieldProfile):
         self.lambd = lambd
         self.F = F
         self.e = e
-        
+        self.update()
+
+    def update(self):
         # Aphi = F/(2*pi) * (rho/lambd^2 if rho < lambd else 1/rho)
-        inner = self.rho < lambd
+        inner = self.rho < self.lambd
         outer = ~inner
         
-        pre = F / (2 * np.pi)
-        self.a_phi[inner] = pre * self.rho[inner] / (lambd**2)
-        self.a_phi[outer] = pre / self.rho[outer]
+        pre = self.F / (2 * np.pi)
         
-        # da_phi = F/(2*pi) * (1/lambd^2 if rho < lambd else -1/rho^2)
-        self.da_phi[inner] = pre / (lambd**2)
-        self.da_phi[outer] = -pre / (self.rho[outer]**2)
+        # Initialize tensors if not already
+        self.a_phi = torch.zeros_like(self.rho)
+        self.da_phi = torch.zeros_like(self.rho)
+        
+        # Fill a_phi
+        self.a_phi = torch.where(inner, pre * self.rho / (self.lambd**2), pre / self.rho)
+        
+        # Fill da_phi
+        self.da_phi = torch.where(inner, pre / (self.lambd**2), -pre / (self.rho**2))
+
+class DifferentiableProfile(FieldProfile):
+    """
+    A profile where a_phi and da_phi are derived from differentiable parameters.
+    """
+    def __init__(self, rho, params):
+        super().__init__(rho)
+        self.params = params # e.g. spline coefficients or NN weights
+        
+    def forward(self):
+        # This should be implemented by subclasses or provided via a function
+        raise NotImplementedError
