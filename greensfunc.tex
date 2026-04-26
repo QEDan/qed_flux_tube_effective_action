@@ -1,0 +1,1080 @@
+\chapter{Green's Function Method for Cylindrically Symmetric Flux Tubes}
+\label{ch:greensfunc}
+\acresetall
+
+\begin{summary}
+	The effective action for arbitrary, non-homogeneous magnetic backgrounds can be expressed in terms 
+	of Green's functions. In this chapter, I derive the differential equation 
+	for these Green's functions for magnetic flux tubes of arbitrary profiles. This provides a 
+	new tool for thinking about the flux tube effective action and suggests a new numerical 
+	method that might be applied to the problem. 
+	The Green's functions expressions are also useful for examining 
+	field configurations with stationary effective actions. The specific case of step-function 
+	flux tubes is discussed in detail in the Green's function picture.
+\end{summary}
+
+\section{Introduction}
+In chapter \ref{ch:fluxtubes}, we discussed the astrophysical motivations for examining 
+the effective actions of magnetic flux tubes in \ac{QED}. However, computing the fermion 
+determinant for non-homogeneous magnetic fields can be quite involved. For computing magnetic 
+flux tube effective actions, there are only a few methods available in the literature, some 
+of which do not generalize easily to different flux tube profile shapes. These methods are 
+discussed in section \ref{sec:EAisoflux}. Despite the calculational difficulties, 
+the quantum correction to the classical energies of flux tube configurations are potentially 
+significant, and could impact our conclusions about their stability or other properties. 
+It is therefore interesting to explore other methods 
+that might provide new tools for performing the calculation, and new insights into the problem.
+
+In this chapter, I discuss some progress toward such a new method for the magnetic flux tube 
+problem based on expressing the effective action in terms of integrals and sums over 
+Green's functions. Since the Green's functions can be determined numerically, this 
+method suggests a possible new numerical technique for computing effective actions. 
+A Green's function technique has been used to exactly derive the effective action for a family of 
+non-homogeneous magnetic fields in 2+1 dimensions~\cite{PhysRevD.52.R3163} and 3+1 dimensions
+\cite{1998PhLB..419..322D}. The family of fields is given by 
+
+\be
+	\vec{B}(\vec{x}) = B_0 {\rm sech}{^2\left(\frac{x}{\lambda}\right)}\hat{z}.
+\ee
+For fields in this form, the effective action can be expressed as a finite integral. This 
+result is particularly valuable because there are so few field configurations which are 
+exactly solvable for the effective action. So, it provides a good tool for testing our 
+understanding of the derivative expansion and other approximate expressions of the effective 
+action. Presently, we will use the approach used to discover these exact solutions 
+to explore the effective actions of 
+flux tube configurations. 
+
+\section{Effective Action in Arbitrary Fields}
+\label{sec:arbitraryfields}
+
+% The effective-action in the presence of a magnetic field is
+% \be 
+% i \int d^3x \mathcal{L} = {\rm ln ~Det} \{ D_\mu D^\mu + m^2 + \frac{1}{2}e\sigma^{\mu \nu}F^0_{\mu \nu} \}
+% \ee 
+% 
+% where
+% 
+% \be 
+% D_\mu = \partial_\mu + i e A_\mu
+% \ee 
+% and
+% \be 
+% \sigma^{\mu \nu} = \frac{i}{2}[\gamma^\mu,\gamma^\nu]
+% \ee 
+% 
+ We begin with the effective action, equation (\ref{eqn:generalEA}), 
+ in a static, but non-homogeneous magnetic field:
+ 
+ \be
+ \Gamma[A^0_\mu] = \Gamma_0 - \frac{i \hbar}{2} {\rm Tr ~ln} \left[\frac{(p_\mu+eA^0_\mu)^2
+	+\frac{1}{2}e\sigma^{\mu\nu}F^0_{\mu\nu} + m^2}{p^2 +m^2}\right].
+\ee
+Since $A_\mu^0$ is time-independent and $A_0^0$ vanishes for static magnetic 
+fields, we may express the canonical four-momentum in terms of its angular 
+frequency eigenbasis and the canonical three-momentum,
+\ba
+	(p_\mu+eA^0_\mu)^2 &=& p^2 +e(p^\mu A^0_\mu + A^0_\mu p^\mu) + e (A^0)^2 \\
+	& = & -\omega^2 -\vec{\nabla}^2 - ie[(\vec{\nabla}\cdot\vec{A}^0) + 
+	(\vec{A}^0\cdot \vec{\nabla})] -e^2 (A^0)^2 \\
+	& \equiv & -\omega^2 -\vec{\Pi}^2.
+\ea
+Then,
+
+\be 
+\label{eqn:EffAct}
+\Gamma[A^0_\mu] = \Gamma_0 - \frac{i \hbar}{2} {\rm Tr ~ln} \left[\frac{-\omega^2 - \vec{\Pi}^2
+	+\frac{1}{2}e\sigma^{\mu\nu}F^0_{\mu\nu} + m^2}{p^2 +m^2}\right] 
+\ee
+where
+ \be 
+	\sigma^{\mu \nu} = \frac{i}{2}[\gamma^\mu,\gamma^\nu]
+ \ee 
+
+and
+\be 
+	\Gamma_0 = \int d^4x\left(-\frac{1}{4}F^0_{\mu \nu}F^{0~\mu \nu}\right)
+\ee 
+is the classical action.
+
+In order to express the effective action in terms of Green's functions, 
+we make use of the fact that the trace involves an integration over 
+frequency, $\omega$, and integration-by-parts in this integral 
+produces the inverse of the operator:
+\ba
+	\lefteqn{{\rm Tr~ln}\left[-\omega^2-\vec{\Pi}^2+
+	\frac{1}{2}e\sigma^{\mu \nu}F^0_{\mu \nu}+m^2\right]} \nonumber \\
+	& = & \int_{-\infty}^\infty d\omega {\rm Tr}_3 ~{\rm ln}
+	\left[-\omega^2-\vec{\Pi}^2+\frac{1}{2}e\sigma^{\mu \nu}F^0_{\mu \nu}+m^2\right] \\
+	&=& 2\int_{-\infty}^\infty \omega^2 d\omega {\rm Tr}_3 
+	\left[-\omega^2-\vec{\Pi}^2+\frac{1}{2}e\sigma^{\mu \nu}F^0_{\mu \nu}+m^2\right]^{-1} \\
+	& = & \int_{-\infty}^\infty d\omega \int d^3\vec{x} d^3\vec{x}' 
+	G_3(\vec{x},\vec{x}')\delta^{(3)}(\vec{x}-\vec{x}').
+\ea
+
+So, we may express (\ref{eqn:EffAct}) in terms of time-independent 
+Green's functions to evaluate the trace:
+
+\be
+	\Gamma[A^0_\mu] =\Gamma_0 - i\hbar \int^{\infty}_{-\infty}\omega^2d\omega\int d^3\vec{x} 
+		~\left(G_3(\vec{x},\vec{x})-G_3^0(\vec{x},\vec{x})\right),
+\ee
+where $G_3(\vec{x},\vec{x}')$ is defined by the Schr\"{o}dinger-like equation
+
+\be 
+\label{eqn:Greens}
+\left[ -\vec{\Pi}^2 + \frac{1}{2}e\sigma^{\mu \nu}F^0_{\mu \nu} + m^2 
+	-\omega^2\right]G_3(\vec{x},\vec{x}') 
+	= \delta^{(3)}(\vec{x}-\vec{x}').
+\ee 
+$G_3^0(\vec{x},\vec{x}')$ is the Green's function in the absence of external fields (i.e. $A_\mu=0$),
+
+\be 
+\label{eqn:Green0}
+\left[ -\vec{p}^2 + m^2 
+	-\omega^2\right]G^0_3(\vec{x},\vec{x}') 
+	= \delta^{(3)}(\vec{x}-\vec{x}').
+\ee 
+
+\section{Cylindrically Symmetric B-fields}
+
+We now specialize our analysis to the case of a cylindrically symmetric magnetic field, 
+pointing in the \bhattext{z}-direction in cylindrical coordinates, the symmetry relevant 
+to flux tube configurations.
+Making a gauge choice that $A_0 = A_\rho = A_z = 0$, 
+the magnetic field is $\vec{B} = B(\rho)$\bhattext{z} with
+
+\be 
+\label{eqn:Bgf}
+	B(\rho) = \frac{A_\phi(\rho)}{\rho} + \frac{dA_\phi(\rho)}{d\rho}.
+\ee 
+
+
+Using the cylindrical symmetry, the Green's function is a function of the radial 
+coordinate and can be expressed as a sum over the magnetic quantum number, $m_l$, 
+the momentum along the axis of symmetry, $k_z$, the frequency, $\omega$, and 
+the spin projection eigenvalues, $\sigma^3$:
+
+\be
+	G_3(\vec{x},\vec{x}') = \sum_{m_l,k_z,\omega,\sigma^3} G_{m_l,k_z,\omega,\sigma^3}(\rho,\rho').
+\ee
+From equation (\ref{eqn:Greens}), we can write the equation governing each term of the 
+Green's function,
+
+\be 
+\label{eqn:cylGreen}
+\left[ -\frac{d^2}{d\rho^2}  - \frac{1}{\rho}\frac{d}{d\rho}+ \frac{1}{\rho^2}+V_{m_l}(\rho) +k_z^2 +m^2-\omega^2
+	 +\frac{1}{\rho^2}\right]\cylGreen 
+	= \delta(\rho-\rho')
+\ee 
+with the magnetic potential given by
+
+\be 
+V_{m_l}(\rho) = \frac{1}{2}e\sigma^{\mu \nu}F^0_{\mu \nu} +\frac{(m_l^2-1)}{\rho^2} 
+	-\frac{2m_l e}{\rho}\Aphi +e^2 (\Aphi)^2.
+\ee 
+
+The spin-field coupling is proportional to the spin eigenvalue and the magnetic field,
+$\sigma^{\mu \nu}F_{\mu\nu} = 2 \sigma^{1 2}B_z = 
+	2 \sigma ^3\left(\frac{\Aphi}{\rho} +\frac{d\Aphi}{d\rho}\right)$.  So, the 
+potential term is given by
+
+
+%  in a coordinate system with metric 
+% signature ${\rm diag}(-1, 1, \rho^2, 1)$.  Letting Roman characters label the local Lorentz  
+% coordinate system and Greek letters label the Cylindrical coordinates, our tetrads, defined by the equation 
+% $g^{\mu \nu} = e^\mu_a e^\nu_b \eta^{a b}$ are given by
+% 
+% \ba 
+% e^\phi_2  =\rho \nonumber \\
+% e^t_0 = e^\rho_1 =  e^z_3 = 1  \nonumber \\
+% e^\mu_a = 0 ~~{\rm otherwise}
+% \ea 
+% We may now write our gamma matrices in cylindrical coordinates using the relation
+% 
+% \be 
+% \gamma^\mu = e^\mu_a \gamma^a
+% \ee 
+% so that
+% 
+% \ba 
+% \label{eqn:cylgammas}
+% \gamma^\rho = \gamma^1 \nonumber \\
+% \gamma^\phi = \rho \gamma^2 \nonumber \\
+% \gamma^z = \gamma^3
+% \ea where the numerical superscripts refer to standard Minkowski space $\gamma$ matrices.
+% 
+% Using the results (\ref{eqn:cylgammas}), we have
+% 
+% \ba 
+% \label{eqn:sigmaF}
+% \sigma^{\mu \nu}F^0_{\mu \nu} &=& \sigma^{\rho \phi} F^0_{\rho \phi} + 
+% 		\sigma^{\phi \rho } F^0_{\phi \rho} \nonumber \\
+% 	& = & 2 \rho \sigma^{3} \pderiv{\Aphi}{\rho}.
+% \ea  with $\sigma^3$ denoting the spin projection eigenvalue, $+/- 1$ for spin up/down.
+% 
+% Putting equation (\ref{eqn:sigmaF}) into equation (\ref{eqn:GreensCyl}) gives
+
+\be 
+\label{eqn:effPot}
+V_{m_l}(\rho) = e\sigma^{3} \left(\frac{\Aphi}{\rho}  + 
+	\frac{d\Aphi}{d\rho}\right) + \frac{(m_l^2-1)}{\rho^2}+
+	e^2 (\Aphi)^2 - \frac{2e m_l}{\rho} \Aphi.
+\ee 
+$\sigma^3$ is the spin projection eigenvalue $+1/-1$ for spin up/down.
+
+\section{Solution Strategy}
+
+
+
+We will attempt to find the effective action by computing the Green's function, 
+(\ref{eqn:cylGreen}).  This can be done by
+matching the independent solutions of the homogeneous equation,
+
+\be
+\left[ -\frac{d^2}{d\rho^2}  - \frac{1}{\rho}\frac{d}{d\rho}+ \frac{1}{\rho^2}+V_{m_l}(\rho) +k_z^2 +m^2-\omega^2
+	 +\frac{1}{\rho^2}\right]u_{m_l,k_z,\omega,\sigma^3}(\rho) 
+	= 0.
+\ee
+For a given model of the magnetic field (a choice of $\Aphi$), 
+the homogeneous solutions $u_0(\rho)$ and $u_\infty(\rho)$ are regular at $\rho =0$
+and $\rho=\infty$ respectively.  The Wronskian of these solutions is defined as
+
+\be 
+W(\rho) = u'_0(\rho)u_\infty(\rho) - u_0(\rho)u_\infty'(\rho).
+\ee 
+Then, the Green's function which solves (\ref{eqn:cylGreen}) is simply given by
+
+\be 
+G_{\omega,k_z, m_l} (\rho, \rho') = \theta(\rho' - \rho) \frac{\rho u_0(\rho)u_\infty(\rho')}{W_0} + 
+	\theta(\rho-\rho')\frac{\rho u_0(\rho')u_\infty(\rho)}{W_0}
+\ee 
+where
+\be 
+W_0 = \rho W(\rho)
+\ee 
+is constant by Abel's theorem.
+
+\begin{sloppypar}
+We can exactly solve for the Green's function in the 
+absence of fields, $G_{\subscripts}^0(\rho,\rho)$,
+ by noticing that the 
+differential equation is Bessel's equation in the dimensionless 
+coordinate $x=\sqrt{\omega^2-k_z^2 -m^2}\rho$.
+Then, the homogeneous solution that is regular at $\rho=0$, $u_0(\rho)$ is identified 
+with $J_{m_l}(\sqrt{\omega^2-k_z^2-m^2}\rho)$ and the homogeneous solution 
+that is regular at $\rho=\infty$ is identified with $Y_{m_l}(\sqrt{\omega^2-k_z^2-m^2}\rho)$, 
+where $J_n(x)$ and $Y_n(x)$ are Bessel functions of the first and second kind,
+respectively.
+So, we have
+
+\be 
+G_{\subscripts}^0(\rho,\rho) = \frac{\rho}{W^0_0}J_{m_l}(\sqrt{\omega^2-k_z^2-m^2}\rho)
+	Y_{m_l}(\sqrt{\omega^2-k_z^2 -m^2}\rho).
+\ee 
+We can also compute
+$W_0^0$ exactly for the field-free case using the Bessel function identity
+
+\be 
+\label{eqn:BessID}
+J'_n(x)Y_n(x) - J_n(x)Y'_n(x)=-\frac{2}{\pi x}.
+\ee 
+Then,
+\be 
+\label{eqn:BkgGreens}
+G_{\subscripts}^0(\rho,\rho) = -\frac{\pi \rho}{2}J_{m_l}(\sqrt{\omega^2-k_z^2 -m^2}\rho)
+	Y_{m_l}(\sqrt{\omega^2-k_z^2 -m^2}\rho)
+\ee 
+\end{sloppypar}
+We can now write the (unrenormalized) effective action as
+
+\ba 
+	\Gamma &=& \Gamma_0 -i\hbar \sum_{\rm \sigma^3= \{\pm1\}}\sum_{m_l=-\infty}^\infty  
+	 \int_{-\infty}^\infty \omega^2 d\omega dk_z
+	\int_0^{\infty} d\rho \rho (G_{\subscripts}(\rho,\rho) \nonumber \\ 
+	& &~~~~~~- G_{\subscripts}^0(\rho,\rho)) \\
+\label{eqn:soln}
+	&=& \Gamma_0 -i\hbar \sum_{\rm \sigma^3= \{\pm1\}}\sum_{m_l=-\infty}^\infty  
+	\int_{-\infty}^\infty \omega^2 d\omega dk_z
+	\int_0^{\infty} d\rho \rho^2 \biggr(\biggr[\frac{ 
+	u_0(\rho)u_\infty(\rho)}{W_0}\biggr]_{\subscripts} \nonumber \\ 
+	& &~~~~~~~+\frac{\pi}{2}J_{m_l}(\sqrt{\omega^2-k_z^2 -m^2}\rho)
+	Y_{m_l}(\sqrt{\omega^2-k_z^2 -m^2}\rho)\biggr) \nonumber \\
+	&=& \Gamma_0 +\hbar\pi \sum_{\rm \sigma^3= \{\pm1\}}\sum_{m_l=-\infty}^\infty  
+	\int_{0}^\infty \chi^3 d\chi
+	\int_0^{\infty} d\rho \rho^2 \biggr(\biggr[\frac{ 
+	u_0(\rho)u_\infty(\rho)}{W_0}\biggr]_{\csubscripts} \nonumber \\ 
+	& &~~~~~~~+\frac{\pi}{2}J_{m_l}(\sqrt{\chi^2 -m^2}\rho)
+	Y_{m_l}(\sqrt{\chi^2 -m^2}\rho)\biggr).
+\ea 
+The final equality is arrived at by analytically 
+continuing $\omega\to i\omega$ and observing that 
+the value of the integral along a semi-circle which 
+closes the contour is unchanged by the rotation 
+in the complex plane.  
+By Abel's identity, $W_0$ has no dependence on $\rho$.  
+It can come outside of the integral.  In the above equations, we have introduced a sum 
+over the eigenvalues of the operator $\sigma^{1 2} = \frac{i}{2}(\gamma^1 \gamma^2 - \gamma^2 \gamma^1)$.
+So, to account for two pairs of degenerate eigenvalues, 
+we introduce an overall factor of $2$ and sum over $\sigma^3=\{+1,-1\}$.
+
+The $u(\rho)_{\csubscripts}$'s are solutions to the differential equation
+
+\be 
+\label{eqn:chieqn}
+\left(-\frac{d^2}{d\rho^2} - \frac{1}{\rho}\frac{d}{d\rho} + 
+	V_{m_l}(\rho) - \chi^2 + m^2 +\frac{1}{\rho^2}\right)u_{[0,\infty]}(\rho)|_{\chi,m_l,\sigma^3} = 0
+\ee 
+where $[u_0(\rho)]_{\csubscripts}$ and $[u_\infty(\rho)]_{\csubscripts}$ are independent solutions which 
+are regular at $\rho = 0$ and $\rho = \infty$, respectively.
+
+% We may simplify the following numerics by absorbing the $\chi^2-m^2$ 
+% term into an order-0 Bessel function so that
+% 
+% \be 
+% [u_0(\rho)]_{\csubscripts} = J_0(\sqrt{\chi^2-m^2}\rho)[\psi_0(\rho)]_{m_l,\sigma^3}
+% \ee 
+% \be 
+% [u_\infty(\rho)]_{\csubscripts} = Y_0(\sqrt{\chi^2-m^2}\rho)[\psi_\infty(\rho)]_{m_l,\sigma^3}
+% \ee 
+% where the $\psi$ functions satisfy
+% \be 
+% \left[\frac{d^2}{d\rho^2} +\left(\frac{1}{\rho}-
+% 	2\sqrt{\chi^2-m^2}\frac{J_1(\sqrt{\chi^2-m^2}\rho)}{J_0(\sqrt{\chi^2-m^2}\rho)}\right)\frac{d}{d\rho}
+% 	-V_{m_l}(\rho) -\frac{1}{\rho^2}\right]
+% 	[\psi_0(\rho)]_{m_l,\sigma^3}=0
+% \ee 
+% \be 
+% \left[\frac{d^2}{d\rho^2} +\left(\frac{1}{\rho}-
+% 	2\sqrt{\chi^2-m^2}\frac{Y_1(\sqrt{\chi^2-m^2}\rho)}{Y_0(\sqrt{\chi^2-m^2}\rho)}\right)\frac{d}{d\rho}
+% 	-V_{m_l}(\rho) - \frac{1}{\rho^2}\right]
+% 	[\psi_\infty(\rho)]_{m_l,\sigma^3}=0
+% \ee 
+% 
+% The constant $W_0$ can be expressed in terms of the $\psi$ functions
+% \be 
+% W_0=-\frac{2}{\pi}[\psi_0(\rho)\psi_\infty(\rho)]_{m_l,\sigma^3} + \rho W_\psi(\rho)
+% 	J_0(\sqrt{\chi^2-m^2}\rho)Y_0(\sqrt{\chi^2-m^2}\rho)
+% \ee 
+% where $W_\psi$ has the form of a Wronskian, but it should be noted that $\psi_0$ and $\psi_\infty$ 
+% are solutions to different differential equations.
+% \be 
+% W_\psi(\rho) = \psi'_0(\rho)\psi_\infty(\rho) - \psi_0(\rho)\psi'_\infty(\rho).
+% \ee 
+
+% The effective action is an extensive quantity.  Therefore, we divide by the (infinite) spacetime volume to 
+% find the effective vacuum potential.
+% 
+% \be 
+% 	V_{eff}(\Aphi) = \frac{\Gamma}{\pi L_{\rho}^2 \int_{-\infty}^{\infty} d\omega dk_z}
+% \ee 
+% 
+
+Equations (\ref{eqn:soln}) and (\ref{eqn:chieqn}) are the most general form for the 
+effective action in this method. To use these equations for computations, we must know the 
+functions $[u_0(\rho)]_{\csubscripts}$ and $[u_\infty(\rho)]_{\csubscripts}$. Therefore, 
+we can proceed either by choosing a form of the potential, $V_{m_l}(\rho)$, and 
+solving the differential equation analytically, or by computing the required functions 
+numerically for an arbitrary potential. In section \ref{sec:stepfunc}, we will 
+make some analytic progress using a step-function flux tube profile. For either 
+technique, though, we must establish the boundary conditions on these solutions, 
+so we discuss those next.
+
+
+
+\section{Boundary Conditions}
+We would like to choose suitable boundary conditions to numerically 
+compute $[u_0(\rho)]_{\csubscripts}$ and $[u_\infty(\rho)]_{\csubscripts}$.  We begin by 
+considering $\Aphi$ in the form
+
+\be 
+\Aphi = \frac{F}{2\pi \rho}f_\lambda(\rho)
+\ee 
+so that
+\be 
+B_z(\rho)=\frac{F}{2\pi\rho}\frac{df_\lambda(\rho)}{d\rho}.
+\ee 
+The subscript $\lambda$ refers to a length scale that characterizes the size of the flux 
+tube.  In practice, it is inconvenient to discuss the boundary conditions at infinity. So, 
+we will introduce a scale, $L_\rho \gg \lambda$, which is finite but 
+sufficiently far away from the flux tube. 
+The total magnetic flux is
+\be 
+\Phi=F(f_\lambda(L_\rho)-f_\lambda(0)).
+\ee 
+It is convenient to express the flux in units of $\frac{2 \pi}{e}$ and define 
+a dimensionless quantity
+
+\be 
+\mathcal{F}=\frac{e}{2 \pi} F
+\ee 
+Under these definitions, our operator is
+
+\be 
+-\frac{d^2}{d\rho^2} - \frac{1}{\rho}\frac{d}{d\rho} + 
+	\frac{\sigma^3\mathcal{F}}{\rho}f'_\lambda(\rho) +
+	 \frac{1}{\rho^2}\left(m_l -\mathcal{F}f_\lambda(\rho)\right)^2
+	-\left(\chi^2-m^2\right).
+\ee 
+
+If we require that $B_z(\rho)$ remains finite at $\rho \to 0$ and that
+ $\frac{dB_z(\rho)}{d\rho}\biggr|_{\rho=0}=0$, then we can choose without 
+loss of generality that, for small $\rho$, $f_\lambda(\rho) = C_1\rho^2 + C_2\rho^4 +...$ 
+and $f_\lambda(L_\rho) = 1$. Then, the total flux, $\Phi$, is simply $F$, and the 
+field profile near the center is a quadratic with coefficient given by
+
+\be 
+C_1=\frac{eB_z(0)}{2 \mathcal{F}}\equiv\frac{e B_0}{2\mathcal{F}}.
+\ee 
+
+With the above observations, we notice that equation (\ref{eqn:chieqn}) takes the form of 
+Bessel's equation in the asymptotic limits of small and large $\rho$.  
+We use this fact to 
+inform the following boundary conditions:
+
+
+\ba 
+\label{eqn:BCa}
+ u_0(0)|_{\csubscripts} &=& J_{m_l}(0) \\
+ u'_0(0)|_{\csubscripts} &=& \sqrt{\chi^2-m^2-eB_0(\sigma^2-m_l)} J'_{m_l}(0)\nonumber \\
+	&=&\frac{\sqrt{\chi^2-m^2-eB_0(\sigma^3-m_l)}}{2} \nonumber \\
+ 	& & \times(J_{m_l-1}(0)-J_{m_l+1}(0))\\
+ u_\infty(L_{\rho})|_{\csubscripts} &=& Y_n(\sqrt{\chi^2-m^2}L_\rho) \\
+\label{eqn:BCb}
+ u'_\infty(L_{\rho})|_{\csubscripts} &=& \sqrt{\chi^2-m^2-eB_0(\sigma^2-m_l)} Y'_{m_l}(0)\nonumber \\
+	&=&\frac{\sqrt{\chi^2-m^2}}{2}
+  	(Y_{n-1}(\sqrt{\chi^2-m^2}L_\rho) \nonumber \\
+ 	& & -Y_{n+1}(\sqrt{\chi^2-m^2}L_\rho)) \\
+ n&\equiv&m_l-\mathcal{F}.
+\ea 
+
+If we take $F=0$, these boundary conditions reproduce our result for the 
+Green's function in the absence of any fields, equation (\ref{eqn:BkgGreens}).  
+
+% In terms of the $\psi(\rho)$ functions, our boundary conditions are
+% \ba 
+% \label{eqn:BCa}
+%  \psi_0(0)|_{m_l,\sigma^3} &=& \frac{J_{m_l}(0)}{J_0(0)} \\
+%  \psi'_0(0)|_{m_l,\sigma^3} &=& \frac{\sqrt{\chi^2-m^2-eB_0(\sigma^3-m_l)}}{2}
+%  	\frac{J_{m_l-1}(0)-J_{m_l+1}(0)}{J_0(0)}\\
+%  \psi_\infty(L_{\rho})|_{m_l,\sigma^3} &=& 
+% 	\frac{Y_n(\sqrt{\chi^2-m^2}L_\rho)}{Y_0(\sqrt{\chi^2-m^2})} \\
+%  \psi'_\infty(L_{\rho})|_{m_l,\sigma^3} &=& \frac{\sqrt{\chi^2-m^2}}{2} \nonumber \\
+%   	& & \frac{Y_{n-1}(\sqrt{\chi^2-m^2}L_\rho) 
+%  	-Y_{n+1}(\sqrt{\chi^2-m^2}L_\rho)}{Y_0(\sqrt{\chi^2-m^2}L_\rho)} \\
+% \label{eqn:BCb}
+% \ea 
+
+
+
+% We would like to choose suitable boundary conditions to numerically 
+% compute $[u_0(\rho)]_{\subscripts}$ and $[u_\infty(\rho)]_{\subscripts}$.  
+% Consider the limit of asymptotically large $\rho$.  As a consequence of (\ref{eqn:B}),
+% for magnetic fields localized 
+% around finite $\rho$, we must have $\Aphi \rightarrow {\rm const.}$ as $\rho \rightarrow \infty$.
+% Thus, we recover Bessel's equation in this limit, allowing us to define boundary conditions 
+% that guarantee the linear independence of our solutions.
+% 
+% \ba 
+% u_0(\rho=L_{\rho}) &=& J_{m_l}(sL_{\rho}) \\
+% u'_0(\rho=L_{\rho}) &=& J'_{m_l}(sL_{\rho}) \\
+% u_\infty(\rho=L_{\rho}) &=& Y_{m_l}(
+% 	sL_{\rho}) \\
+% u'_\infty(\rho=L_{\rho}) &=& Y'_{m_l}(sL_{\rho}) \\
+% s&\equiv&\sqrt{\omega^2 -k_z^2-m^2  
+%  	+ (eA_\phi(L_\rho))^2}
+% \ea 
+% where $L_\rho$ is chosen relative to a length scale, $\lambda$, characterizing 
+% the flux tube, $\lambda \ll L_\rho$.  Here, we will take $A_\phi(L_\rho)=0$, 
+% which must be true if we are to have finite total flux.
+% 
+% Making use of (\ref{eqn:BessID}) and this particular choice of boundary conditions 
+% we see that 
+% 
+% \be 
+% 	W_0^{-1}=-\frac{\pi}{2}\sqrt{\omega^2 -k_z^2-m^2}
+% \ee 
+% 
+% 
+% Now,
+% \ba 
+% \label{eqn:soln}
+% 	\Gamma&=& \Gamma_0 +\frac{i \hbar \pi}{2} 
+% 	\sum_{\rm \sigma^3= \{\pm1\}}\sum_{m_l=-\infty}^\infty  
+% 	\int_{-\infty}^\infty \omega^2 d\omega dk_z
+% 	\int_0^{L_\rho} d\rho \rho^2 \nonumber \\
+% 	& & \times \sqrt{\omega^2 -k_z^2 -m^2}\biggr(\biggr[ 
+% 	u_0(\rho)u_\infty(\rho)\biggr]_{\subscripts} \nonumber \\ 
+% 	& &- 
+% 	J_{m_l}(\sqrt{\omega^2-k_z^2 -m^2}\rho)
+% 	Y_{m_l}(\sqrt{\omega^2-k_z^2 -m^2}\rho)\biggr)
+% \ea 
+% We may analytically continue $k_z\rightarrow ik_z$ as usual\footnote{The value of the 
+% integral along a semi-circle that closes the contour is non-zero but is the same 
+% before and after the rotation, so we may neglect it.} and 
+% write the resulting integral in polar coordinates in the Wick rotated $\omega$-$k_z$ plane.  
+% Integrating over the angular part leaves
+% \ba 
+% 	\Gamma &=& \Gamma_0 -\frac{\hbar \pi^2}{2} 
+% 	\sum_{\rm \sigma^3= \{\pm1\}}\sum_{m_l=-\infty}^\infty  
+% 	\int_{0}^\infty  d\chi \chi^3
+% 	\int_0^{L_\rho} d\rho \rho^2 \sqrt{\chi^2 -m^2 }\nonumber \\
+% 	& & \times \biggr(\biggr[ 
+% 	\hat{u}_0(\rho)\hat{u}_\infty(\rho)\biggr]_{\chi,m_l,\sigma^3} - 
+% 	J_{m_l}(\sqrt{\chi^2 -m^2}\rho)
+% 	Y_{m_l}(\sqrt{\chi^2 -m^2}\rho)\biggr).
+% \ea 
+% The $\hat{u}(\rho)$'s are solutions to the differential equation
+% 
+% \be 
+% \left(-\frac{d^2}{d\rho^2} - \frac{1}{\rho}\frac{d}{d\rho} + 
+% 	V_{m_l}(\rho) - \chi^2 +\frac{1}{\rho^2}\right)\hat{u}_{[0,\infty]}(\rho)|_{\chi,m_l,\sigma^2} = 0
+% \ee 
+
+From equation (\ref{eqn:soln}), we can compute the effective action given the homogeneous solutions 
+to the Green's function, $u_0(\rho)$ and $u_\infty(\rho)$.
+Equations (\ref{eqn:cylGreen}) and (\ref{eqn:effPot}) define an \ac{ODE} that can be numerically 
+integrated to find the homogeneous solutions given a cylindrically symmetric vector potential $A_\phi(\rho)$
+and suitable boundary conditions, equations (\ref{eqn:BCa}) to (\ref{eqn:BCb}).
+
+\section{Configurations with Stationary Action}
+\label{sec:stationaryEA}
+
+The classical motion of a system is determined by the principle of least action: 
+classical systems follow paths for which the variation of the action is zero. 
+\be 
+\delta \Gamma = 0
+\ee 
+The quantum 
+mechanical explanation for this is well-known. Consider the partition functional 
+of \ac{QED}, equation (\ref{eqn:qedpartition}),
+
+\ba
+\lefteqn{Z[J^\mu, \bar{\eta}, \eta]}\nonumber \\
+  & =&\int \mathcal{D}A_\mu \mathcal{D}\psi \mathcal{D} \bar{\psi}
+  \exp\left( \frac{i}{\hbar}\int d^4x(\mathcal{L} + J^\mu A_\mu + \bar{\eta}\psi
+  +\bar{\psi}\eta)\right).
+  \label{eqn:qedpartition2}
+\ea
+In a classical system, the action in units of $\hbar$ is very large. This means 
+that the functional integral is highly oscillatory and for most field configurations 
+gives a small contribution. Therefore, the main contributions come from critical 
+points where the action is stationary relative to the fields. These critical points 
+are simply the solutions to the classical field equations. This observation is the 
+basis of the stationary phase method in quantum mechanics, which replaces the functional 
+integrals with a sum of integrals over neighbourhoods of stationary action. 
+
+Since the 
+effective action can be thought of as a quantum-correction of the classical action, 
+the principle of least effective action would give us the quantum-corrected 
+equations of motion. The Green's function method allows us to express the 
+effective action in terms of functionals of an arbitrary magnetic field profile.
+So, we take this opportunity to explore the stationary points of the 
+effective action with respect to the flux tube profile shape.
+
+
+In our geometry, the classical action is
+
+\be 
+\Gamma_0=-\int d^4x \frac{B^2}{2} = -\pi \int_{-\infty}^\infty dt dz \int_0^{L_\rho} \rho d\rho
+	B_z(\rho)^2.
+\ee We would like to minimize the effective action with respect to fluctuations 
+of the function $\flr$ and its first derivative $f'_\lambda(\rho)$.  
+Taking the entire action, 
+
+\be 
+\delta \Gamma = \pderiv{\Gamma}{\flr} \delta \flr + \pderiv{\Gamma}{(f'_\lambda(\rho))}\delta f'_\lambda(\rho).
+\ee 
+
+For now, we will neglect the vacuum renormalization terms and reintroduce them at the end of the analysis:
+
+\ba 
+\label{eqn:varActa}
+\delta \Gamma &=& \biggr[\biggr\{-2\pi \int_{-\infty}^\infty dt dz B_z(\rho) + 
+	\hbar \pi \sum_{m_l,\sigma^3} \int_{0}^\infty \chi^3 d\chi W_0^{-1}\nonumber \\
+	& &\left(
+	\pderiv{u_0(\rho)}{f'_\lambda(\rho)}u_\infty(\rho) +u_0(\rho)\pderiv{u_\infty(\rho)}{f'_\lambda(\rho)}
+	\right)\biggr\}\delta \flr \biggr]_{\rho=0}^{L_\rho} \nonumber \\
+	& &+\int_0^{L\rho}d\rho\biggr\{2\pi\int_{-\infty}^\infty dtdz\left(\frac{dB_z(\rho)}{d\rho}\right) 
+	-\hbar \pi\sum_{m_l,\sigma^3} \int_{0}^\infty \chi^3d\chi 
+	 \rho^2 W_0^{-1}\nonumber \\
+	& & \times \biggr[u_\infty(\rho)\left(\pderiv{u_0(\rho)}{\flr} - \pderiv{u'_0(\rho)}
+	{f'_\lambda(\rho)}\right) + u_0(\rho)\left(\pderiv{u_\infty(\rho)}{\flr} - \pderiv{u'_\infty(\rho)}
+	{f'_\lambda(\rho)}\right) \nonumber \\
+	& & -\pderiv{u_0(\rho)}{f'_\lambda(\rho)}u'_\infty(\rho) -
+	 \pderiv{u_\infty(\rho)}{f'_\lambda(\rho)}u'_0(\rho)
+	\biggr]_{\chi, m_l, \sigma^3}\biggr\}\delta\flr = 0.
+\ea 
+
+To compute the functional derivatives of the $u(\rho)$'s, we make use of the chain rule.  Here it is 
+appropriate since functionals can be defined in terms of integrals over composed functions~\cite{greiner1996field}:
+
+\be 
+\frac{\delta u(\rho, [\flr])}{\delta \flr} = \pderiv{u(\rho)}{\rho}\frac{d\rho}{d \flr} = \frac{u'(\rho)}{f'_\lambda(\rho)}.
+\ee 
+
+The surface terms for the classical part vanish straightforwardly.  
+We can impose conservation of flux by fixing the 
+endpoints of the field fluctuations so that $\delta f_\lambda(0)=\delta f_\lambda(L_\rho) =0$.  
+In this case, we can ignore the surface terms in (\ref{eqn:varActa}) to arrive at
+
+
+
+
+\ba 
+\label{eqn:varAct}
+\int_0^{L\rho}d\rho\biggr\{2\pi\int_{-\infty}^\infty dtdz\left(\frac{d B_z(\rho)}{d\rho}\right) 
+	-\frac{\hbar \pi}{2}\sum_{m_l,\sigma^3} \int_{0}^\infty \chi^3d\chi 
+	 \rho^2  W_0^{-1}& &\nonumber \\
+	 \times \biggr[u_\infty(\rho)\left(\frac{u'_0(\rho)}{f'_\lambda(\rho)} - \frac{u''_0(\rho)}
+	{f''_\lambda(\rho)}\right) + u_0(\rho)\left(\frac{u'_\infty(\rho)}{f'_\lambda(\rho)} 
+	- \frac{u''_\infty(\rho)}
+	{f''_\lambda(\rho)}\right) & &\nonumber \\
+	 -2\frac{u'_0(\rho)u'_\infty(\rho)}{f''_\lambda(\rho)}
+	\biggr]_{\chi,m_l,\sigma^3}\delta \flr\biggr\} = 0. & &
+\ea 
+Inside the integral, there are no restrictions on the fluctuations $\delta \flr$
+meaning that the rest of the integrand must vanish on its own:
+
+
+
+\ba 
+\label{eqn:stationary}
+\frac{d B_z(\rho)}{d \rho}
+	-\frac{\hbar}{2\Delta} \int_{0}^\infty \chi^3d\chi 
+	 \rho^2 
+	 \sum_{m_l,\sigma^3}W_0^{-1}\biggr[u_\infty(\rho)\biggr(\frac{u'_0(\rho)}{f'_\lambda(\rho)} 
+	- \frac{u''_0(\rho)}{f''_\lambda(\rho)}\biggr) 
+	& & \nonumber \\
+	+ u_0(\rho)\left(\frac{u'_\infty(\rho)}{f'_\lambda(\rho)} 
+	- \frac{u''_\infty(\rho)}
+	{f''_\lambda(\rho)}\right) 
+	 -2\frac{u'_0(\rho)u'_\infty(\rho)}{f''_\lambda(\rho)}
+	\biggr]_{\chi,m_l,\sigma^3} =0,
+\ea 
+where $\Delta=\int_{-\infty}^{\infty}d\omega \int_{-\infty}^{\infty}dk_z$ is an infinite constant
+arising because the field extends infinitely in time and along the $\hat{z}$-direction.
+
+Finally, we subtract the zero flux 
+equivalents of each of the one-loop terms to ensure that the action 
+remains finite and vanishes with the magnetic field. Thus, we arrive at the 
+ quantum-corrected equations of motion for a magnetic flux tube:
+
+ \ba 
+ \label{eqn:stationaryEffAct}
+ &&\frac{d B_z(\rho)}{d \rho}
+ 	-\frac{\hbar}{2\Delta} \int_{0}^\infty \chi^3d\chi 
+ 	 \rho^2 
+ 	 \sum_{m_l,\sigma^3}\biggr[W_0^{-1}\biggr\{u_\infty(\rho)\biggr(\frac{u'_0(\rho)}{f'_\lambda(\rho)} 
+ 	- \frac{u''_0(\rho)}{f''_\lambda(\rho)}\biggr) 
+ 	 \nonumber \\
+ 	& &+ u_0(\rho)\left(\frac{u'_\infty(\rho)}{f'_\lambda(\rho)} 
+ 	- \frac{u''_\infty(\rho)}
+ 	{f''_\lambda(\rho)}\right) 
+ 	 -2\frac{u'_0(\rho)u'_\infty(\rho)}{f''_\lambda(\rho)}
+ 	\biggr\} \nonumber \\
+ 	& &+\frac{\pi}{2}\biggr\{\BESSO{Y}\biggr(\frac{\sqrt{\chi^2-m^2}\BESSO{J'}}{f'_\lambda(\rho)} \nonumber \\
+ 	& &- \frac{(\chi^2-m^2)\BESSO{J''}}{f''_\lambda(\rho)}\biggr) 
+ 	\nonumber \\
+ 	& & + \BESSO{J}\biggr(\frac{\sqrt{\chi^2-m^2}\BESSO{Y'}}{f'_\lambda(\rho)} \nonumber \\
+ 	& &- \frac{(\chi^2-m^2)\BESSO{Y''}}
+ 	{f''_\lambda(\rho)}\biggr)  \nonumber \\
+ 	& & -2\frac{(\chi^2-m^2)\BESSO{J'}\BESSO{Y'}}{f''_\lambda(\rho)}
+ 	\biggr\}
+ \biggr]_{\chi,m_l,\sigma^3} =0.
+ \ea 
+ This expression is not guaranteed to be finite because it does not yet account for the field-strength 
+ renormalization. It is not clear how this renormalization can be performed for the general case.
+
+% In terms of the $\psi$ fields, this result becomes
+% \ba 
+% & & \frac{d B_z(\rho)}{d \rho}
+% 	-\frac{\hbar}{2\Delta} \sum_{m_l,\sigma^3}\biggr[\int_{0}^\infty \chi^3 
+% 	\frac{J_0(\sqrt{\chi^2-m^2}\rho)Y_0(\sqrt{\chi^2-m^2}\rho)}{W_0} d\chi \biggr]
+% 	 \rho^2 \nonumber \\
+% 	 & &\biggr[\psi_\infty(\rho)\biggr(\frac{\psi'_0(\rho)}{f'_\lambda(\rho)} 
+% 	- \frac{\psi''_0(\rho)}{f''_\lambda(\rho)}\biggr) 
+% 	+ \psi_0(\rho)\left(\frac{\psi'_\infty(\rho)}{f'_\lambda(\rho)} 
+% 	- \frac{\psi''_\infty(\rho)}
+% 	{f''_\lambda(\rho)}\right) \nonumber \\
+% 	 & & -2\frac{\psi'_0(\rho)\psi'_\infty(\rho)}{f''_\lambda(\rho)}
+% 	\biggr]_{m_l,\sigma^3} =0
+% \ea 
+
+Here we see the familiar classical result:  the field which minimizes the classical action is homogeneous 
+($\frac{d B_z(\rho)}{d \rho} =0$ everywhere).  However, the second term arising from the one-loop 
+QED effects suggests that some non-homogeneous field ($\frac{d B_z(\rho)}{d \rho} \ne 0$)
+may be a stationary point of the action for a fixed amount of flux. This equation 
+potentially provides a numerical method for computing the quantum-corrected equations 
+of motion of a cylindrically symmetric magnetic field. However, exploring 
+this equation in more depth is outside the scope of this dissertation.
+ 
+
+%\section{Flux Tube Models}
+
+%The macroscopic properties of superconductors are usually described by 
+%the Landau-Ginzburg effective potential.  In this model, the gauge field 
+%which describes the flux tube at large distances is 
+
+%\be 
+%\Aphi = \frac{1}{e}\left(\frac{1}{\rho} + \frac{C}{\lambda} K_1(\rho/\lambda)\right)
+%\ee where $C$ is an arbitrary constant governing the 
+%magnetic flux and $\lambda$ is the London 
+%penetration length
+
+%\be 
+%\lambda = \sqrt{\frac{m}{4 \pi e^2 n}}.
+%\ee 
+%Here, $n$ is the number density of Cooper pairs in the superconducting medium.
+
+
+%Another model magnetic field profile is the Gaussian flux tube. We have 
+
+%\be 
+%B_z(\rho) = \frac{F}{\pi \lambda^2} \exp{(-(\rho/\lambda)^2)}
+%\ee 
+%A gauge field which gives us this profile is
+
+%\be 
+%\Aphi = \frac{F}{2 \pi \rho}(1-\exp{(-\rho^2/\lambda^2)})
+%\ee 
+%The Gaussian is particularly appealing since the field, $\Aphi$, and its derivatives are finite 
+%as $\rho \to 0$.
+
+%If we wish to have a Step-Function profile, we have 
+
+%\be 
+%B_z(\rho) = \frac{F}{\pi \lambda^2} \theta(\lambda-\rho) =\frac{2 \mathcal{F}}{e\lambda^2}\theta(\lambda-\rho)
+%\ee 
+%A gauge field which gives us this profile is
+
+%\be 
+%\Aphi = \frac{F}{2\pi} \left(\frac{\rho}{\lambda^2}\theta(\lambda-\rho) +
+%	\frac{1}{\rho}\theta(\rho-\lambda)\right)
+%\ee 
+
+%For a flux tube with a solitonic profile, we have 
+
+%\be 
+%B_z(\rho) = \frac{F}{2 \pi cosh^2(\rho/\lambda)}
+%\ee 
+%A gauge field which gives us this profile is
+
+%\be 
+%\Aphi = \frac{F}{2\pi} \left( \lambda \tanh{(\rho/\lambda)}.-\frac{\lambda^2}{\rho}\ln(\cosh{(\rho/\lambda)})\right)
+%\ee 
+
+%A zero flux configuration explicitly accounts for the back-flux and has the desirable property
+%that $\Aphi$ falls faster than $1/\rho$ for large $\rho$.  However, we must replace the 
+%boundary condition at $L_\rho$ with $f_\lambda(L_\rho) = 0$.  An example zero-flux field is
+%\be 
+%\Aphi = \frac{F}{2 \pi} \frac{\rho^3}{e^{(\rho/\lambda)^2}-1}.
+%\ee 
+
+\section{Step-Function Flux Tube}
+\label{sec:stepfunc}
+As an example of how the Green's function method is applied to specific magnetic field 
+profiles, $f_\lambda(\rho)$, we consider a step-function flux tube. The \ac{QED} effective 
+action in this profile has already been computed using other 
+methods than the ones shown here~\cite{1999PhRvD..60j5019B}. In this 
+profile, there is a uniform field in the cylindrical region $\rho < \lambda$, and 
+no field outside of the region:
+\be 
+B_z(\rho) = \frac{F}{\pi \lambda^2} \theta(\lambda-\rho).
+\ee 
+The profile function which gives this field is
+
+\be 
+f_\lambda(\rho)=\frac{\rho^2}{\lambda^2}\theta(\lambda-\rho) + \theta(\rho-\lambda)
+\ee 
+and the potential function is
+
+\ba 
+V_{m_l}(\rho)&=&\frac{m_l^2-1}{\rho^2} + \theta(\lambda-\rho)\frac{\mathcal{F}}{\lambda^2}
+	\left(2(\sigma^3-m_l)+\frac{\mathcal{F}}{\lambda^2}\rho^2\right) \nonumber \\
+	& &+ \theta(\rho-\lambda)\frac{\mathcal{F}}{\rho^2}
+	\left(\mathcal{F}-2m_l\right) -\frac{2\mathcal{F}}{\lambda^2}\delta(\lambda-\rho).
+\ea 
+
+The solutions to equation (\ref{eqn:kchi}) for the inner region ($\rho < \lambda$) of 
+this potential are expressed in terms of 
+Whittaker $M$ and $W$ functions~\cite{slater1960confluent},
+
+\be 
+\label{eqn:Whit1}
+[u_0(\rho)]_{\csubscripts}=\frac{W_{\frac{\lambda^2k^2}{4\mathcal{F}},\frac{m_l}{2}}
+	\left(\frac{\mathcal{F}}{\lambda^2}\rho^2\right)}{\rho}
+\ee 
+
+\be 
+\label{eqn:Whit2}
+[u_\infty(\rho)]_{\csubscripts}=\frac{M_{\frac{\lambda^2k^2}{4\mathcal{F}},\frac{m_l}{2}}
+	\left(\frac{\mathcal{F}}{\lambda^2}\rho^2\right)}{\rho},
+\ee 
+where 
+
+\be
+	\label{eqn:kchi}
+	k^2=\chi^2-m^2-\frac{2\mathcal{F}}{\lambda^2}(\sigma^3-m_l).
+\ee
+The constant $W_0=\rho W(\rho)$ associated with these solutions is~\cite{slater1960confluent}
+
+\be 
+W_0^{-1}=-\frac{\lambda^2}{2\mathcal{F}}\frac{\Gamma\left[\frac{1}{2}\left(m_l+1-\frac{k^2\lambda^2}{2\mathcal{F}}\right)\right]}{\Gamma(1+m_l)}.
+\ee 
+
+The solutions for the exterior region ($\rho > \lambda$) are the Bessel functions,
+\be 
+\label{eqn:u0ext}
+[u_0(\rho)]_{\csubscripts}=J_n(\sqrt{\chi^2-m^2}\rho)
+\ee 
+and
+\be 
+\label{eqn:uinfext}
+[u_\infty(\rho)]_{\csubscripts}=Y_n(\sqrt{\chi^2-m^2}\rho),
+\ee 
+where $n=m_l-\mathcal{F}$.  We note that for large $m_l$ (i.e. $m_l\gg \mathcal{F}$), $n\approx m_l$ and these solutions coincide with the field-free case.
+
+\subsection{Exterior Integral}
+\label{sec:extint}
+
+The homogeneous solutions for the exterior ($\rho > \lambda$) region are 
+given by equations (\ref{eqn:u0ext}) and (\ref{eqn:uinfext}):
+
+\ba 
+	\Gamma^{(1)}_{\rm ext}& =& -\frac{\hbar\pi^2}{2} \sum_{\rm \sigma^3= \{\pm1\}}
+	\sum_{m_l=-\infty}^{\infty}  
+	\int_{0}^\infty \chi^3 d\chi
+	\int_0^{\lambda} d\rho \rho^2 \biggr(\nonumber \\
+	& &~~~~~~~J_{m_l-\mathcal{F}}(\sqrt{\chi^2 -m^2}\rho)
+	Y_{m_l-\mathcal{F}}(\sqrt{\chi^2 -m^2}\rho)\nonumber \\ 
+	& &~~~~~~~-J_{m_l}(\sqrt{\chi^2 -m^2}\rho)
+	Y_{m_l}(\sqrt{\chi^2 -m^2}\rho) \biggr).
+\ea
+This integral is somewhat problematic because it is apparently divergent for large 
+values of $\sqrt{\chi^2-m^2}\rho$. The asymptotic expansions of the Bessel functions 
+for large argument are
+\be
+	J_n(x) \approx \sqrt{\frac{2}{\pi x}} \cos{\left(x-\frac{n\pi}{2}-\frac{\pi}{4}\right)}
+\ee
+and
+\be
+	Y_n(x) \approx \sqrt{\frac{2}{\pi x}} \sin{\left(x-\frac{n\pi}{2}-\frac{\pi}{4}\right)}.
+\ee
+So, in this limit, the integrand for an individual term of the $m_l$ sum results in a 
+divergent integral:
+\ba
+	\lefteqn{J_{m_l-\mathcal{F}}(\sqrt{\chi^2 -m^2}\rho)
+	Y_{m_l-\mathcal{F}}(\sqrt{\chi^2 -m^2}\rho)}\nonumber \\
+	& &-
+	J_{m_l}(\sqrt{\chi^2 -m^2}\rho)
+	Y_{m_l}(\sqrt{\chi^2 -m^2}\rho) \nonumber \\
+	& \approx&\frac{2}{\pi \sqrt{\chi^2-m^2}\rho}\sin{\left(\frac{\pi}{2}\mathcal{F}\right)}
+	\cos{\left(\frac{\pi}{2}(\mathcal{F}-2m_l+1)+2\sqrt{\chi^2-m^2}\rho\right)}.
+\ea
+This seems to be an ultraviolet divergence, but it cannot be easily renormalized 
+by a field-strength renormalization because the dependence on the field 
+strength, $\mathcal{F}$, is not quadratic like the classical term. Nevertheless, 
+since \ac{QED} is a renormalizable theory, the effective action in the exterior 
+region must either be finite, or proportional to the classical action. To make 
+sense of this divergence, we need to consider the entire sum over $m_l$, and 
+not simply the individual terms in isolation.
+
+We note that the exterior integral must be zero when 
+$\mathcal{F}$ is an integer. In this case, the Bessel function order numbers 
+of the first term are shifted 
+by an integer value relative to the second term. But, since the sum is over all integer 
+values of $m_l$, there will still be cancellation in pairs. In other words, for any
+finite integer, $j$,
+\be
+	\sum_{i=-\infty}^{\infty}J_i(x)Y_i(x) = \sum_{i=-\infty}^{\infty}J_{i-j}(x)Y_{i-j}(x).
+\ee
+Physically, integer values of $\mathcal{F}$ correspond to the disappearance of the 
+Aharonov-Bohm effect when the Berry's phase of a closed path is a multiple of $2\pi$. 
+Since our primary motivation is in flux tubes in superconducting materials where 
+$\mathcal{F}$ is naturally quantized to integer values, 
+we will focus on integer values of $\mathcal{F}$ for now, and set this 
+integral to zero. 
+
+The bulk of the effective action density is expected to be 
+in the interior region where the field is, and 
+where all of the classical action density is. However, nonlocal quantum effects can
+cause diffusion of the effective action density to regions where 
+no classical field exists~\cite{Gies:2001zp}. So, there may be interesting 
+physical content within this integral.
+Nevertheless, evaluating this integral for non-integer values of $\mathcal{F}$ is 
+left for future research.
+
+\subsection{Interior Integral}
+
+Here, we consider the integral for the interior ($\rho < \lambda$) region.  
+The Whittaker functions in equations (\ref{eqn:Whit1}) and (\ref{eqn:Whit2}) obey the differential
+equation
+
+\be 
+\frac{d^2 W(\rho)}{d\rho^2} - \frac{1}{\rho}\frac{dW(\rho)}{d\rho} +\left[
+	k^2+\frac{(1-m_l^2)}{\rho^2}-\rho^2\left(\frac{\mathcal{F}}{\lambda^2}\right)^2\right]W(\rho)=0.
+\ee 
+In exploring the asymptotics of the solutions, it is interesting to write this equation in 
+canonical form
+
+\be 
+\label{eqn:canonical}
+y''(\rho) +\left[k^2+\frac{1/4-m_l^2}{\rho^2} -\rho^2\left(\frac{\mathcal{F}}{\lambda^2}\right)^2 \right]y(\rho)=0,
+\ee 
+with $W(\rho)=\sqrt{\rho}y(\rho)$.
+
+We may neglect the contribution from negative values of $m_l$ since for negative integer values of $n$~\cite{slater1960confluent},
+
+\be 
+	\frac{W_{k,\frac{n}{2} }(x) M_{k,\frac{n}{2}}(x)}{\Gamma(1+n)} = 0.
+\ee 
+For large values of $m_l$ ($m_l \gg \mathcal{F}$), the Whittaker functions correspond to Bessel 
+functions and there is cancellation between them and the background terms.  So, we may compute the 
+interior integral to arbitrary precision by summing a finite number of positive-$m_l$ terms.
+
+\subsubsection{Field-Strength Renormalization}
+
+There is an ultraviolet divergence for large values of $\chi$ which may be subtracted using a 
+field-strength renormalization.  To see this, we consider the differential equation, (\ref{eqn:canonical}), 
+in the limit of asymptotically large $k$ using the WKB approximation.  Our asymptotic $u(\rho)$ functions 
+in this approximation are
+
+\be 
+\label{eqn:WKBu0}
+[u_0(\rho)]_{k,m_l,\sigma^3} \approx \frac{1}{\sqrt{\rho}}\cos\left\{k\rho-\frac{1}{2k\rho}\left[(1/4-m_l^2) +
+	\frac{\rho^4}{3}\left(\frac{\mathcal{F}}{\lambda^2}\right)^2\right]\right\}
+\ee 
+and
+\be 
+\label{eqn:WKBui}
+[u_\infty(\rho)]_{k,m_l,\sigma^3} \approx \frac{1}{\sqrt{\rho}}\sin\left\{k\rho-\frac{1}{2k\rho}\left[(1/4-m_l^2) +
+	\frac{\rho^4}{3}\left(\frac{\mathcal{F}}{\lambda^2}\right)^2\right]\right\}.
+\ee 
+
+The relevant constant for these solutions is $W_0=\rho W[u_0(\rho),u_\infty(\rho)]$, where
+
+\be 
+\label{eqn:WKBW0}
+W_0\approx k+\frac{(1/4-m_l^2)}{2k\rho^2}-\frac{\rho^2}{2k}
+	\left(\frac{\mathcal{F}}{\lambda^2}\right)^2.
+\ee 
+Taking equations (\ref{eqn:WKBu0}), (\ref{eqn:WKBui}), and 
+(\ref{eqn:WKBW0}), and expanding in powers of $\frac{1}{k\rho}$ gives
+\ba 
+\lefteqn{\left[\frac{u_0(\rho)u_\infty(\rho)}{W_0}\right]_{k,m_l,\sigma^3} \approx
+	\frac{\sin{(k\rho)}\cos{(k\rho)}}{k\rho}}\nonumber \\
+	& &-\frac{1}{2(k\rho)^2}
+	\left[(1/4-m_l^2)+\frac{1}{3}\left(\frac{\rho^2\mathcal{F}}{\lambda^2}\right)^2\right]\cos{(2k\rho)} \nonumber \\
+	& & -\frac{(1/4-m_l^2)}{2(k\rho)^3}\sin{(k\rho)}\cos{(k\rho)} \nonumber \\
+	& &+\frac{1}{2(k\rho)^3}\left(\frac{\rho^2\mathcal{F}}{\lambda^2}\right)^2\sin{(k\rho)}\cos{(k\rho)} \nonumber \\
+	& & +\frac{1}{4(k\rho)^4}\left[(1/4-m_l^2)+\frac{1}{3}\left(\frac{\rho^2\mathcal{F}}{\lambda^2}\right)^2\right] \nonumber \\
+	& &\times \left[(1/4-m_l^2)-\left(\frac{\rho^2\mathcal{F}} {\lambda^2}\right)^2\right]\cos{(2k\rho)} \\
+	\label{eqn:infcn}
+	\lefteqn{\approx \left[\frac{u_0(\rho)u_\infty(\rho)}{W_0}\right]_{k,m_l,\sigma^3} 
+	\biggr|_{\mathcal{F}=0} }\nonumber\\
+	 & &-\frac{1}{6(k\rho)^2}\left(\frac{\rho^2\mathcal{F}}
+	 {\lambda^2}\right)^2\cos{(2k\rho)}\nonumber \\
+	 & & +\frac{1}{2(k\rho)^3}
+	\left(\frac{\rho^2\mathcal{F}}
+	 {\lambda^2}\right)^2\sin{(k\rho)}\cos{(k\rho)} \nonumber \\
+	 & & -\frac{1}{6(k\rho)^4}\left(\frac{\rho^2\mathcal{F}}
+	 {\lambda^2}\right)^2\biggr[(1/4-m_l^2)  -	\left(\frac{\rho^2\mathcal{F}}
+	 {\lambda^2}\right)^2\biggr]\cos{(2k\rho)}.
+\ea 
+
+
+The subtraction of the background field corresponds to cancellation of the first term in 
+equation (\ref{eqn:infcn}).  The remaining terms represent ultraviolet divergences proportional 
+to $\left(\frac{\mathcal{F}}{\lambda^2}\right)^2$.  These terms may be subtracted out from the integral
+ by a field-strength renormalization.
+
+The renormalized contribution to the effective action from the interior region is, then
+
+%\ba 
+%	\label{eqn:gfee}
+%	\Gamma^{(1)}_{\rm int}& =& -\hbar\pi \sum_{\rm \sigma^3= \{\pm1\}}\sum_{m_l=0}^{m_l\gg\mathcal{F}}  
+%	\int_{0}^\infty \chi^3 d\chi
+%	\int_0^{\lambda} d\rho \rho^2 \biggr(
+%	\frac{\lambda^2}{2\mathcal{F}}\nonumber \\
+%	& &\frac{\Gamma\left(\frac{1}{2}\left(m_l+1-\frac{k^2\lambda^2}{2\mathcal{F}}\right)\right)}
+%		{m_l!} 
+%	W_{\frac{\lambda^2k^2}{4\mathcal{F}},\frac{m_l}{2}}
+%	\left(\frac{\mathcal{F}}{\lambda^2}\rho^2\right) 
+%	M_{\frac{\lambda^2k^2}{4\mathcal{F}},\frac{m_l}{2}}
+%	\left(\frac{\mathcal{F}}{\lambda^2}\rho^2\right)\nonumber \\ 
+%	& &~~~~~~~-\frac{\pi}{2}J_{m_l}(\sqrt{\chi^2 -m^2}\rho)
+%	Y_{m_l}(\sqrt{\chi^2 -m^2}\rho)\nonumber \\
+%	& & +\left(\frac{\mathcal{F}}{\lambda^2}\right)^2
+%	\biggr[ \frac{\rho^3}{k^2} \sin(\Theta_{m_l,k}(\rho))
+%	\cos(\Theta_{m_l,k}(\rho))+\nonumber \\
+%	& &\frac{\rho^2}{6k^3}\cos(2\Theta_{m_l,k}(\rho))\biggr]\biggr).
+%\ea 
+
+\ba 
+	\label{eqn:gfee}
+	\Gamma^{(1)}_{\rm int}& =& -\hbar\pi \sum_{\rm \sigma^3= \{\pm1\}}\sum_{m_l=0}^{m_l\gg\mathcal{F}}  
+	\int_{0}^\infty \chi^3 d\chi
+	\int_0^{\lambda} d\rho \rho^2 \biggr(
+	\frac{\lambda^2}{2\mathcal{F}}\nonumber \\
+	& &\frac{\Gamma\left(\frac{1}{2}\left(m_l+1-\frac{k^2\lambda^2}{2\mathcal{F}}\right)\right)}
+		{m_l!} 
+	W_{\frac{\lambda^2k^2}{4\mathcal{F}},\frac{m_l}{2}}
+	\left(\frac{\mathcal{F}}{\lambda^2}\rho^2\right) 
+	M_{\frac{\lambda^2k^2}{4\mathcal{F}},\frac{m_l}{2}}
+	\left(\frac{\mathcal{F}}{\lambda^2}\rho^2\right)\nonumber \\ 
+	& &~~~~~~~-\frac{\pi}{2}J_{m_l}(\sqrt{\chi^2 -m^2}\rho)
+	Y_{m_l}(\sqrt{\chi^2 -m^2}\rho)\nonumber \\
+	& & +\left(\frac{\mathcal{F}}{\lambda^2}\right)^2
+	\biggr[ \frac{\rho^3}{2k^2} \sin(\Theta_{m_l,k}(\rho))
+	+\frac{\rho^2}{6k^3}\cos(\Theta_{m_l,k}(\rho))\biggr]\biggr),
+\ea 
+where $\Theta_{m_l,k}(\rho)\equiv 2k\rho -\frac{(1/4-m_l^2)}{k\rho}$ and $k$ is given 
+in terms of the relevant integration and summation parameters by 
+equation (\ref{eqn:kchi}).
+
+
+
+\section{Discussion}
+Equation (\ref{eqn:gfee}) is a renormalized expression of the 1-loop correction term to the effective 
+action for a step-function flux tube in terms of finite integrals and sums over finitely many terms. 
+So, it is straightforward to implement a numerical algorithm for computing the effective action using 
+this expression. However,  the integrand is polluted by numerous poles
+which make the computations time consuming. For this reason, it is more practical to approach the problem 
+using other numerical methods such as those presented in chapter \ref{ch:WLNumerics}. 
+Moreover, the effective action for the step function flux tube profile 
+has been computed before, arguably in a simpler way~\cite{1999PhRvD..60j5019B}. 
+Establishing if the method discussed here produces the same results as 
+previous methods is an important next step along this research path.
+Nevertheless, the Green's function 
+method described in this chapter has proved useful for 
+establishing an expression for non-homogeneous 
+configurations with stationary effective action, equation 
+(\ref{eqn:stationaryEffAct}). Additionally, it may 
+prove useful in future research since it is a technique which 
+can be applied to arbitrary flux tube 
+profiles, and doesn't have the precision limitations of Monte Carlo 
+techniques. One could also imagine that 
+a clever choice of potential might lead to considerable analytic 
+progress. For example, some 
+potential function 
+may result in functions $u_0(\rho)$ and $u_\infty(\rho)$ for 
+which the integrals can be evaluated.
+
+One obstacle with the approach outlined in this chapter is in performing 
+the field-strength renormalization in general. In section \ref{sec:extint}, we 
+observed that the renormalization proceedure could not be performed on individual 
+terms alone, but rather needed to account for the entire angular momentum summation.
+This poses certain technical problems that were not addressed here. However, previous 
+research applying a WKB phase shift method to fermion determinants in non-homogeneous 
+background fields has produced a renormalization scheme which may be generalized to 
+the background fields discussed in this chapter~\cite{2004PhLB..600..302D}. 
+There are therefore promising prospects in addressing the field-strength renormalization 
+in this method by proceeding analogously with the WKB phase shift method.
+
+Perhaps the most interesting result from this section is that 
+the Green's function method may provide 
+a way to numerically compute the
+quantum corrected equations of motion for external 
+electromagnetic fields. Making further progress on studying 
+equation (\ref{eqn:stationaryEffAct}) may therefore be a
+particularly interesting direction for future research.
