@@ -1,0 +1,566 @@
+\chapter{Magnetic Flux Tubes}
+\label{ch:fluxtubes}
+\acresetall
+
+
+\begin{summary}
+This chapter serves as an introduction to the work presented in chapters 
+\ref{ch:greensfunc} through \ref{ch:periodic}.  Neutron stars have a crust made 
+of dense nuclear material which is generally expected to be in a type-II superconducting state. 
+We therefore expect the intense magnetic fields in the crust of a neutron star 
+to form a lattice of individual flux tubes. This provides the primary motivation for the 
+following chapters which study magnetic flux tubes in \ac{QED}. In this chapter we will 
+review some of the basic properties of the dense nuclear material of neutron stars that 
+may result in the formation of a flux tube lattice.
+\end{summary}
+
+
+
+\section{Introduction}
+In this part, we will explore the \ac{QED} effective action 
+in cylindrically symmetric, extended tubes of magnetic flux.
+These configurations may be called 
+flux tubes, strings, or vortices, depending on the context.  
+Flux tubes are of interest in astrophysics 
+because they describe magnetic structures near stars and planets, 
+cosmic strings~\cite{vilenkin2000cosmic}, and vortices in the superconducting core of neutron stars
+\cite{2006pfsb.book..135S, schmitt2010dense}.
+Outside of astrophysics, magnetic vortex systems are at the forefront of research in condensed 
+matter physics for the role they play in superconducting systems and in \ac{QCD} research 
+for their relation to center vortices, a gluonic configuration analogous to magnetic vortices 
+which is believed to be important to quark confinement~\cite{tHooft19781, 2003PrPNP..51....1G}.  
+In this part of the dissertation, we will primarily discuss the 
+roles played by magnetic flux tubes in neutron star cores. 
+
+Our motivation for discussing flux tubes comes from the fact that 
+superconductivity is predicted in the nuclear matter of neutron stars
+and that some superconducting materials produce a lattice of flux tubes 
+when placed in an external magnetic field. Superconductivity is a macroscopic 
+quantum state of a fluid of fermions that, most notably,
+allows for the resistanceless conduction of charge. In 1933, 
+Meissner and Ochsenfeld observed that magnetic fields are repelled 
+from superconducting materials~\cite{meisner33}. 
+In 1935, F. and H. London described the Meissner effect in terms of 
+a minimization of the free energy of the superconducting current~\cite{london35}.
+Then, in 1957, by studying the superconducting 
+electromagnetic equations of motion in cylindrical coordinates, 
+Abrikosov predicted the possible existence of line defects in superconductors 
+which can carry quantized magnetic flux through the superconducting material
+\cite{abrikosov57}. 
+
+A more complete microscopic description of superconducting materials is given by 
+BCS (Bardeen, Cooper, and Schrieffer) theory~\cite{PhysRev.108.1175}. 
+However, detailed discussions 
+are outside the scope of this chapter. Instead, I will simply outline the main 
+features of superconductivity that motivate the study of flux tubes in neutron 
+stars. Interested readers may pursue more thorough reviews of superconductivity 
+and superfluidity in neutron stars~\cite{2006pfsb.book..135S, schmitt2010dense}.
+
+\section{Superconductivity}
+
+
+To see how superconductivity is possible, 
+consider fermions at zero temperature with chemical potential, $\mu$. The
+free energy of this system is 
+\be
+	\Omega = E - \mu N.
+\ee
+For non-interacting fermions, we could add fermions at the Fermi surface 
+without changing the free energy, since the first and second terms would 
+change by the same amount. If, instead, the fermions are interacting, 
+the binding energy between the fermions means that the free energy can 
+be reduced by adding fermions. So, if there is an attractive interaction 
+between the fermions, then there is a new ground state of the fermion fluid
+where pairs of fermions are created at the Fermi surface. These pairs of 
+fermions are called Cooper pairs and (since a pair of fermions can be viewed 
+as a boson) they form a Bose condensate.
+
+The particles in a Cooper pair do not form a bound state, but they are interacting 
+through attractive forces, so there is an energy $\Delta$ associated with 
+separating them. The consequence of this is that there is an energy gap in 
+the dispersion relation for the Cooper pair:
+
+\be
+	\epsilon_k = \sqrt{(\sqrt{k^2+m^2} - \mu)^2 + \Delta^2}.
+\ee
+This energy gap means that a finite amount of energy is required to 
+excite a single electron state, even near the Fermi surface. 
+An amazing consequence of this is that particles flowing through 
+the Bose condensate cannot scatter inelastically 
+from the phonons because 
+fermions cannot be excited at low energies. For neutral fermions, 
+such as neutrons, this can give rise to superfluidity, characterized by 
+frictionless flows. If the fermions forming 
+the cooper pairs are charge carriers such as protons or electrons, 
+this effect gives rise to superconductivity, characterized by the 
+resistanceless conduction of charge. 
+
+\section{Energy Interpretation of the \texorpdfstring{\acs{QED}}{QED} Effective Action}
+
+In section \ref{sec:qedea}, I argued that $E[J^\mu, \bar{\eta},\eta]$ was the 
+vacuum energy associated with the external source. Thus, equation (\ref{eqn:LegendreTrans})
+implies that the effective action is closely related to the vacuum energy of a 
+classical field configuration. Importantly, the effective action 
+can be thought of as the additive inverse of the energy. 
+Since this idea is important for understanding 
+the free energy associated with a magnetic flux tube, I will make the relationships 
+between the Hamiltonian expectation value, $E[J^\mu, \bar{\eta},\eta]$, 
+and $\Gamma[A^0_\mu, \bar{\psi}^0, \psi^0]$ clear and explicit
+\footnote{This section follows section 16.3 of Weinberg~\cite{weinberg1966quantum}.}.
+
+To study the vacuum energy of a static electromagnetic field, we would like to 
+minimize the expectation value of the Hamiltonian, 
+\be
+	\mean{H}_\Omega = \bra{\Omega}H\ket{\Omega},
+\ee
+under the constraint that the vacuum expectation value of the quantum gauge 
+field is the classical field,
+\be
+	\bra{\Omega}A_\mu(\vec{x})\ket{\Omega} = A_\mu^0(\vec{x}).
+\ee
+We assume that the classical fields, $\bar{\psi}^0$ and $\psi^0$, vanish.
+Using the method of Lagrange multipliers, the function which we would like to 
+minimize is:
+\be
+	\mean{H}_\Omega - \alpha\braket{\Omega}{\Omega}
+	-\int d^3x \beta^\mu(\vec{x})\bra{\Omega}A_\mu(\vec{x})\ket{\Omega}.
+\ee
+So, we find that we must satisfy
+\be
+	\label{eqn:Hmin}
+	H\ket{\Omega} = \alpha\ket{\Omega} + \int d^3x 
+	\beta^\mu(\vec{x}) A_\mu(\vec{x}) \ket{\Omega}.
+\ee
+This can be done if the Lagrange multipliers 
+$\alpha$ and $\beta^\mu(\vec{x})$ are functionals of $A_\mu^0(\vec{x})$.
+
+Let $\ket{\Psi}_{J^\mu}$ be normalized eigenvectors of the Hamiltonian in the presence of 
+external source $J^\mu$. The energy eigenvalue equation is 
+
+\be
+	\left[H-\int d^3x\left(J^\mu A_\mu + \bar{\eta}\psi + \bar{\psi}\eta\right)\right]
+	\ket{\Psi}_{J^\mu} = \frac{E[J^\mu,\bar{\eta},\eta]}{\mathcal{T}}\ket{\Psi}_{J^\mu},
+\ee
+where $\mathcal{T}$ is the time extent of the functional integration.
+If we turn on the external source $J^{0,\mu}$ adiabatically to put the vacuum into the 
+energy eigenstate $\ket{\Psi}_{J^{0,\mu}}$, then equation (\ref{eqn:Hmin}) is satisfied by 
+taking 
+\be
+	\ket{\Omega} = \ket{\Psi}_{J^{0,\mu}},
+\ee
+\be
+	\alpha = E[J^{0, \mu}, 0, 0],
+\ee
+and
+\be
+	\beta_\mu(\vec{x}) = J_\mu^0(\vec{x}).
+\ee
+Under these substitutions, equation (\ref{eqn:Hmin}) provides an expression for the 
+vacuum expectation value for the Hamiltonian in the external field in terms of the 
+external fields and currents.
+\be
+	\mean{H}_{A_\mu^0} = \frac{E[J_\mu^0,0,0]}{\mathcal{T}} + \frac{\int d^4x J_\mu^0A^{0,\mu}}{\mathcal{T}}
+\ee
+The above equation is related simply to the definition of the effective action 
+as a Legendre transformation of the energy
+\be
+	\tag{\ref{eqn:LegendreTrans}}
+	\Gamma[A_\mu^0, \bar{\psi}^0, \psi^0] = -E[J^\mu, \bar{\eta},\eta]
+	-\int d^4 y (J^\mu(y)A_\mu^0(y) + \bar{\eta}(y)\psi^0(y) +\bar{\psi}^0(y)\eta(y)).
+\ee
+So, we arrive at the relationship between the expectation value of the 
+Hamiltonian in the external field and the effective action.
+\be
+	\mean{H}_{A_\mu^0} = -\frac{1}{\mathcal{T}} \Gamma[A_\mu^0]
+\ee
+Because the energy is extensive, the most interesting quantity for magnetic 
+flux tube configurations is the total energy per unit length.
+\be
+	\frac{\mean{H}_{A_\mu^0}}{L_z} = -\frac{\Gamma[A_\mu^0]}{L_z \mathcal{T}}
+\ee
+Thus, we have explicitly confirmed the expectation that the negative effective 
+action is related to the total vacuum energy of a specific field configuration.
+
+\section{Flux Tube Free Energy}
+
+Many of the basic properties of flux tubes in superconductors can 
+be understood by examining the free energy in Ginzberg-Landau theory.
+The Ginzberg-Landau free energy is given by
+
+
+\ba
+	\label{eqn:GLFE}
+	E &=& \int d^2 x \biggr\{\frac{1}{2m}\biggr|\left(\vec{\nabla }
+		- iq\vec{A}(\vec{x})\right)\psi(\vec{x})\biggr|^2 \nonumber \\
+	 & & - \mu | \psi(\vec{x}) |^2+\frac{a}{2}| \psi(\vec{x}) |^4 
+	 + \frac{1}{8\pi}(\vec{\nabla} \times \vec{A} (\vec{x}))^2\biggr\},	
+\ea
+where $\psi(\vec{x})$ is a complex order field such that the 
+density of superconducting fermions is proportional to $|\psi|^2$, $\mu$ 
+is the chemical potential and $a$ is related to the scattering length. 
+The first term represents the dynamical energy of fluctuations of the 
+order field. The next two terms represent the potential energy 
+of the order field. The final term is the familiar energy of the 
+classical magnetic field.
+
+Incorporating the 1-loop effects from \ac{QED}, the classical term 
+must be replaced with the energy of the field, 
+$E_{\rm 1-loop} = -\frac{\Gamma[A_\mu^0]}{L_z\mathcal{T}}$.
+\ba
+	E &=& \int d^2 x \biggr\{\frac{1}{2m}\left|\left(\vec{\nabla }
+		- iq\vec{A}(\vec{x})\right)\psi(\vec{x})\right|^2 \nonumber \\
+	 & & - \mu|\psi(\vec{x})| ^2+\frac{a}{2}|\psi(\vec{x})|^4 
+	 \biggr\} -\frac{\Gamma[A_\mu^0]}{\mathcal{T}}.	
+\ea
+This addition can be viewed as a correction to the classical 
+magnetic field energy in the Ginzburg-Landau free energy.
+Many important behaviours of superconductors are determined 
+by minimizing the free energy. The technique discussed in section 
+\ref{sec:stationaryEA} may lead to a way to perform
+this minimization while including 1-loop \ac{QED} effects.
+
+The Ginzburg-Landau free energy plays an important role in 
+determining the difference between type-I and type-II superconductors.
+For example, the free energy of a pair of flux tubes will contain 
+terms characterizing the energy of each flux tube, but also 
+cross terms arising from the interaction between these flux tubes.
+The sign of this interaction energy determines if the flux tubes 
+will repel each other and form a lattice, or attract each other and collapse.
+In the classical case, when the fields are separated spatially, there 
+is no interaction energy arising from the last term in equation (\ref{eqn:GLFE}).
+However, when the 1-loop \ac{QED} effects are taken into account, the 
+non-local effects arising due to a nearby flux tube make a contribution 
+to the free energy~\cite{Langfeld:2002vy}. 
+
+\subsection{Meissner Effect}
+
+The free energy in a superconductor is minimized if the magnetic 
+field obeys its equation of motion, the London equation,
+
+\be
+	\vec{\nabla} \times \vec{\nabla} \times \vec{B}(\vec{x})
+	= - \lambda_L^2\vec{B}(\vec{x}),
+\ee
+where $\lambda_L$ is called the London penetration depth,
+which is defined as
+\be
+	\label{eqn:LondonPD}
+	\lambda_L = \sqrt{\frac{2m_f c^2}{4\pi (2 q_f)^2 n_0}}
+\ee
+where $m_f$ and $q_f$ are the fermion mass and charge, 
+respectively, and $n_0$ is the fermion density.
+
+The solution to this equation implies that magnetic 
+fields are repelled exponentially from the surface
+of the superconductor.
+
+\be
+	B(x) = e^{-\frac{x}{\lambda_L}}
+\ee
+
+
+Superconducting regions of a material must repel magnetic 
+fields according to this Meissner effect. However, there 
+can be a large free energy cost to expelling field lines 
+around a superconducting region. For some materials, it 
+is therefore energetically favourable to allow magnetic field 
+lines to penetrate the material through a non-superconducting 
+core. When this occurs, tubes of magnetic flux are 
+permitted in the material.
+
+\subsection{Interaction Energy Between Vortices}
+
+
+The interaction energy between two vortices, and therefore 
+the force between them, can be found by examining the 
+free energy of a two vortex system and subtracting off 
+the energy expected from each individual flux tube~\cite{PhysRevB.3.3821}.
+The interaction energy is then given by the remaining cross terms
+
+\be
+	E_{\rm int} = \int d^2 x \left(J_1^\mu A_\mu^2 - \rho_1 \psi_2\right)
+\ee
+where $\psi_i$ and $A_\mu^i$ are the fields induced by sources 
+$\rho_i$ and $J_i^\mu$~\cite{Speight_staticintervortex}.
+
+In a superconductor, these two terms tend to oppose one 
+another. Two neighbouring vortices 
+have charged fermion currents in opposite directions 
+and are repelled from each other. However, there 
+is also an attractive force due to a free energy associated 
+with defects in the superconductor which can be reduced 
+if two vortices are combined~\cite{PhysRevB.3.3821}. 
+So, the vortices can be 
+either attractive or repulsive depending on the relative 
+sizes of these terms.
+
+
+This leads to two different behaviours for superconductors 
+in the presence of magnetic fields. The behaviour is 
+naively determined by the Ginzburg-Landau parameter,
+
+\be
+	\label{eqn:GLparam}
+	\kappa = \frac{\lambda_L}{\xi}.
+\ee
+
+The coherence length, $\xi$, is the length scale associated with density variations of superconducting fermions. This
+length scale is given in terms of $a$ in the Ginzburg-Landau theory (see equation (\ref{eqn:GLFE})), 
+or in terms of the energy gap, $\Delta$, and the velocity of Cooper pairs, $v_f$ in BCS theory. 
+\ba
+	\xi &=& \sqrt \frac{\hbar^2}{4 m_f |a|} \\
+	 &=& \frac{2 \hbar v_f}{\pi \Delta}
+\ea
+When $\kappa > \frac{1}{\sqrt{2}}$, the vortices will 
+repel, and when $\kappa < \frac{1}{\sqrt{2}}$, the vortices 
+will attract. Of course, this analysis has assumed that 
+the free energy has been completely accounted for by 
+the standard analysis. If there are additional 
+considerations in the interaction energy, they will 
+influence the properties of the superconducting material.
+Previously, the effects of an asymmetry in the scattering 
+length between neutron and proton cooper 
+pairs~\cite{2004PhRvL..92o1102B},  and the 
+effects of currents transported along vortices~\cite{2007PhRvC..76a5801C} have been 
+suggested as mechanisms for making a type-II superconductor 
+behave like a type-I superconductor. Friction between superconducting and 
+normal fluid domains in a type-I proton superfluid 
+causes a dissipation which is consistent with precession~\cite{2005PhRvD..71h3003S}.
+Thus, a major motivation 
+for studying the \ac{QED} contribution to the free energy 
+of flux tubes, is to learn how this contribution may affect their 
+interaction energies and the rotational dynamics of neutron stars.
+
+If $\kappa$ is large, meaning the vortices repel, 
+the superconductor can be in a so-called mixed state where the 
+vortices will form a triangular Abrikosov lattice
+with each vortex carrying a single quanta of flux~\cite{abrikosov57}. 
+The superconductors where this happens allow partial 
+penetration of the magnetic field and are called 
+type-II superconductors. However, this mixed state only occurs for 
+magnetic fields strong enough to form vortices, but not so strong that they 
+destroy superconductivity. If $\kappa$ is small, 
+the vortices will attract each other and annihilate. 
+When this happens, the superconductor does not allow 
+magnetic flux to penetrate the material and is called 
+a type-I superconductor.
+
+\begin{figure}[h]
+	\centering
+		\includegraphics[width=8.5cm]{images/hexlatticegs.eps}
+                \caption[Hexagonal lattice]
+				{In type-II superconductors, flux tubes 
+				form an Abrikosov lattice. The geometry is 
+				shown in the diagram above where each 
+				hexagonal space can be imagined as containing 
+				a flux tube at its centre}
+	\label{fig:hexlatticegs}
+\end{figure}
+
+In this section, I have argued that without the electromagnetic 
+forces, the vortices in a superconductor will experience an 
+attractive force. Naively, this suggests that superfluids 
+should be type-I since they lack a coupling to the gauge fields.
+This contrasts with the experimental observation that 
+superfluids are type-II. The subtlety here is that the 
+nature of the self-interaction of the order field is different 
+in the absence of gauge fields, and is always repulsive for 
+superfluids. We can understand a superconductor as the $q_e \to 0$
+limit of a superfluid. In this limit, the London penetration depth, equation 
+(\ref{eqn:LondonPD}), becomes infinite and so does the Ginzburg-Landau
+parameter, equation (\ref{eqn:GLparam}).
+\be
+	\lim_{q_e\to0}\kappa = \lim_{q_e\to 0}\frac{\lambda_L}{\xi} 
+	\sim \lim_{q_e\to0}\frac{1}{q_e} = \infty
+\ee
+So, we predict type-II behaviour from superfluids, consistent with 
+experimental results. The self-interaction of the order field 
+is repulsive in the absence of a gauge field.
+
+\section{Nuclear Superconductivity in Neutron Stars}
+
+In the dense nuclear matter of a neutron star, it may be possible 
+to have neutron superfluidity, proton superconductivity, and 
+even quark colour superconductivity~\cite{2006pfsb.book..135S, schmitt2010dense}. 
+The first prediction of 
+neutron-star superfluidity dates back to Migdal in 1959~\cite{1959NucPh..13..655M}.
+The arguments which make superfluidity seem likely are based on 
+the temperatures of neutron stars. A short time after their 
+creation, neutron stars are very cold. The temperature in the 
+interior may be a few hundred keV. Studies of nuclear matter 
+show that the transition temperature is 
+$T_c \gtrsim 500$ keV~\cite{1989tns..conf..457S}.
+So, it is expected that the nuclear matter in a neutron star 
+forms condensates of cooper pairs.
+
+Because of this, some fraction of neutrons in the inner crust 
+of a neutron star are expected to be superfluid. These neutrons make up 
+about a percent of the moment of inertia of the star and are 
+weakly coupled to the nuclear crystal lattice which makes up the 
+remainder of the inner crust. If the neutron vortices in the 
+superfluid component move at nearly the same speed as the nuclear 
+lattice, the vortices can become pinned to the lattice so that the 
+superfluid shares an angular velocity with the crust. 
+This pinning between the fluid and solid crust has observable impacts 
+on the rotational dynamics of the neutron star, for the same reasons that 
+hard-boiling an egg (pinning the yolk to the shell) produces an 
+observable difference in the way it spins on its side.
+
+This picture of a neutron superfluid co-rotating with a solid crust 
+has been used to interpret several types of pulsar timing anomalies.
+Pulsars are nearly perfect clocks, although they gradually spin-down 
+as they radiate energy. Occasionally, though, pulsars demonstrate 
+deviations from their expected regularity. A glitch is an abrupt 
+increase in the rotation and spin-down rate of a pulsar, followed 
+by a slow relaxation to pre-glitch values over weeks or years. This 
+behaviour is consistent with the neutron superfluid suddenly 
+becoming unpinned from the crust and then dynamically relaxing 
+due to its weak coupling to the crust until it is pinned once 
+again~\cite{1975Natur.256...25A}.
+
+The neutron star in Cassiopeia A has been observed to be rapidly cooling
+\cite{2010ApJ...719L.167H}. The surface temperature decreases by about 
+4\% every 10 years. This observation is also strong evidence 
+of superfluidity and superconductivity in neutron stars
+\cite{2011PhRvL.106h1101P, 2011MNRAS.412L.108S}. The observed cooling 
+is too fast to be explained by the observed x-ray emissions 
+and standard neutrino cooling. However, 
+the cooling is readily explained by the emission of neutrinos during 
+the formation of neutron Cooper pairs. Based on such a model, 
+the superfluid transition temperature of neutron star matter is
+$\sim 10^{9}$ K or $\sim 90$ keV. 
+
+Further hints regarding superfluidity in neutron stars 
+come from long-term periodic variability
+in pulsar timing data. For example, variabilities in PSR B1828-11
+were initially interpreted as free 
+precession (or wobble) of the star~\cite{2000Natur.406..484S}. 
+If neutron stars can
+precess, observations could strongly constrain the ratio of the moments
+of inertia of the crust and the superfluid neutrons. Moreover, the existence
+of flux tubes (\ie type-II superconductivity)
+in the crust is generally incompatible with the slow, large 
+amplitude precession suggested by PSR B1828-11~\cite{2000Natur.406..484S}. The neutron vortices 
+would have to pass through the flux tubes, which should cause a huge dissipation 
+of energy and a dampening of the precession which is not observed~\cite{PhysRevLett.91.101101}. 
+However,
+recent arguments suggest that the timing variability data is not well explained 
+by free precession and that it more likely suggests that the star is switching between 
+two magnetospheric states~\cite{2010Sci...329..408L}. 
+Nevertheless, other authors suggest not being premature in throwing 
+out the precession hypothesis without further observations
+\cite{2012MNRAS.420.2325J}.
+
+\section{Magnetic Flux Tubes in Neutron Stars}
+
+
+If a magnetic field is able to penetrate the proton superfluid on a microscopic level,
+it must do so by forming a triangular Abrikosov 
+lattice with a single quanta of flux in each flux tube. So, the 
+density of flux tubes is given simply by the average field strength.
+If the distance between flux tubes is $l_f$, the flux in a circular 
+region within $l_f/2$ of a flux tube is given by 
+
+\be
+	F = \frac{2\pi \mathcal{F}}{e} = 2\pi \int_0^{l_f/2} B \rho d\rho
+\ee
+where we have introduced a dimensionless measure of flux 
+$\mathcal{F} = \frac{e}{2\pi}F$.
+So, the distance between flux tubes is
+\be
+	l_f = \sqrt{\frac{8 \mathcal{F}}{eB}}.
+\ee
+If the magnetic field is the critical field strength, $B_k$, then 
+the flux tubes are separated by a few Compton electron wavelengths.
+This is particularly interesting since this is the distance scale 
+associated with non-locality in \ac{QED}.
+
+The size of a flux tube profile in laboratory superconductors is 
+on the nanometer or micron scale~\cite{poole2007superconductivity}. Because the flux 
+is fixed, the size of the tube profile determines the strength of the magnetic field 
+within the tube. For laboratory superconductors
+the field strengths are small compared to the quantum critical field, and the field is slowly 
+varying on the scale of the Compton wavelength.  In this case, the quantum corrections to the 
+free energy are known to be much smaller than the classical contribution 
+(see section \ref{sec:EAisoflux}).
+The size scale for the flux tubes in a superconductor is determined by the London penetration depth. 
+In a neutron star, this quantity is estimated to be a small fraction of a 
+Compton wavelength, much smaller than in laboratory superconductors
+\cite{lrr-2008-10, PhysRevLett.91.101101}. In this case, 
+the magnetic field strength at the centre of the 
+tube exceeds the quantum critical field strength and the field varies rapidly, 
+rendering the derivative expansion description of the effective action unreliable.
+
+The Ginzburg-Landau parameter, equation (\ref{eqn:GLparam}), is the 
+ratio of the proton coherence length, $\xi_p \sim 30$ fm, and the 
+London penetration depth of a proton super conductor, $\lambda_p \sim 80$~fm
+\cite{PhysRevLett.91.101101}. 
+
+\be
+	\kappa = \frac{\lambda_p}{\xi_p} \sim 2
+\ee
+We therefore expect that the proton cooper pairs most likely 
+form a type-II superconductor~\cite{Sedrakian:2006xm}. 
+However, it is possible that 
+physics beyond what is taken into account in the standard 
+picture affects the free energy of a magnetic flux tube. In 
+that case, the interaction between two flux tubes may indeed 
+be attractive in which case the neutron star would be a type-I 
+superconductor.
+
+\section{\texorpdfstring{\acs{QED}}{QED} Effective Actions of Flux Tubes}
+\label{sec:EAisoflux}
+
+Vortices of magnetic flux have very important impacts on the quantum 
+mechanics of electrons. In particular, the phase of the electron's wavefunction 
+is not unique in such a magnetic field. This is demonstrated by the Aharonov-Bohm
+effect~\cite{0370-1301-62-1-303,PhysRev.115.485}. The first calculations of the 
+fermion effective energies of these configurations were for infinitely thin Aharonov-Bohm
+flux strings~\cite{Gornicki1990271, 1998MPLA...13..379S}. Calculations for thin strings 
+were also performed for cosmic string configurations~\cite{0264-9381-12-5-013}. For these 
+infinitely-thin string magnetic fields, the energy density is singular for small radii. So, 
+it is not possible to define a total energy per unit length. Another approach was to 
+compute the effective action for a finite-radius flux tube where the magnetic flux was 
+confined entirely to the radius of the tube~\cite{PhysRevD.51.810}. This approach 
+results in infinite classical energy densities.
+
+Physical flux tube configurations would have a finite radius.
+The earliest paper to deal with finite radius flux tubes in QED considered the effective 
+action of a step-function profiled flux tube using the Jost function of the related 
+scattering problem~\cite{1999PhRvD..60j5019B}. One of the conclusions from this research 
+was that the quantum correction to the classical energy was relatively 
+small for any value of the flux tube size, for the entire range of applicability of \ac{QED}. 
+The techniques from this study were 
+soon generalized to other field profiles including, a delta-function cylindrical shell magnetic 
+field~\cite{PhysRevD.62.085024}, and more realistic flux tube configurations 
+such as the Gaussian~\cite{2001PhRvD..64j5011P} and the Nielsen-Olesen 
+vortex~\cite{2003PhRvD..68f5026B}. 
+Flux tube vacuum energies were also analyzed extensively using a spectral method
+\cite{2005NuPhB.707..233G, 2006JPhA...39.6799W, Weigel:2010pf}.
+
+The effective actions of flux tubes have been previously analyzed using worldline 
+numerics~\cite{Langfeld:2002vy}.  This research investigated isolated 
+flux tubes, but also made use of the loop cloud method's applicability to situations 
+of low symmetry to investigate pairs of interacting 
+vortices. One conclusion from that investigation was that the fermionic effects resulted 
+in an attractive force between vortices with parallel orientations, and a repulsive 
+force between vortices with anti-parallel orientations.
+Due to the similarity in scope and technique, the latter mentioned 
+research is the closest to the research presented in chapter \ref{ch:periodic}.
+
+
+
+\section{Conclusion}
+
+In this chapter I have discussed my motivation for studying tubes of magnetic 
+flux, and the 1-loop \ac{QED} correction to the energy of these configurations. 
+In particular, I am interested in the role that flux tubes play in neutron stars 
+where the magnetic fields vary rapidly on the Compton wavelength scale. 
+In chapter \ref{ch:greensfunc}, I outline progress toward a new Green's 
+function technique for computing effective actions for flux tubes, and which 
+yields an expression for the quantum-corrected equations of motion for the 
+magnetic field. In chapters \ref{ch:WLNumerics} and \ref{ch:WLError}, I outline 
+a numerical method implemented on \acp{GPU} to compute the 1-loop effective action 
+for magnetic flux tubes. The physics results and conclusions from this method 
+are presented in chapter \ref{ch:periodic}.
+

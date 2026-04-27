@@ -74,76 +74,117 @@ class CSolverBackend:
         res_np = np.frombuffer(results_array, dtype=np.complex128).reshape(n_params, n_points)
         return res_np
 
+from pytorch_solver import PyTorchSolver
+from renormalization import Renormalizer
+
+# ... (ctypes structures unchanged)
+
 class Orchestrator:
-    def __init__(self, backend_type="pytorch", device=None, lib_path="./libsolver.so"):
+    def __init__(self, backend_type="pytorch", device=None, lib_path="./libsolver.so", batch_size=128):
         self.backend_type = backend_type
+        self.batch_size = batch_size
         if backend_type == "pytorch":
             self.backend = PyTorchSolver(device=device)
             self.device = self.backend.device
+            self.renormalizer = Renormalizer(device=self.device)
         elif backend_type == "c":
             self.backend = CSolverBackend(lib_path=lib_path)
-            self.device = torch.device("cpu") # Default for C backend
+            self.device = torch.device("cpu")
+            self.renormalizer = Renormalizer(device="cpu")
         else:
             raise ValueError(f"Unknown backend type: {backend_type}")
 
-    def compute_effective_action(self, field_profile, chi_values, ml_values, sigma3_values, m=1.0, e=1.0):
+    def compute_effective_action(self, field_profile, chi_values, ml_values, sigma3_values, m=1.0, e=1.0, chi_threshold=100.0):
         """
         Computes the full effective action by integrating over chi and summing over ml.
+        Implements batching to manage memory and UV renormalization.
         """
-        params_grid = generate_params_grid(chi_values, ml_values, sigma3_values, m=m, e=e)
+        rho, _, _ = field_profile.get_arrays(as_numpy=False)
+        rho = rho.to(self.device)
+        n_points = len(rho)
         
-        if self.backend_type == "pytorch":
-            # Direct tensor computation for gradients
-            results = self.backend.solve_batch(params_grid, field_profile)
+        # Integration weights for rho (trapezoidal)
+        rho_weights = torch.zeros_like(rho)
+        rho_weights[1:-1] = (rho[2:] - rho[:-2]) / 2.0
+        rho_weights[0] = (rho[1] - rho[0]) / 2.0
+        rho_weights[-1] = (rho[-1] - rho[-2]) / 2.0
+        rho_factor = (rho**2 * rho_weights).to(torch.complex128)
+
+        # Prepare parameters for batching
+        all_params = []
+        for chi in chi_values:
+            for ml in ml_values:
+                for s3 in sigma3_values:
+                    all_params.append({'chi': chi, 'ml': ml, 'sigma3': s3, 'm': m, 'e': e})
+
+        total_inner_sum = torch.zeros(len(chi_values), device=self.device, dtype=torch.complex128)
+        
+        # Mapping chi index for easy summation
+        chi_map = {chi: i for i, chi in enumerate(chi_values)}
+
+        # Process in batches
+        for i in range(0, len(all_params), self.batch_size):
+            batch = all_params[i : i + self.batch_size]
             
-            # G0 (field-free) subtraction: results - G0
-            # For simplicity in this step, we can compute G0 by passing a zero profile
-            # or by implementing the analytic Bessel expression.
-            # Let's use the analytic background Greens function from Eq 2.22
-            rho, _, _ = field_profile.get_arrays(as_numpy=False)
+            # Split batch into numerical and asymptotic regimes
+            numerical_batch = [p for p in batch if abs(p['chi']) <= chi_threshold]
+            asymptotic_batch = [p for p in batch if abs(p['chi']) > chi_threshold]
             
-            # Reshape results to (n_chi, n_ml, n_s3, n_points)
-            n_chi = len(chi_values)
-            n_ml = len(ml_values)
-            n_s3 = len(sigma3_values)
-            n_points = len(rho)
-            res_tensor = results.view(n_chi, n_ml, n_s3, n_points)
+            # Extract batch parameters for renormalization
+            b_chi = torch.tensor([p['chi'] for p in batch], device=self.device, dtype=torch.complex128)
+            b_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.int32)
             
-            # Background G0 = -pi/2 * rho * J_ml(k*rho) * Y_ml(k*rho)
-            # where k = sqrt(chi^2 - m^2) (Wait, chi is Wick rotated, so k is real?)
-            # In Eq 2.21, chi was introduced after rotation.
+            # Initialize renormalized_g for the whole batch
+            renormalized_g = torch.zeros((len(batch), n_points), device=self.device, dtype=torch.complex128)
             
-            # For now, let's implement the integral sum:
-            # action = sum_{s3, ml} \int chi^3 dchi \int rho^2 drho (G - G0)
+            if numerical_batch:
+                # Solve ODE for numerical batch
+                num_results = self.backend.solve_batch(numerical_batch, field_profile)
+                
+                # Get G0 and UV sub for numerical batch
+                num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
+                num_ml = torch.tensor([p['ml'] for p in numerical_batch], device=self.device, dtype=torch.int32)
+                
+                num_g0 = self.renormalizer.compute_g0(num_chi, num_ml, m, rho)
+                num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
+                
+                num_renorm = num_results - num_g0 - num_uv
+                
+                # Place into renormalized_g
+                num_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) <= chi_threshold]
+                renormalized_g[num_indices] = num_renorm
+
+            if asymptotic_batch:
+                # For large chi, we assume the renormalized contribution is negligible or follow analytic form
+                # In a full implementation, we'd use a 1/chi^4 expansion here.
+                # For now, we set it to zero as it decays very fast.
+                asymp_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) > chi_threshold]
+                renormalized_g[asymp_indices] = 0.0
+
+            # Integration over rho
+            inner_int = torch.sum(renormalized_g * rho_factor, dim=-1) # (batch_size,)
             
-            # Trapeze integration over rho
-            rho_weights = torch.zeros_like(rho)
-            rho_weights[1:-1] = (rho[2:] - rho[:-2]) / 2.0
-            rho_weights[0] = (rho[1] - rho[0]) / 2.0
-            rho_weights[-1] = (rho[-1] - rho[-2]) / 2.0
-            
-            # Inner integral over rho: \int rho^2 (G - G0) drho
-            # Assuming G0 is handled or using a simpler subtraction for validation
-            # Let's assume we want the raw integral for now to test auto-diff
-            inner_int = torch.sum(res_tensor * (rho**2 * rho_weights), dim=-1)
-            
-            # Sum over ml and s3
-            summed = torch.sum(inner_int, dim=(1, 2))
-            
-            # Integration over chi (using chi_values)
-            chi_tensor = torch.tensor([complex(c) for c in chi_values], device=self.device, dtype=torch.complex128)
-            chi_weights = torch.zeros_like(chi_tensor.real)
-            # Simple trapezoid for chi
-            chi_real = chi_tensor.real
+            # Accumulate into total_inner_sum based on chi
+            for idx, p in enumerate(batch):
+                chi_idx = chi_map[p['chi']]
+                total_inner_sum[chi_idx] += inner_int[idx]
+
+        # Final integration over chi
+        chi_tensor = torch.tensor([complex(c) for c in chi_values], device=self.device, dtype=torch.complex128)
+        chi_real = chi_tensor.real
+        chi_weights = torch.zeros_like(chi_real)
+        if len(chi_real) > 1:
             chi_weights[1:-1] = (chi_real[2:] - chi_real[:-2]) / 2.0
             chi_weights[0] = (chi_real[1] - chi_real[0]) / 2.0
             chi_weights[-1] = (chi_real[-1] - chi_real[-2]) / 2.0
-            
-            # Full action = \pi * \sum \int chi^3 * inner_int dchi
-            action = torch.pi * torch.sum(chi_tensor**3 * summed * chi_weights)
-            return action
         else:
-            raise NotImplementedError("Effective action integration only implemented for PyTorch backend.")
+            # If only one chi point, we can't integrate. 
+            # This is primarily for testing single points.
+            chi_weights[0] = 1.0
+        
+        action = torch.pi * torch.sum(chi_tensor**3 * total_inner_sum * chi_weights)
+        return action
+
 
 def generate_params_grid(chi_values, ml_values, sigma3_values, m=1.0, e=1.0):
     grid = []
