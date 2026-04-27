@@ -56,8 +56,9 @@ Finding the stationary points ($\delta \Gamma = 0$) is a core objective.
 - **Benchmark:** Compare PyTorch results against the C/OpenMP results and the analytic Whittaker solutions.
 - **Wronskian Check:** Monitor $|W_0(\rho) - W_{const}|$ to ensure solver stability across different backends.
 
-## 7. Implementation Phases
-1.  **Phase 1: Foundation.** Implement the Orchestrator and the C/OpenMP reference solver.
-2.  **Phase 2: PyTorch Vectorization.** Implement the batch-oriented ODE solver in PyTorch.
-3.  **Phase 3: Auto-Diff Integration.** Set up the optimization loop for finding stationary field profiles.
-4.  **Phase 4: Scaling.** Optimize GPU memory usage and implement full UV renormalization.
+## Development Roadmap
+1.  **Core Infrastructure:** Implement the Orchestrator and the C/OpenMP reference solver for baseline validation.
+2.  **PyTorch Vectorization:** Implement the batch-oriented ODE solver in PyTorch for high-performance scaling.
+3.  **Auto-Diff Integration:** Integrate PyTorch's `autograd` to enable optimization of stationary field profiles.
+4.  **Scaling & Optimization:** Optimize memory usage for massive parameter grids and implement complete UV renormalization.
+5.  **Implementation of step-function configuration:** Implement the step-function special case to verify the method and identify any stationary action points for the step-function case.
