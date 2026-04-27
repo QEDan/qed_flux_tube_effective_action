@@ -14,10 +14,10 @@ static double complex get_v_eff(double r, Parameters params, Profile profile, in
     
     double v_ml = e * s3 * (a/r + da) + (ml*ml - 1.0)/(r*r) + e*e*a*a - 2.0*e*ml*a/r;
     
-    // ODE: u'' + 1/r * u' - (v_ml + 1/r^2 + chi^2 + m^2) u = 0
-    // We rewrite as u'' = -1/r * u' + (v_ml + 1/r^2 + chi^2 + m^2) u
+    // ODE: u'' + 1/r * u' - (v_ml + 1/r^2 - chi^2 + m^2) u = 0
+    // We rewrite as u'' = -1/r * u' + (v_ml + 1/r^2 - chi^2 + m^2) u
     // Effective potential term for u''
-    return v_ml + 1.0/(r*r) + params.chi * params.chi + params.m * params.m;
+    return v_ml + 1.0/(r*r) - params.chi * params.chi + params.m * params.m;
 }
 
 typedef struct {

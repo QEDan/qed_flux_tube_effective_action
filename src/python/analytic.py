@@ -1,19 +1,33 @@
 import numpy as np
-from scipy.special import hyp1f1, hyperu, gamma
+import mpmath
+from scipy.special import gamma as scipy_gamma
+
+# Set precision for mpmath
+mpmath.mp.dps = 25
 
 def M_whittaker(z, kappa, mu):
     """
     Whittaker M function: M_{kappa, mu}(z)
-    M_{k,m}(z) = z^{m+1/2} e^{-z/2} 1F1(1/2+m-k, 1+2m, z)
     """
-    return z**(mu + 0.5) * np.exp(-0.5 * z) * hyp1f1(0.5 + mu - kappa, 1 + 2 * mu, z)
+    def single_val(zv):
+        res = mpmath.whitm(kappa, mu, zv)
+        return complex(res)
+        
+    if isinstance(z, np.ndarray):
+        return np.array([single_val(zv) for zv in z])
+    return single_val(z)
 
 def W_whittaker(z, kappa, mu):
     """
     Whittaker W function: W_{kappa, mu}(z)
-    W_{k,m}(z) = z^{m+1/2} e^{-z/2} U(1/2+m-k, 1+2m, z)
     """
-    return z**(mu + 0.5) * np.exp(-0.5 * z) * hyperu(0.5 + mu - kappa, 1 + 2 * mu, z)
+    def single_val(zv):
+        res = mpmath.whitw(kappa, mu, zv)
+        return complex(res)
+        
+    if isinstance(z, np.ndarray):
+        return np.array([single_val(zv) for zv in z])
+    return single_val(z)
 
 def get_step_function_params(chi, ml, sigma3, m, lambd, F):
     """
@@ -62,9 +76,10 @@ def get_analytic_wronskian(chi, ml, sigma3, m, lambd, F):
     
     # M W' - M' W = -gamma(1+2*mu) / gamma(1/2+mu-kappa)
     # So M' W - M W' = gamma(1+2*mu) / gamma(1/2+mu-kappa)
-    wronskian_mw = gamma(1 + 2 * mu) / gamma(0.5 + mu - kappa)
+    # Use mpmath for complex gamma
+    wronskian_mw = mpmath.gamma(1 + 2 * mu) / mpmath.gamma(0.5 + mu - kappa)
     
-    W0 = (2.0 * F_dim / lambd**2) * wronskian_mw
+    W0 = (2.0 * F_dim / lambd**2) * complex(wronskian_mw)
     return W0
 
 def get_exterior_solutions(rho, chi, ml, sigma3, m, lambd, F):

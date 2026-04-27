@@ -21,10 +21,11 @@ class PyTorchSolver:
         m = params['m']
         
         # V_ml(rho) = e*sigma3 * (Aphi/rho + dAphi/drho) + (ml^2-1)/rho^2 + e^2*Aphi^2 - 2*e*ml*Aphi/rho
-        v_ml = e * s3 * (a_phi / r + da_phi) + (ml**2 - 1.0) / (r**2) + (e * a_phi)**2 - 2.0 * e * ml * a_phi / r
+        v_ml = e * s3 * (a_phi / r + da_phi) + (ml*ml - 1.0) / (r*r) + (e * a_phi)*(e * a_phi) - 2.0 * e * ml * a_phi / r
         
-        # ODE term: v_ml + 1/r^2 + chi^2 + m^2
-        return v_ml + 1.0 / (r**2) + chi**2 + m**2
+        # ODE term: v_ml + 1/r^2 - chi^2 + m^2
+        return v_ml + 1.0 / (r*r) - chi*chi + m*m
+
 
     def solve_batch(self, params_list, field_profile):
         """
@@ -68,7 +69,13 @@ class PyTorchSolver:
         
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
-            curr_state = self.rk4_step(rho[i], h, curr_state, params, a_phi[i], da_phi[i])
+            # Approximate midpoint for profile
+            a_mid = 0.5 * (a_phi[i] + a_phi[i+1])
+            da_mid = 0.5 * (da_phi[i] + da_phi[i+1])
+            curr_state = self.rk4_step(rho[i], h, curr_state, params, 
+                                       a_phi[i], da_phi[i],
+                                       a_mid, da_mid,
+                                       a_phi[i+1], da_phi[i+1])
             u0[:, i+1] = curr_state[:, 0]
             
         du0_last = curr_state[:, 1]
@@ -77,7 +84,7 @@ class PyTorchSolver:
         uinf = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
         
         rho_max = rho[-1]
-        k = torch.sqrt(params['chi']**2 + params['m']**2)
+        k = torch.sqrt(params['chi']*params['chi'] + params['m']*params['m'])
         # Ensure Re(k) > 0
         k = torch.where(k.real < 0, -k, k)
         
@@ -89,8 +96,13 @@ class PyTorchSolver:
         
         for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
-            # Use i-1 to be consistent with the forward pass for the same interval
-            curr_state = self.rk4_step(rho[i], h, curr_state, params, a_phi[i-1], da_phi[i-1])
+            # Approximate midpoint for profile
+            a_mid = 0.5 * (a_phi[i] + a_phi[i-1])
+            da_mid = 0.5 * (da_phi[i] + da_phi[i-1])
+            curr_state = self.rk4_step(rho[i], h, curr_state, params, 
+                                       a_phi[i], da_phi[i],
+                                       a_mid, da_mid,
+                                       a_phi[i-1], da_phi[i-1])
             uinf[:, i-1] = curr_state[:, 0]
             
         # Wronskian W0 = rho * (u0' * uinf - u0 * uinf') at rho_max
@@ -108,9 +120,10 @@ class PyTorchSolver:
         d_du = -1.0/r * du + v_eff * u
         return torch.stack([d_u, d_du], dim=1)
 
-    def rk4_step(self, r, h, state, params, a_phi, da_phi):
-        k1 = self.f(r, state, params, a_phi, da_phi)
-        k2 = self.f(r + 0.5*h, state + 0.5*h*k1, params, a_phi, da_phi)
-        k3 = self.f(r + 0.5*h, state + 0.5*h*k2, params, a_phi, da_phi)
-        k4 = self.f(r + h, state + h*k3, params, a_phi, da_phi)
-        return state + (h/6.0) * (k1 + 2*k2 + 2*k3 + k4)
+    def rk4_step(self, r, h, state, params, a_p_start, da_p_start, a_p_mid, da_p_mid, a_p_end, da_p_end):
+        k1 = self.f(r, state, params, a_p_start, da_p_start)
+        k2 = self.f(r + 0.5*h, state + 0.5*h*k1, params, a_p_mid, da_p_mid)
+        k3 = self.f(r + 0.5*h, state + 0.5*h*k2, params, a_p_mid, da_p_mid)
+        k4 = self.f(r + h, state + h*k3, params, a_p_end, da_p_end)
+        return state + (h/6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
+
