@@ -3,13 +3,15 @@ import numpy as np
 import os
 import torch
 from pytorch_solver import PyTorchSolver
+from renormalization import Renormalizer
+from typing import List, Dict, Any, Optional, Tuple
 
 # Define ctypes structures
 class Complex128(ctypes.Structure):
     _fields_ = [("real", ctypes.c_double), ("imag", ctypes.c_double)]
 
     @classmethod
-    def from_complex(cls, c):
+    def from_complex(cls, c: complex) -> 'Complex128':
         return cls(c.real, c.imag)
 
 class Parameters(ctypes.Structure):
@@ -30,7 +32,7 @@ class Profile(ctypes.Structure):
     ]
 
 class CSolverBackend:
-    def __init__(self, lib_path="./libsolver.so"):
+    def __init__(self, lib_path: str = "./libsolver.so") -> None:
         if not os.path.exists(lib_path):
              # Try to find it in the project root if called from elsewhere
              project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -46,7 +48,7 @@ class CSolverBackend:
         ]
         self.lib.solve_batch.restype = None
 
-    def solve_batch(self, params_list, field_profile):
+    def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> np.ndarray:
         n_params = len(params_list)
         rho, a_phi, da_phi = field_profile.get_arrays()
         n_points = len(rho)
@@ -74,13 +76,8 @@ class CSolverBackend:
         res_np = np.frombuffer(results_array, dtype=np.complex128).reshape(n_params, n_points)
         return res_np
 
-from pytorch_solver import PyTorchSolver
-from renormalization import Renormalizer
-
-# ... (ctypes structures unchanged)
-
 class Orchestrator:
-    def __init__(self, backend_type="pytorch", device=None, lib_path="./libsolver.so", batch_size=128):
+    def __init__(self, backend_type: str = "pytorch", device: Optional[str] = None, lib_path: str = "./libsolver.so", batch_size: int = 128) -> None:
         self.backend_type = backend_type
         self.batch_size = batch_size
         if backend_type == "pytorch":
@@ -94,7 +91,7 @@ class Orchestrator:
         else:
             raise ValueError(f"Unknown backend type: {backend_type}")
 
-    def compute_effective_action(self, field_profile, chi_values, ml_values, sigma3_values, m=1.0, e=1.0, chi_threshold=100.0):
+    def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0, chi_threshold: float = 100.0) -> torch.Tensor:
         """
         Computes the full effective action by integrating over chi and summing over ml.
         Implements batching to manage memory and UV renormalization.
@@ -130,10 +127,6 @@ class Orchestrator:
             numerical_batch = [p for p in batch if abs(p['chi']) <= chi_threshold]
             asymptotic_batch = [p for p in batch if abs(p['chi']) > chi_threshold]
             
-            # Extract batch parameters for renormalization
-            b_chi = torch.tensor([p['chi'] for p in batch], device=self.device, dtype=torch.complex128)
-            b_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.int32)
-            
             # Initialize renormalized_g for the whole batch
             renormalized_g = torch.zeros((len(batch), n_points), device=self.device, dtype=torch.complex128)
             
@@ -155,9 +148,6 @@ class Orchestrator:
                 renormalized_g[num_indices] = num_renorm
 
             if asymptotic_batch:
-                # For large chi, we assume the renormalized contribution is negligible or follow analytic form
-                # In a full implementation, we'd use a 1/chi^4 expansion here.
-                # For now, we set it to zero as it decays very fast.
                 asymp_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) > chi_threshold]
                 renormalized_g[asymp_indices] = 0.0
 
@@ -178,15 +168,13 @@ class Orchestrator:
             chi_weights[0] = (chi_real[1] - chi_real[0]) / 2.0
             chi_weights[-1] = (chi_real[-1] - chi_real[-2]) / 2.0
         else:
-            # If only one chi point, we can't integrate. 
-            # This is primarily for testing single points.
             chi_weights[0] = 1.0
         
         action = torch.pi * torch.sum(chi_tensor**3 * total_inner_sum * chi_weights)
         return action
 
 
-def generate_params_grid(chi_values, ml_values, sigma3_values, m=1.0, e=1.0):
+def generate_params_grid(chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0) -> List[Dict[str, Any]]:
     grid = []
     for chi in chi_values:
         for ml in ml_values:

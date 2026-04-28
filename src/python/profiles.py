@@ -1,16 +1,17 @@
 import numpy as np
 import torch
+from typing import Union, Tuple, Optional, Any
 
 class FieldProfile:
-    def __init__(self, rho):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor]) -> None:
         if isinstance(rho, np.ndarray):
-            self.rho = torch.from_numpy(rho).to(torch.float64)
+            self.rho: torch.Tensor = torch.from_numpy(rho).to(torch.float64)
         else:
             self.rho = rho
-        self.a_phi = torch.zeros_like(self.rho)
-        self.da_phi = torch.zeros_like(self.rho)
+        self.a_phi: torch.Tensor = torch.zeros_like(self.rho)
+        self.da_phi: torch.Tensor = torch.zeros_like(self.rho)
 
-    def get_arrays(self, as_numpy=True):
+    def get_arrays(self, as_numpy: bool = True) -> Tuple[Any, Any, Any]:
         if as_numpy:
             return self.rho.detach().cpu().numpy(), \
                    self.a_phi.detach().cpu().numpy(), \
@@ -18,7 +19,7 @@ class FieldProfile:
         return self.rho, self.a_phi, self.da_phi
 
 class StepFunctionProfile(FieldProfile):
-    def __init__(self, rho, lambd, F, e=1.0, smooth_width=None):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], lambd: float, F: float, e: float = 1.0, smooth_width: Optional[float] = None) -> None:
         """
         Magnetic field B = (F / (pi * lambd^2)) * theta(lambd - rho)
         A_phi = (F / (2*pi)) * f_lambda(rho) / rho
@@ -31,7 +32,7 @@ class StepFunctionProfile(FieldProfile):
         self.smooth_width = smooth_width
         self.update()
 
-    def update(self):
+    def update(self) -> None:
         pre = self.F / (2.0 * np.pi)
         
         if self.smooth_width is None:
@@ -51,8 +52,6 @@ class StepFunctionProfile(FieldProfile):
             self.da_phi = b_field - self.a_phi / self.rho
         else:
             # Smoothed step function using sigmoid for theta(lambd - rho)
-            # theta(x) approx 0.5 * (1 + tanh(x / smooth_width))
-            # x = lambd - rho
             arg = (self.lambd - self.rho) / self.smooth_width
             theta_smooth = 0.5 * (1.0 + torch.tanh(arg))
             
@@ -62,7 +61,6 @@ class StepFunctionProfile(FieldProfile):
             self.a_phi = pre * f_lambd / self.rho
             
             # Derivative of f_lambda
-            # d/drho theta_smooth = 0.5 * (1 - tanh^2(arg)) * (-1/smooth_width)
             d_theta = -0.5 * (1.0 - torch.tanh(arg)**2) / self.smooth_width
             
             df_lambd = (2.0 * self.rho / self.lambd**2) * theta_smooth + \
@@ -75,10 +73,9 @@ class DifferentiableProfile(FieldProfile):
     """
     A profile where a_phi and da_phi are derived from differentiable parameters.
     """
-    def __init__(self, rho, params):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], params: Any) -> None:
         super().__init__(rho)
         self.params = params # e.g. spline coefficients or NN weights
         
-    def forward(self):
-        # This should be implemented by subclasses or provided via a function
+    def forward(self) -> None:
         raise NotImplementedError

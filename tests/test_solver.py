@@ -3,6 +3,7 @@ import os
 sys.path.append(os.path.join(os.getcwd(), 'src/python'))
 
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 from orchestrator import Orchestrator, generate_params_grid
 from profiles import StepFunctionProfile
@@ -23,7 +24,10 @@ def test_solver():
     sigma3_values = [1, -1]
     params_grid = generate_params_grid(chi_values, ml_values, sigma3_values)
     
-    results = orc.compute_greens_function_batch(params_grid, profile)
+    results = orc.backend.solve_batch(params_grid, profile)
+    
+    if isinstance(results, torch.Tensor):
+        results = results.detach().cpu().numpy()
     
     assert results.shape == (len(params_grid), len(rho))
     assert not np.any(np.isnan(results))

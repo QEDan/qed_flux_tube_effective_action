@@ -1,15 +1,15 @@
 import numpy as np
 import mpmath
-from scipy.special import gamma as scipy_gamma
+from typing import Union, Tuple, Any
 
 # Set precision for mpmath
 mpmath.mp.dps = 25
 
-def M_whittaker(z, kappa, mu):
+def M_whittaker(z: Union[float, np.ndarray], kappa: complex, mu: float) -> Union[complex, np.ndarray]:
     """
     Whittaker M function: M_{kappa, mu}(z)
     """
-    def single_val(zv):
+    def single_val(zv: complex) -> complex:
         res = mpmath.whitm(kappa, mu, zv)
         return complex(res)
         
@@ -17,11 +17,11 @@ def M_whittaker(z, kappa, mu):
         return np.array([single_val(zv) for zv in z])
     return single_val(z)
 
-def W_whittaker(z, kappa, mu):
+def W_whittaker(z: Union[float, np.ndarray], kappa: complex, mu: float) -> Union[complex, np.ndarray]:
     """
     Whittaker W function: W_{kappa, mu}(z)
     """
-    def single_val(zv):
+    def single_val(zv: complex) -> complex:
         res = mpmath.whitw(kappa, mu, zv)
         return complex(res)
         
@@ -29,7 +29,7 @@ def W_whittaker(z, kappa, mu):
         return np.array([single_val(zv) for zv in z])
     return single_val(z)
 
-def get_step_function_params(chi, ml, sigma3, m, lambd, F):
+def get_step_function_params(chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float) -> Tuple[float, complex, complex, float]:
     """
     Calculate intermediate parameters for step function analytic solution.
     """
@@ -45,7 +45,7 @@ def get_step_function_params(chi, ml, sigma3, m, lambd, F):
     
     return F_dim, k2, kappa, mu
 
-def get_interior_solutions(rho, chi, ml, sigma3, m, lambd, F):
+def get_interior_solutions(rho: np.ndarray, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute analytic solutions u0 (regular at 0) and uinf (regular at infinity)
     for the interior region (rho < lambd) of a step function flux tube.
@@ -54,7 +54,7 @@ def get_interior_solutions(rho, chi, ml, sigma3, m, lambd, F):
     uinf(rho) = W_{kappa, mu}(z) / rho
     where z = (F_dim / lambd^2) * rho^2
     """
-    F_dim, k2, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F)
+    F_dim, _, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F)
     
     z = (F_dim / lambd**2) * rho**2
     
@@ -63,16 +63,12 @@ def get_interior_solutions(rho, chi, ml, sigma3, m, lambd, F):
     
     return u0, uinf
 
-def get_analytic_wronskian(chi, ml, sigma3, m, lambd, F):
+def get_analytic_wronskian(chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float) -> complex:
     """
     Compute analytic Wronskian W0 = rho * (u0' * uinf - u0 * uinf')
     for the interior solutions.
-    
-    Using M, W Wronskian properties:
-    M' W - M W' = gamma(1+2*mu) / gamma(1/2+mu-kappa)
-    W0 = (2 * F_dim / lambd^2) * (M' W - M W')
     """
-    F_dim, k2, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F)
+    F_dim, _, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F)
     
     # M W' - M' W = -gamma(1+2*mu) / gamma(1/2+mu-kappa)
     # So M' W - M W' = gamma(1+2*mu) / gamma(1/2+mu-kappa)
@@ -82,12 +78,8 @@ def get_analytic_wronskian(chi, ml, sigma3, m, lambd, F):
     W0 = (2.0 * F_dim / lambd**2) * complex(wronskian_mw)
     return W0
 
-def get_exterior_solutions(rho, chi, ml, sigma3, m, lambd, F):
+def get_exterior_solutions(rho: np.ndarray, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float) -> Any:
     """
     Bessel function solutions for the exterior region (rho > lambd).
-    Placeholder for now as per step_plan.md Task 2 focus on Whittaker.
     """
-    # n = ml - F / (2*pi)
-    # k_ext = sqrt(chi^2 - m^2)
-    # u = J_n(k_ext * rho) or Y_n(k_ext * rho)
     raise NotImplementedError("Exterior analytic solutions not yet fully implemented.")

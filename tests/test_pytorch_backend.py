@@ -22,14 +22,14 @@ def test_pytorch_vs_c():
     
     # Compute with C backend
     orc_c = Orchestrator(backend_type="c", lib_path="./libsolver.so")
-    results_c = orc_c.compute_greens_function_batch(params_grid, profile)
+    results_c = orc_c.backend.solve_batch(params_grid, profile)
     
     # Compute with PyTorch backend
     orc_pt = Orchestrator(backend_type="pytorch", device="cpu")
-    results_pt = orc_pt.compute_greens_function_batch(params_grid, profile)
+    results_pt = orc_pt.backend.solve_batch(params_grid, profile)
     
     # Compare
-    max_diff = np.max(np.abs(results_c - results_pt))
+    max_diff = np.max(np.abs(results_c - results_pt.detach().numpy()))
     assert max_diff < 1e-10, f"Difference too large: {max_diff}"
 
 def test_wronskian_consistency():
@@ -55,9 +55,9 @@ def test_wronskian_consistency():
         'e': torch.tensor([p['e'] for p in params_list], dtype=torch.float64),
     }
     
-    rho_t = torch.from_numpy(rho).to(torch.float64)
-    a_phi_t = torch.from_numpy(profile.a_phi).to(torch.float64)
-    da_phi_t = torch.from_numpy(profile.da_phi).to(torch.float64)
+    rho_t = profile.rho
+    a_phi_t = profile.a_phi
+    da_phi_t = profile.da_phi
     
     # Solve u0
     u0 = torch.zeros((1, len(rho)), dtype=torch.complex128)
@@ -69,7 +69,13 @@ def test_wronskian_consistency():
     
     for i in range(len(rho)-1):
         h = rho[i+1] - rho[i]
-        curr_state = solver.rk4_step(rho_t[i], h, curr_state, params, a_phi_t[i], da_phi_t[i])
+        # Approximate midpoint for profile
+        a_mid = 0.5 * (a_phi_t[i] + a_phi_t[i+1])
+        da_mid = 0.5 * (da_phi_t[i] + da_phi_t[i+1])
+        curr_state = solver.rk4_step(rho_t[i], h, curr_state, params, 
+                                     a_phi_t[i], da_phi_t[i],
+                                     a_mid, da_mid,
+                                     a_phi_t[i+1], da_phi_t[i+1])
         u0[0, i+1] = curr_state[0, 0]
         du0[0, i+1] = curr_state[0, 1]
 
@@ -78,7 +84,7 @@ def test_wronskian_consistency():
     duinf = torch.zeros((1, len(rho)), dtype=torch.complex128)
     
     rho_max = torch.tensor(rho[-1], dtype=torch.float64)
-    k = torch.sqrt(params['chi']**2 + params['m']**2)
+    k = torch.sqrt(params['chi']*params['chi'] + params['m']*params['m'])
     u_inf_init = torch.exp(-k * rho_max) / torch.sqrt(rho_max)
     du_inf_init = (-k - 0.5/rho_max) * u_inf_init
     
@@ -88,8 +94,13 @@ def test_wronskian_consistency():
     
     for i in range(len(rho)-1, 0, -1):
         h = rho[i-1] - rho[i]
-        # Use i-1 to be consistent with the forward pass
-        curr_state = solver.rk4_step(rho_t[i], h, curr_state, params, a_phi_t[i-1], da_phi_t[i-1])
+        # Approximate midpoint for profile
+        a_mid = 0.5 * (a_phi_t[i] + a_phi_t[i-1])
+        da_mid = 0.5 * (da_phi_t[i] + da_phi_t[i-1])
+        curr_state = solver.rk4_step(rho_t[i], h, curr_state, params, 
+                                     a_phi_t[i], da_phi_t[i],
+                                     a_mid, da_mid,
+                                     a_phi_t[i-1], da_phi_t[i-1])
         uinf[0, i-1] = curr_state[0, 0]
         duinf[0, i-1] = curr_state[0, 1]
         

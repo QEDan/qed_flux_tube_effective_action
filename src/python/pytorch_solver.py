@@ -1,18 +1,17 @@
 import torch
 import numpy as np
+from typing import Dict, List, Any, Optional
 
 class PyTorchSolver:
-    def __init__(self, device=None):
+    def __init__(self, device: Optional[str] = None) -> None:
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = torch.device(device)
             
-    def get_v_eff(self, r, params, a_phi, da_phi):
+    def get_v_eff(self, r: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
         """
         Computes the effective potential for a batch of parameters.
-        params: dict of tensors (chi, ml, sigma3, m, e) each of shape (batch_size,)
-        a_phi, da_phi: scalars or tensors of shape (batch_size,)
         """
         e = params['e']
         ml = params['ml'].to(torch.float64)
@@ -27,7 +26,7 @@ class PyTorchSolver:
         return v_ml + 1.0 / (r*r) - chi*chi + m*m
 
 
-    def solve_batch(self, params_list, field_profile):
+    def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> torch.Tensor:
         """
         params_list: list of dicts (converted to batch tensors)
         field_profile: FieldProfile object
@@ -59,10 +58,10 @@ class PyTorchSolver:
         
         u_init = torch.where(abs_ml == 0, 
                              torch.ones_like(abs_ml, dtype=torch.complex128), 
-                             rho_min**abs_ml + 0j)
+                             torch.pow(rho_min, abs_ml) + 0j)
         du_init = torch.where(abs_ml == 0, 
                               torch.zeros_like(abs_ml, dtype=torch.complex128), 
-                              abs_ml * rho_min**(abs_ml - 1) + 0j)
+                              abs_ml * torch.pow(rho_min, abs_ml - 1) + 0j)
         
         curr_state = torch.stack([u_init, du_init], dim=1) # (batch, 2)
         u0[:, 0] = curr_state[:, 0]
@@ -111,7 +110,7 @@ class PyTorchSolver:
         results = (u0 * uinf) / W0.unsqueeze(1)
         return results
 
-    def f(self, r, state, params, a_phi, da_phi):
+    def f(self, r: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
         u = state[:, 0]
         du = state[:, 1]
         v_eff = self.get_v_eff(r, params, a_phi, da_phi)
@@ -120,10 +119,12 @@ class PyTorchSolver:
         d_du = -1.0/r * du + v_eff * u
         return torch.stack([d_u, d_du], dim=1)
 
-    def rk4_step(self, r, h, state, params, a_p_start, da_p_start, a_p_mid, da_p_mid, a_p_end, da_p_end):
+    def rk4_step(self, r: torch.Tensor, h: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], 
+                 a_p_start: torch.Tensor, da_p_start: torch.Tensor, 
+                 a_p_mid: torch.Tensor, da_p_mid: torch.Tensor, 
+                 a_p_end: torch.Tensor, da_p_end: torch.Tensor) -> torch.Tensor:
         k1 = self.f(r, state, params, a_p_start, da_p_start)
         k2 = self.f(r + 0.5*h, state + 0.5*h*k1, params, a_p_mid, da_p_mid)
         k3 = self.f(r + 0.5*h, state + 0.5*h*k2, params, a_p_mid, da_p_mid)
         k4 = self.f(r + h, state + h*k3, params, a_p_end, da_p_end)
         return state + (h/6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
-
