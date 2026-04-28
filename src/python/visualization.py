@@ -13,7 +13,7 @@ def plot_energy_surface(lambda_values: List[float], action_values: List[float]) 
     plt.xlabel("Width $\lambda$")
     plt.ylabel("Energy $E = -\Gamma$")
     plt.grid(True)
-    plt.savefig("energy_surface.png")
+    plt.savefig("results/energy_surface.png")
     plt.close()
 
 def plot_profile_comparison(rho: np.ndarray, profiles_dict: Any) -> None:
@@ -29,7 +29,7 @@ def plot_profile_comparison(rho: np.ndarray, profiles_dict: Any) -> None:
     plt.ylabel("Magnetic field $B(\\rho)$")
     plt.legend()
     plt.grid(True)
-    plt.savefig("profile_comparison.png")
+    plt.savefig("results/profile_comparison.png")
     plt.close()
 
 def plot_density_diffusion(rho: torch.Tensor, density_integrand: torch.Tensor, flux_f: float) -> None:
@@ -42,5 +42,5 @@ def plot_density_diffusion(rho: torch.Tensor, density_integrand: torch.Tensor, f
     plt.xlabel("Radial coordinate $\\rho$")
     plt.ylabel("Integrand $\\rho^2 \Delta G(\rho)$")
     plt.grid(True)
-    plt.savefig(f"density_diffusion_f{flux_f}.png")
+    plt.savefig(f"results/density_diffusion_f{flux_f}.png")
     plt.close()

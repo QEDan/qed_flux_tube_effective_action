@@ -26,7 +26,7 @@ def test_pytorch_vs_c():
     
     # Compute with PyTorch backend
     orc_pt = Orchestrator(backend_type="pytorch", device="cpu")
-    results_pt = orc_pt.backend.solve_batch(params_grid, profile)
+    results_pt, _ = orc_pt.backend.solve_batch(params_grid, profile)
     
     # Compare
     max_diff = np.max(np.abs(results_c - results_pt.detach().numpy()))

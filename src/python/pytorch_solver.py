@@ -109,7 +109,7 @@ class PyTorchSolver:
         W0 = rho_max * (du0_last * uinf[:, -1] - u0[:, -1] * du_inf_init)
         
         results = (u0 * uinf) / W0.unsqueeze(1)
-        return results
+        return results, W0
 
     def f(self, r: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
         u = state[:, 0]
