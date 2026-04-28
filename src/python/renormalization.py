@@ -47,7 +47,7 @@ class Renormalizer:
                 res_j[i] = jv(float(m_val), sub_k_rho_np[i])
                 res_y[i] = yv(float(m_val), sub_k_rho_np[i])
                 
-            sub_g0_np = -0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
+            sub_g0_np = 0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
             sub_g0 = torch.from_numpy(sub_g0_np).to(self.device).to(torch.complex128)
             
             # Update cache and result
