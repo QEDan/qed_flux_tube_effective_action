@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import Dict, List, Any, Optional
+from typing import Union, Dict, List, Any, Optional
 
 class PyTorchSolver:
     def __init__(self, device: Optional[str] = None) -> None:

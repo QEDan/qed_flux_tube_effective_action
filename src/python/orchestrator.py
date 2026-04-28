@@ -4,7 +4,7 @@ import os
 import torch
 from pytorch_solver import PyTorchSolver
 from renormalization import Renormalizer
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Union, List, Dict, Any, Optional, Tuple
 
 # Define ctypes structures
 class Complex128(ctypes.Structure):
@@ -91,21 +91,26 @@ class Orchestrator:
         else:
             raise ValueError(f"Unknown backend type: {backend_type}")
 
-    def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0, chi_threshold: float = 100.0) -> torch.Tensor:
+    def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0, chi_threshold: float = 100.0, collect_density: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Computes the full effective action by integrating over chi and summing over ml.
         Implements batching to manage memory and UV renormalization.
+
+        If collect_density is True, returns (action, density_integrand).
         """
         rho, _, _ = field_profile.get_arrays(as_numpy=False)
         rho = rho.to(self.device)
         n_points = len(rho)
-        
+
         # Integration weights for rho (trapezoidal)
         rho_weights = torch.zeros_like(rho)
         rho_weights[1:-1] = (rho[2:] - rho[:-2]) / 2.0
         rho_weights[0] = (rho[1] - rho[0]) / 2.0
         rho_weights[-1] = (rho[-1] - rho[-2]) / 2.0
         rho_factor = (rho**2 * rho_weights).to(torch.complex128)
+
+        # Initialize density tracking if requested
+        density_integrand = torch.zeros_like(rho, dtype=torch.complex128) if collect_density else None
 
         # Prepare parameters for batching
         all_params = []
@@ -115,34 +120,34 @@ class Orchestrator:
                     all_params.append({'chi': chi, 'ml': ml, 'sigma3': s3, 'm': m, 'e': e})
 
         total_inner_sum = torch.zeros(len(chi_values), device=self.device, dtype=torch.complex128)
-        
+
         # Mapping chi index for easy summation
         chi_map = {chi: i for i, chi in enumerate(chi_values)}
 
         # Process in batches
         for i in range(0, len(all_params), self.batch_size):
             batch = all_params[i : i + self.batch_size]
-            
+
             # Split batch into numerical and asymptotic regimes
             numerical_batch = [p for p in batch if abs(p['chi']) <= chi_threshold]
             asymptotic_batch = [p for p in batch if abs(p['chi']) > chi_threshold]
-            
+
             # Initialize renormalized_g for the whole batch
             renormalized_g = torch.zeros((len(batch), n_points), device=self.device, dtype=torch.complex128)
-            
+
             if numerical_batch:
                 # Solve ODE for numerical batch
                 num_results = self.backend.solve_batch(numerical_batch, field_profile)
-                
+
                 # Get G0 and UV sub for numerical batch
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
                 num_ml = torch.tensor([p['ml'] for p in numerical_batch], device=self.device, dtype=torch.int32)
-                
+
                 num_g0 = self.renormalizer.compute_g0(num_chi, num_ml, m, rho)
                 num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
-                
+
                 num_renorm = num_results - num_g0 - num_uv
-                
+
                 # Place into renormalized_g
                 num_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) <= chi_threshold]
                 renormalized_g[num_indices] = num_renorm
@@ -151,9 +156,12 @@ class Orchestrator:
                 asymp_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) > chi_threshold]
                 renormalized_g[asymp_indices] = 0.0
 
+            if collect_density:
+                density_integrand += torch.sum(renormalized_g, dim=0)
+
             # Integration over rho
             inner_int = torch.sum(renormalized_g * rho_factor, dim=-1) # (batch_size,)
-            
+
             # Accumulate into total_inner_sum based on chi
             for idx, p in enumerate(batch):
                 chi_idx = chi_map[p['chi']]
@@ -169,14 +177,17 @@ class Orchestrator:
             chi_weights[-1] = (chi_real[-1] - chi_real[-2]) / 2.0
         else:
             chi_weights[0] = 1.0
-        
+
         # k_vac = sqrt(chi^2 - m^2)
         k_vac = torch.sqrt(chi_tensor*chi_tensor - m*m)
 
-        
         # Eq 2.59: -hbar * pi * sum * int(chi^3 * k_vac * total_inner_sum)
         action = -torch.pi * torch.sum(chi_tensor**3 * k_vac * total_inner_sum * chi_weights)
+
+        if collect_density:
+            return action, density_integrand
         return action
+
 
 
 def generate_params_grid(chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0) -> List[Dict[str, Any]]:

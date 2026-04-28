@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from scipy.special import jv, yv
-from typing import Dict, Tuple, Any, Optional, List
+from typing import Union, Dict, Tuple, Any, Optional, List
 
 class Renormalizer:
     def __init__(self, device: str = "cpu") -> None:
