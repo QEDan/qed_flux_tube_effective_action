@@ -19,9 +19,9 @@ static State f(double r, State s, Parameters params, double a, double da) {
     
     double v_ml = e * s3 * (a/r + da) + (ml*ml - 1.0)/(r*r) + e*e*a*a - 2.0*e*ml*a/r;
     
-    // ODE: u'' + 1/r * u' - (v_ml + 1/r^2 - chi^2 + m^2) u = 0
+    // ODE: u'' + 1/r * u' - (v_ml + 1/r^2 - (chi^2 - m^2)) u = 0
     // Effective potential term for u''
-    double complex v_eff = v_ml + 1.0/(r*r) - params.chi * params.chi + params.m * params.m;
+    double complex v_eff = v_ml + 1.0/(r*r) - (params.chi * params.chi - params.m * params.m);
     
     ds.du = -1.0/r * s.du + v_eff * s.u;
     return ds;
@@ -81,8 +81,8 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
 
     // Boundary condition for uinf at large rho
     double rho_max = profile.rho[N-1];
-    double complex k = csqrt(params.chi * params.chi + params.m * params.m);
-    // Ensure Re(k) > 0 for decay
+    double complex k = csqrt(params.chi * params.chi - params.m * params.m);
+    // Ensure Re(k) > 0 for decay or Im(k) > 0
     if (creal(k) < 0) k = -k;
     
     State sinf;

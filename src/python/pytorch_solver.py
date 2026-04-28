@@ -22,8 +22,9 @@ class PyTorchSolver:
         # V_ml(rho) = e*sigma3 * (Aphi/rho + dAphi/drho) + (ml^2-1)/rho^2 + e^2*Aphi^2 - 2*e*ml*Aphi/rho
         v_ml = e * s3 * (a_phi / r + da_phi) + (ml*ml - 1.0) / (r*r) + (e * a_phi)*(e * a_phi) - 2.0 * e * ml * a_phi / r
         
-        # ODE term: v_ml + 1/r^2 - chi^2 + m^2
-        return v_ml + 1.0 / (r*r) - chi*chi + m*m
+        # ODE term: v_ml + 1/r^2 - (chi^2 - m^2)
+        # matches Eq 2.50 k^2 = chi^2 - m^2 - ...
+        return v_ml + 1.0 / (r*r) - (chi*chi - m*m)
 
 
     def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> torch.Tensor:
@@ -83,8 +84,8 @@ class PyTorchSolver:
         uinf = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
         
         rho_max = rho[-1]
-        k = torch.sqrt(params['chi']*params['chi'] + params['m']*params['m'])
-        # Ensure Re(k) > 0
+        k = torch.sqrt(params['chi']*params['chi'] - params['m']*params['m'])
+        # Ensure Re(k) > 0 or Im(k) > 0 for proper decay/oscillation
         k = torch.where(k.real < 0, -k, k)
         
         u_inf_init = torch.exp(-k * rho_max) / torch.sqrt(rho_max)

@@ -11,10 +11,13 @@ class Renormalizer:
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor) -> torch.Tensor:
         """
         Computes the background Green's function G0 = -pi/2 * rho * J_ml(k*rho) * Y_ml(k*rho)
-        where k = sqrt(chi^2 + m^2).
+        where k = sqrt(chi^2 - m^2).
         Uses caching for (chi, ml) pairs.
         """
-        k = torch.sqrt(chi*chi + m*m).to(torch.complex128)
+        k2 = chi*chi - m*m
+        k2 = torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2)
+        k = torch.sqrt(k2).to(torch.complex128)
+
         n_points = len(rho)
         n_batch = len(chi)
         
@@ -47,7 +50,7 @@ class Renormalizer:
                 res_j[i] = jv(float(m_val), sub_k_rho_np[i])
                 res_y[i] = yv(float(m_val), sub_k_rho_np[i])
                 
-            sub_g0_np = 0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
+            sub_g0_np = -0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
             sub_g0 = torch.from_numpy(sub_g0_np).to(self.device).to(torch.complex128)
             
             # Update cache and result
@@ -65,7 +68,10 @@ class Renormalizer:
         uv_sub = (eB/2)^2 * [ (rho^3 / 2k^2) * sin(Theta) + (rho^2 / 6k^3) * cos(Theta) ]
         Theta = 2k*rho - (1/4 - ml^2)/(k*rho)
         """
-        k = torch.sqrt(chi*chi + m*m).to(torch.complex128)
+        k2 = chi*chi - m*m
+        k2 = torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2)
+        k = torch.sqrt(k2).to(torch.complex128)
+
         _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
         e = 1.0 
         

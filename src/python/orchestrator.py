@@ -172,6 +172,7 @@ class Orchestrator:
         
         # k_vac = sqrt(chi^2 - m^2)
         k_vac = torch.sqrt(chi_tensor*chi_tensor - m*m)
+
         
         # Eq 2.59: -hbar * pi * sum * int(chi^3 * k_vac * total_inner_sum)
         action = -torch.pi * torch.sum(chi_tensor**3 * k_vac * total_inner_sum * chi_weights)
