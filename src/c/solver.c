@@ -4,10 +4,15 @@
 #include <complex.h>
 #include <omp.h>
 
-static double complex get_v_eff(double r, Parameters params, Profile profile, int idx) {
-    // V_ml(rho) = e*sigma3 * (Aphi/rho + dAphi/drho) + (ml^2-1)/rho^2 + e^2*Aphi^2 - 2*e*ml*Aphi/rho
-    double a = profile.a_phi[idx];
-    double da = profile.da_phi[idx];
+typedef struct {
+    double complex u;
+    double complex du;
+} State;
+
+static State f(double r, State s, Parameters params, double a, double da) {
+    State ds;
+    ds.u = s.du;
+    
     double e = params.e;
     double ml = (double)params.ml;
     double s3 = (double)params.sigma3;
@@ -15,35 +20,27 @@ static double complex get_v_eff(double r, Parameters params, Profile profile, in
     double v_ml = e * s3 * (a/r + da) + (ml*ml - 1.0)/(r*r) + e*e*a*a - 2.0*e*ml*a/r;
     
     // ODE: u'' + 1/r * u' - (v_ml + 1/r^2 - chi^2 + m^2) u = 0
-    // We rewrite as u'' = -1/r * u' + (v_ml + 1/r^2 - chi^2 + m^2) u
     // Effective potential term for u''
-    return v_ml + 1.0/(r*r) - params.chi * params.chi + params.m * params.m;
-}
-
-typedef struct {
-    double complex u;
-    double complex du;
-} State;
-
-static State f(double r, State s, Parameters params, Profile profile, int idx) {
-    State ds;
-    ds.u = s.du;
-    double complex v_eff = get_v_eff(r, params, profile, idx);
+    double complex v_eff = v_ml + 1.0/(r*r) - params.chi * params.chi + params.m * params.m;
+    
     ds.du = -1.0/r * s.du + v_eff * s.u;
     return ds;
 }
 
-static State rk4_step(double r, double h, State s, Parameters params, Profile profile, int idx) {
-    State k1 = f(r, s, params, profile, idx);
+static State rk4_step(double r, double h, State s, Parameters params, 
+                      double a_start, double da_start, 
+                      double a_mid, double da_mid, 
+                      double a_end, double da_end) {
+    State k1 = f(r, s, params, a_start, da_start);
     
     State s2 = {s.u + 0.5 * h * k1.u, s.du + 0.5 * h * k1.du};
-    State k2 = f(r + 0.5 * h, s2, params, profile, idx);
+    State k2 = f(r + 0.5 * h, s2, params, a_mid, da_mid);
     
     State s3 = {s.u + 0.5 * h * k2.u, s.du + 0.5 * h * k2.du};
-    State k3 = f(r + 0.5 * h, s3, params, profile, idx);
+    State k3 = f(r + 0.5 * h, s3, params, a_mid, da_mid);
     
     State s4 = {s.u + h * k3.u, s.du + h * k3.du};
-    State k4 = f(r + h, s4, params, profile, idx);
+    State k4 = f(r + h, s4, params, a_end, da_end);
     
     State res;
     res.u = s.u + (h/6.0) * (k1.u + 2.0*k2.u + 2.0*k3.u + k4.u);
@@ -72,7 +69,12 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     State curr = s0;
     for (int i = 0; i < N - 1; i++) {
         double h = profile.rho[i+1] - profile.rho[i];
-        curr = rk4_step(profile.rho[i], h, curr, params, profile, i);
+        double a_mid = 0.5 * (profile.a_phi[i] + profile.a_phi[i+1]);
+        double da_mid = 0.5 * (profile.da_phi[i] + profile.da_phi[i+1]);
+        curr = rk4_step(profile.rho[i], h, curr, params, 
+                        profile.a_phi[i], profile.da_phi[i],
+                        a_mid, da_mid,
+                        profile.a_phi[i+1], profile.da_phi[i+1]);
         u0[i+1] = curr.u;
     }
     double complex du0_last = curr.du;
@@ -91,11 +93,14 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     curr = sinf;
     for (int i = N - 1; i > 0; i--) {
         double h = profile.rho[i-1] - profile.rho[i];
-        // Use i-1 to be consistent with forward pass for the same interval
-        curr = rk4_step(profile.rho[i], h, curr, params, profile, i-1);
+        double a_mid = 0.5 * (profile.a_phi[i] + profile.a_phi[i-1]);
+        double da_mid = 0.5 * (profile.da_phi[i] + profile.da_phi[i-1]);
+        curr = rk4_step(profile.rho[i], h, curr, params, 
+                        profile.a_phi[i], profile.da_phi[i],
+                        a_mid, da_mid,
+                        profile.a_phi[i-1], profile.da_phi[i-1]);
         uinf[i-1] = curr.u;
     }
-    double complex duinf_first = curr.du;
 
     // Compute Wronskian W0 = rho * (u0' * uinf - u0 * uinf')
     // We can compute it at rho_max
