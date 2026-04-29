@@ -92,7 +92,20 @@ class Renormalizer:
         term1 = (torch.pow(rho_exp, 3) / (2.0 * k_exp*k_exp)) * torch.sin(theta)
         term2 = (torch.pow(rho_exp, 2) / (6.0 * torch.pow(k_exp, 3))) * torch.cos(theta)
         
-        uv_sub = (eb2_exp*eb2_exp) * (term1 + term2)
+        # Prefactor: (F / lambda^2)^2. 
+        # Since B = 2F / (pi * lambda^2) for step profile, 
+        # F / lambda^2 = pi * B / 2.
+        # So (F/lambda^2)^2 = pi^2 * B^2 / 4.
+        
+        # My current implementation is eb2 = (e*B/2)^2 = e^2 * B^2 / 4.
+        # To match Eq 2.59 prefactor (F/lambda^2)^2, we need:
+        # factor = (F / lambda^2)**2. 
+        # I will update this calculation.
+        
+        F_lambda2 = (np.pi * B) / 2.0 # F / lambda^2
+        factor = (F_lambda2 * F_lambda2).to(torch.complex128)
+        
+        uv_sub = factor * (term1 + term2)
         return uv_sub
 
     def compute_whittaker_benchmark(self, chi: float, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
