@@ -36,10 +36,16 @@ def get_step_function_params(chi: complex, ml: int, sigma3: int, m: float, lambd
     # F is the total flux, F_cal is e*F / (2*pi)
     F_cal = e * F / (2.0 * np.pi)
     
-    # k^2 in the interior
-    k2 = chi**2 - m**2 - (2.0 * F_cal / lambd**2) * (sigma3 - ml)
+    # Whittaker parameters: kappa = (chi^2 - m^2) / (4 * e * F_dim / lambda^2) + (ml - sigma3)/2
+    # Equation derived from matching ODE to Whittaker form z'' + (-1/4 + kappa/z + (1/4-mu^2)/z^2) z = 0
+    # Our ODE: u'' + 1/r u' - ((ml-eA)^2/r^2 + e*s3*B + m^2 - chi^2) u = 0
+    # For interior A = (F_cal/l^2) * r, B = 2*F_cal/l^2
+    # kappa = (chi^2 - m^2 - 2*e*s3*F_cal/l^2) / (4*F_cal/l^2) + ml/2 ?? 
+    # Let's use the dissertation's kappa if possible.
+    # Eq 2.76: k^2 = chi^2 - m^2 - 2*F_cal/l^2 * (sigma3 - ml)
+    # Eq 2.73/2.74: kappa = l^2 * k^2 / (4 * F_cal)
     
-    # Whittaker parameters: kappa = (lambda^2 * k^2) / (4 * F_cal)
+    k2 = chi**2 - m**2 - (2.0 * F_cal / lambd**2) * (sigma3 - ml)
     kappa = (lambd**2 * k2) / (4.0 * F_cal)
     mu = ml / 2.0
     
@@ -78,24 +84,11 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     u0_int_l = complex(mpmath.whitm(kappa, mu, z_l)) / lambd
     uinf_int_l = complex(mpmath.whitw(kappa, mu, z_l)) / lambd
     
-    # Derivatives at lambda (using Whittaker recurrence or finite difference for simplicity here)
-    def d_whitm(k, m_val, z):
-        return (0.5 - k/z) * mpmath.whitm(k, m_val, z) + (m_val + 0.5 + k) * mpmath.whitm(k-1, m_val, z) / z # Verification needed
-    
-    # Simple numerical derivative for robustness
-    dz = 1e-7
-    du0_int_l = (complex(mpmath.whitm(kappa, mu, z_l + dz)) / (lambd * (1 + dz/z_l)**0.5) - u0_int_l) / (dz * (2*F_cal/lambd))
-    # Correct derivative of u(rho) = M(z(rho))/rho:
-    # du/drho = (dM/dz * dz/drho) / rho - M/rho^2
-    # dz/drho = 2 * F_cal * rho / lambd^2
-    dz_drho = 2.0 * F_cal / lambd
-    
+    # Derivatives at lambda
     def get_u_and_du(r, is_u0=True):
         z = (F_cal / lambd**2) * r**2
         if is_u0:
             val = complex(mpmath.whitm(kappa, mu, z)) / r
-            val_p = complex(mpmath.whitm(kappa, mu, z * (1+1e-8))) / (r * (1+1e-8)**0.5)
-            # Actually just use mpmath diff
             dval = complex(mpmath.diff(lambda x: mpmath.whitm(kappa, mu, (F_cal/lambd**2)*x**2)/x, r))
         else:
             val = complex(mpmath.whitw(kappa, mu, z)) / r
@@ -105,9 +98,6 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     u0_l, du0_l = get_u_and_du(lambd, True)
     
     # 2. Exterior Solutions at lambda
-    # Regular at infinity: we use H1 or Y depending on convention, but solver uses Y/K.
-    # Dissertation Eq 2.56 uses Y_n(k Lrho) for u_inf.
-    # Let's use J_n and Y_n as the basis.
     j_l = jv(n, k_ext * lambd)
     y_l = yv(n, k_ext * lambd)
     dj_l = k_ext * 0.5 * (jv(n-1, k_ext * lambd) - jv(n+1, k_ext * lambd))
@@ -118,8 +108,6 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     # u'_ext(l) - u'_int(l) = - (2*F_cal / lambd^2) * u(l)
     
     # For u0 (regular at origin):
-    # u0_full = u0_int (rho < l)
-    # u0_full = A*J_n + B*Y_n (rho > l)
     # A*J + B*Y = u0_l
     # A*DJ + B*DY = du0_l - (2*F_cal/lambd^2)*u0_l
     mat = np.array([[j_l, y_l], [dj_l, dy_l]])
@@ -127,15 +115,11 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     coeffs_u0 = np.linalg.solve(mat, vec)
     
     # For uinf (regular at infinity/boundary):
-    # We define uinf_ext = Y_n (matching student's BC)
-    # uinf_full = Y_n (rho > l)
-    # uinf_full = C*M + D*W (rho < l)
+    # uinf_ext = Y_n
     uinf_l = y_l
     duinf_l_ext = dy_l
     duinf_l_int = duinf_l_ext + (2.0 * F_cal / lambd**2) * uinf_l
     
-    # C*M/l + D*W/l = uinf_l
-    # C*(M/l)' + D*(W/l)' = duinf_l_int
     u_m_l, du_m_l = get_u_and_du(lambd, True)
     u_w_l, du_w_l = get_u_and_du(lambd, False)
     mat_inf = np.array([[u_m_l, u_w_l], [du_m_l, du_w_l]])
@@ -145,10 +129,7 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     # 4. Construct Full Solution
     g_full = np.zeros(len(rho_grid), dtype=complex)
     
-    # Wronskian W0 = rho * (u0' * uinf - u0 * uinf')
-    # Can compute in exterior: u0 = A*J + B*Y, uinf = Y
-    # W = (A*J' + B*Y')*Y - (A*J + B*Y)*Y' = A(J'Y - JY') = A * (-2 / (pi * k * rho))
-    # W0 = rho * W = -2*A / (pi * k)
+    # W0 = rho * (u0' * uinf - u0 * uinf')
     W0 = -2.0 * coeffs_u0[0] / (np.pi * k_ext)
     
     for i, r in enumerate(rho_grid):
@@ -159,7 +140,7 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
             u0_val = coeffs_u0[0] * jv(n, k_ext * r) + coeffs_u0[1] * yv(n, k_ext * r)
             uinf_val = yv(n, k_ext * r)
         
-        g_full[i] = (u0_val * uinf_val) / W0
+        g_full[i] = (r * u0_val * uinf_val) / W0
         
     return g_full
 

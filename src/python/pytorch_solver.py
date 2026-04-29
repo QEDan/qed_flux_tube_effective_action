@@ -27,10 +27,27 @@ class PyTorchSolver:
         return v_ml + 1.0 / (r*r) - (chi*chi - m*m)
 
 
+    def _finalize_results(self, rho, u0, uinf, state_u0_match, state_uinf_match, match_idx):
+        # Match at match_idx
+        u0_match = state_u0_match[:, 0]
+        du0_match = state_u0_match[:, 1]
+        uinf_match = state_uinf_match[:, 0]
+        duinf_match = state_uinf_match[:, 1]
+
+        # W0 = rho * (u0' * uinf - u0 * uinf')
+        W0 = rho[match_idx] * (du0_match * uinf_match - u0_match * duinf_match)
+
+        # G(rho, rho) = (rho * u0 * uinf) / W0
+        # This matches Eq 2.54 and 2.57 in greensfunc.tex
+        results = (rho.unsqueeze(0) * u0 * uinf) / W0.unsqueeze(1)
+        self.last_u0 = u0
+        self.last_uinf = uinf
+        return results, W0
+
     def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> torch.Tensor:
         """
-        Solves the ODE using a matching condition at a central point to replace 
-        the unstable backward integration.
+        Solves the ODE using a matching condition at a central point.
+        Includes handling of delta-function jump conditions at profile boundaries.
         """
         # Get tensors
         rho, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
@@ -39,6 +56,10 @@ class PyTorchSolver:
         da_phi = da_phi.to(self.device)
         n_batch = len(params_list)
         n_points = len(rho)
+
+        # Check if profile has a jump (like StepFunctionProfile)
+        lambd = getattr(field_profile, 'lambd', None)
+        F = getattr(field_profile, 'F', None)
 
         # Batch parameters
         params = {
@@ -61,6 +82,15 @@ class PyTorchSolver:
 
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
+
+            # Apply delta jump if crossing lambda
+            if lambd is not None and rho[i] < lambd <= rho[i+1]:
+                F_cal = params['e'] * F / (2.0 * np.pi)
+                # Jump: u'(l+) = u'(l-) - (2*F_cal / lambd^2) * u(l)
+                # Equation 2.75: -2*F_cal/lambda^2 * delta(rho - lambda)
+                jump_coeff = -2.0 * F_cal / (lambd**2)
+                state_u0[:, 1] += jump_coeff * state_u0[:, 0]
+
             state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
                                      a_phi[i], da_phi[i],
                                      0.5*(a_phi[i]+a_phi[i+1]), 0.5*(da_phi[i]+da_phi[i+1]),
@@ -82,6 +112,14 @@ class PyTorchSolver:
 
         for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
+
+            # Apply delta jump if crossing lambda (backward)
+            # u'(l-) = u'(l+) + (2*F_cal / lambd^2) * u(l)
+            if lambd is not None and rho[i] > lambd >= rho[i-1]:
+                F_cal = params['e'] * F / (2.0 * np.pi)
+                jump_coeff = 2.0 * F_cal / (lambd**2)
+                state_uinf[:, 1] += jump_coeff * state_uinf[:, 0]
+
             state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
                                        a_phi[i], da_phi[i],
                                        0.5*(a_phi[i]+a_phi[i-1]), 0.5*(da_phi[i]+da_phi[i-1]),
@@ -90,18 +128,8 @@ class PyTorchSolver:
             if i - 1 == match_idx:
                 state_uinf_match = state_uinf.clone()
 
-        # Match at match_idx
-        u0_match = state_u0_match[:, 0]
-        du0_match = state_u0_match[:, 1]
-        uinf_match = state_uinf_match[:, 0]
-        duinf_match = state_uinf_match[:, 1]
+        return self._finalize_results(rho, u0, uinf, state_u0_match, state_uinf_match, match_idx)
 
-        W0 = rho[match_idx] * (du0_match * uinf_match - u0_match * duinf_match)
-
-        results = (u0 * uinf) / W0.unsqueeze(1)
-        self.last_u0 = u0
-        self.last_uinf = uinf
-        return results, W0
 
     def f(self, r: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
         u = state[:, 0]

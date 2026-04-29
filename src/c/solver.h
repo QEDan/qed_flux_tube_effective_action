@@ -9,6 +9,8 @@ typedef struct {
     int sigma3;
     double m;
     double e;
+    double lambd;
+    double F;
 } Parameters;
 
 typedef struct {

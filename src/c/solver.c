@@ -69,6 +69,14 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     State curr = s0;
     for (int i = 0; i < N - 1; i++) {
         double h = profile.rho[i+1] - profile.rho[i];
+        
+        // Delta jump condition
+        if (params.lambd > 0 && profile.rho[i] < params.lambd && profile.rho[i+1] >= params.lambd) {
+            double F_cal = params.e * params.F / (2.0 * M_PI);
+            double jump_coeff = -2.0 * F_cal / (params.lambd * params.lambd);
+            curr.du += jump_coeff * curr.u;
+        }
+        
         double a_mid = 0.5 * (profile.a_phi[i] + profile.a_phi[i+1]);
         double da_mid = 0.5 * (profile.da_phi[i] + profile.da_phi[i+1]);
         curr = rk4_step(profile.rho[i], h, curr, params, 
@@ -93,6 +101,14 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     curr = sinf;
     for (int i = N - 1; i > 0; i--) {
         double h = profile.rho[i-1] - profile.rho[i];
+
+        // Delta jump condition (backward)
+        if (params.lambd > 0 && profile.rho[i] > params.lambd && profile.rho[i-1] <= params.lambd) {
+            double F_cal = params.e * params.F / (2.0 * M_PI);
+            double jump_coeff = 2.0 * F_cal / (params.lambd * params.lambd);
+            curr.du += jump_coeff * curr.u;
+        }
+
         double a_mid = 0.5 * (profile.a_phi[i] + profile.a_phi[i-1]);
         double da_mid = 0.5 * (profile.da_phi[i] + profile.da_phi[i-1]);
         curr = rk4_step(profile.rho[i], h, curr, params, 
@@ -107,7 +123,7 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     double complex W0 = rho_max * (du0_last * uinf[N-1] - u0[N-1] * sinf.du);
     
     for (int i = 0; i < N; i++) {
-        results[i] = (u0[i] * uinf[i]) / W0;
+        results[i] = (profile.rho[i] * u0[i] * uinf[i]) / W0;
     }
     
     free(u0);

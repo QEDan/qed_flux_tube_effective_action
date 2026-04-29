@@ -23,6 +23,8 @@ class Parameters(ctypes.Structure):
         ("sigma3", ctypes.c_int),
         ("m", ctypes.c_double),
         ("e", ctypes.c_double),
+        ("lambd", ctypes.c_double),
+        ("F", ctypes.c_double),
     ]
 
 class Profile(ctypes.Structure):
@@ -55,6 +57,9 @@ class CSolverBackend:
         rho, a_phi, da_phi = field_profile.get_arrays()
         n_points = len(rho)
         
+        lambd = getattr(field_profile, 'lambd', 0.0)
+        F = getattr(field_profile, 'F', 0.0)
+
         params_array = (Parameters * n_params)()
         for i, p in enumerate(params_list):
             params_array[i] = Parameters(
@@ -62,7 +67,9 @@ class CSolverBackend:
                 ml=int(p['ml']),
                 sigma3=int(p['sigma3']),
                 m=float(p['m']),
-                e=float(p['e'])
+                e=float(p['e']),
+                lambd=float(lambd),
+                F=float(F)
             )
             
         c_profile = Profile(
