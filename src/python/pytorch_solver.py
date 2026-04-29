@@ -29,18 +29,17 @@ class PyTorchSolver:
 
     def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> torch.Tensor:
         """
-        params_list: list of dicts (converted to batch tensors)
-        field_profile: FieldProfile object
+        Solves the ODE using a matching condition at a central point to replace 
+        the unstable backward integration.
         """
-        # Get tensors without detaching to preserve gradients
+        # Get tensors
         rho, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
         rho = rho.to(self.device)
         a_phi = a_phi.to(self.device)
         da_phi = da_phi.to(self.device)
-        
         n_batch = len(params_list)
         n_points = len(rho)
-        
+
         # Batch parameters
         params = {
             'chi': torch.tensor([p['chi'] for p in params_list], device=self.device, dtype=torch.complex128),
@@ -49,66 +48,61 @@ class PyTorchSolver:
             'm': torch.tensor([p['m'] for p in params_list], device=self.device, dtype=torch.float64),
             'e': torch.tensor([p['e'] for p in params_list], device=self.device, dtype=torch.float64),
         }
-        
-        # u0 integration (forward)
+
+        # Match at central point (n_points // 2)
+        match_idx = n_points // 2
+
+        # Integrate forward from rho[0] (Regular at origin)
         u0 = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
-        
-        # Initial conditions for u0
-        rho_min = rho[0]
         abs_ml = torch.abs(params['ml']).to(torch.float64)
-        
-        u_init = torch.where(abs_ml == 0, 
-                             torch.ones_like(abs_ml, dtype=torch.complex128), 
-                             torch.pow(rho_min, abs_ml) + 0j)
-        du_init = torch.where(abs_ml == 0, 
-                              torch.zeros_like(abs_ml, dtype=torch.complex128), 
-                              abs_ml * torch.pow(rho_min, abs_ml - 1) + 0j)
-        
-        curr_state = torch.stack([u_init, du_init], dim=1) # (batch, 2)
-        u0[:, 0] = curr_state[:, 0]
-        
-        for i in range(n_points - 1):
+        u0[:, 0] = torch.where(abs_ml == 0, 1.0+0j, torch.pow(rho[0], abs_ml) + 0j)
+        du0 = torch.where(abs_ml == 0, 0.0+0j, abs_ml * torch.pow(rho[0], abs_ml - 1) + 0j)
+        state_u0 = torch.stack([u0[:, 0], du0], dim=1)
+
+        for i in range(match_idx):
             h = rho[i+1] - rho[i]
-            # Approximate midpoint for profile
-            a_mid = 0.5 * (a_phi[i] + a_phi[i+1])
-            da_mid = 0.5 * (da_phi[i] + da_phi[i+1])
-            curr_state = self.rk4_step(rho[i], h, curr_state, params, 
-                                       a_phi[i], da_phi[i],
-                                       a_mid, da_mid,
-                                       a_phi[i+1], da_phi[i+1])
-            u0[:, i+1] = curr_state[:, 0]
-            
-        du0_last = curr_state[:, 1]
-        
-        # uinf integration (backward)
+            state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
+                                     a_phi[i], da_phi[i],
+                                     0.5*(a_phi[i]+a_phi[i+1]), 0.5*(da_phi[i]+da_phi[i+1]),
+                                     a_phi[i+1], da_phi[i+1])
+            u0[:, i+1] = state_u0[:, 0]
+
+        # Integrate backward from rho[-1] (Regular at infinity)
+        # Note: As we have seen, backward integration is unstable if solutions oscillate.
+        # However, for this flux tube, uinf is defined by the exterior Bessel boundary.
         uinf = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
-        
-        rho_max = rho[-1]
+
+        # Using analytic BC at rho[-1] for stability
         k = torch.sqrt(params['chi']*params['chi'] - params['m']*params['m'])
-        # Ensure Re(k) > 0 or Im(k) > 0 for proper decay/oscillation
-        k = torch.where(k.real < 0, -k, k)
-        
-        u_inf_init = torch.exp(-k * rho_max) / torch.sqrt(rho_max)
-        du_inf_init = (-k - 0.5/rho_max) * u_inf_init
-        
-        curr_state = torch.stack([u_inf_init, du_inf_init], dim=1)
-        uinf[:, -1] = curr_state[:, 0]
-        
-        for i in range(n_points - 1, 0, -1):
+        u_inf_init = torch.exp(-k * rho[-1]) / torch.sqrt(rho[-1])
+        du_inf_init = (-k - 0.5/rho[-1]) * u_inf_init
+
+        state_uinf = torch.stack([u_inf_init, du_inf_init], dim=1)
+        uinf[:, -1] = state_uinf[:, 0]
+
+        for i in range(n_points - 1, match_idx - 1, -1):
             h = rho[i-1] - rho[i]
-            # Approximate midpoint for profile
-            a_mid = 0.5 * (a_phi[i] + a_phi[i-1])
-            da_mid = 0.5 * (da_phi[i] + da_phi[i-1])
-            curr_state = self.rk4_step(rho[i], h, curr_state, params, 
+            state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
                                        a_phi[i], da_phi[i],
-                                       a_mid, da_mid,
+                                       0.5*(a_phi[i]+a_phi[i-1]), 0.5*(da_phi[i]+da_phi[i-1]),
                                        a_phi[i-1], da_phi[i-1])
-            uinf[:, i-1] = curr_state[:, 0]
-            
-        # Wronskian W0 = rho * (u0' * uinf - u0 * uinf') at rho_max
-        W0 = rho_max * (du0_last * uinf[:, -1] - u0[:, -1] * du_inf_init)
-        
+            uinf[:, i-1] = state_uinf[:, 0]
+
+        # Match at match_idx
+        u0_match = state_u0[:, 0]
+        du0_match = state_u0[:, 1]
+        uinf_match = state_uinf[:, 0]
+        duinf_match = state_uinf[:, 1]
+
+        W0 = rho[match_idx] * (du0_match * uinf_match - u0_match * duinf_match)
+
+        # Rescale uinf to match u0 at match_idx (uinf_corr = uinf * (u0_match / uinf_match))
+        scaling = u0_match / uinf_match
+        uinf = uinf * scaling.unsqueeze(1)
+
         results = (u0 * uinf) / W0.unsqueeze(1)
+        self.last_u0 = u0
+        self.last_uinf = uinf
         return results, W0
 
     def f(self, r: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:

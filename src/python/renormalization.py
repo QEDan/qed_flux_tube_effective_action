@@ -97,10 +97,8 @@ class Renormalizer:
         # F / lambda^2 = pi * B / 2.
         # So (F/lambda^2)^2 = pi^2 * B^2 / 4.
         
-        # My current implementation is eb2 = (e*B/2)^2 = e^2 * B^2 / 4.
         # To match Eq 2.59 prefactor (F/lambda^2)^2, we need:
         # factor = (F / lambda^2)**2. 
-        # I will update this calculation.
         
         F_lambda2 = (np.pi * B) / 2.0 # F / lambda^2
         factor = (F_lambda2 * F_lambda2).to(torch.complex128)
