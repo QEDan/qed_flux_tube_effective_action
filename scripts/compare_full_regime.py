@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "s
 
 from orchestrator import Orchestrator
 from profiles import StepFunctionProfile
-from analytic import get_interior_solutions, get_analytic_wronskian
+from analytic import get_full_analytic_solution, get_analytic_wronskian
 
 def compare_full_regime():
     # Parameters
@@ -36,46 +36,36 @@ def compare_full_regime():
     results_num, w0_num = orc.backend.solve_batch(params, profile)
     res_num = results_num[0].detach().numpy()
     
-    # Analytic
-    # Interior
-    u0_ana, uinf_ana = get_interior_solutions(rho_int, chi, ml, sigma3, m, lambd, F)
-    W0_ana = get_analytic_wronskian(chi, ml, sigma3, m, lambd, F)
-    ana_int = (u0_ana * uinf_ana) / W0_ana
-    
-    # Exterior
-    k_ext = np.sqrt(chi**2 - m**2 + 0j)
-    # G0 approx -pi/2 * rho * J * Y
-    ana_ext = -0.5 * np.pi * rho_ext * jv(ml, k_ext * rho_ext) * yv(ml, k_ext * rho_ext)
-    ana_full = np.concatenate([ana_int, ana_ext])
+    # Analytic - Full Matched Solution
+    ana_full = get_full_analytic_solution(rho_full, chi, ml, sigma3, m, lambd, F, e=1.0)
     
     # Normalization (Path A) - apply to full numerical array
-    scaling = w0_num[0].detach().numpy() / W0_ana
-    res_num_scaled = res_num / scaling
+    # Since we corrected the analytic logic, we should check if scaling is still needed
+    # or if we can use absolute comparison.
+    scaling = 1.0 # Default
+    # res_num_scaled = res_num / scaling
+    res_num_scaled = res_num # For now, let's see raw comparison
     
     # Visualization: 2 subplots (Overlay, Residual)
-    print(f"Num Scaled[0]: {res_num_scaled[0]}")
-    print(f"Num Scaled[100]: {res_num_scaled[100]}")
-    print(f"Num Scaled[-1]: {res_num_scaled[-1]}")
-    print(f"Ana Full[0]: {ana_full[0]}")
-    print(f"Ana Full[100]: {ana_full[100]}")
-    print(f"Ana Full[-1]: {ana_full[-1]}")
+    print(f"Rho[0]: {rho_full[0]}, Rho[1]: {rho_full[1]}")
+    print(f"Num raw[0]: {res_num[0]}, Num raw[1]: {res_num[1]}")
+    print(f"Ana Full[0]: {ana_full[0]}, Ana Full[1]: {ana_full[1]}")
 
     fig, axes = plt.subplots(2, 1, figsize=(10, 12), sharex=True)
     
     # Overlay
-    axes[0].plot(rho_full, res_num_scaled.real, label="Numerical G (Scaled)", linestyle='--')
-    axes[0].plot(rho_int, ana_int.real, label="Analytic Interior")
-    axes[0].plot(rho_ext, ana_ext.real, label="Analytic Exterior")
+    axes[0].plot(rho_full, res_num.real, label="Numerical G", linestyle='--')
+    axes[0].plot(rho_full, ana_full.real, label="Matched Analytic G")
     axes[0].axvline(lambd, color='k', linestyle=':', label='$\lambda$')
     axes[0].set_title("Full Domain Green's Function (Real)")
     axes[0].legend()
     axes[0].grid(True)
     
     # Residuals
-    residuals = np.abs(res_num_scaled - ana_full)
+    residuals = np.abs(res_num - ana_full)
     axes[1].plot(rho_full, residuals, label="Absolute Residual")
     axes[1].axvline(lambd, color='k', linestyle=':')
-    axes[1].set_title("Residuals (Numerical - Analytic)")
+    axes[1].set_title("Residuals (Numerical - Matched Analytic)")
     axes[1].set_xlabel("Radial coordinate rho")
     axes[1].set_ylabel("Absolute Error")
     axes[1].grid(True)

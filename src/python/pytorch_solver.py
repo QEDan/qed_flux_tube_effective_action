@@ -59,17 +59,17 @@ class PyTorchSolver:
         du0 = torch.where(abs_ml == 0, 0.0+0j, abs_ml * torch.pow(rho[0], abs_ml - 1) + 0j)
         state_u0 = torch.stack([u0[:, 0], du0], dim=1)
 
-        for i in range(match_idx):
+        for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
             state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
                                      a_phi[i], da_phi[i],
                                      0.5*(a_phi[i]+a_phi[i+1]), 0.5*(da_phi[i]+da_phi[i+1]),
                                      a_phi[i+1], da_phi[i+1])
             u0[:, i+1] = state_u0[:, 0]
+            if i + 1 == match_idx:
+                state_u0_match = state_u0.clone()
 
         # Integrate backward from rho[-1] (Regular at infinity)
-        # Note: As we have seen, backward integration is unstable if solutions oscillate.
-        # However, for this flux tube, uinf is defined by the exterior Bessel boundary.
         uinf = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
 
         # Using analytic BC at rho[-1] for stability
@@ -80,25 +80,23 @@ class PyTorchSolver:
         state_uinf = torch.stack([u_inf_init, du_inf_init], dim=1)
         uinf[:, -1] = state_uinf[:, 0]
 
-        for i in range(n_points - 1, match_idx - 1, -1):
+        for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
             state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
                                        a_phi[i], da_phi[i],
                                        0.5*(a_phi[i]+a_phi[i-1]), 0.5*(da_phi[i]+da_phi[i-1]),
                                        a_phi[i-1], da_phi[i-1])
             uinf[:, i-1] = state_uinf[:, 0]
+            if i - 1 == match_idx:
+                state_uinf_match = state_uinf.clone()
 
         # Match at match_idx
-        u0_match = state_u0[:, 0]
-        du0_match = state_u0[:, 1]
-        uinf_match = state_uinf[:, 0]
-        duinf_match = state_uinf[:, 1]
+        u0_match = state_u0_match[:, 0]
+        du0_match = state_u0_match[:, 1]
+        uinf_match = state_uinf_match[:, 0]
+        duinf_match = state_uinf_match[:, 1]
 
         W0 = rho[match_idx] * (du0_match * uinf_match - u0_match * duinf_match)
-
-        # Rescale uinf to match u0 at match_idx (uinf_corr = uinf * (u0_match / uinf_match))
-        scaling = u0_match / uinf_match
-        uinf = uinf * scaling.unsqueeze(1)
 
         results = (u0 * uinf) / W0.unsqueeze(1)
         self.last_u0 = u0
