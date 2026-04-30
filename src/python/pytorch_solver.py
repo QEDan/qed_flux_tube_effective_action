@@ -116,8 +116,8 @@ class PyTorchSolver:
                 state_uinf[:, 1] += jump_coeff * state_uinf[:, 0]
 
         # 3. Wronskian at rho_max
-        # W0 = rho * (u0 * uinf' - u0' * uinf)
-        W0 = rho[-1] * (state_u0[:, 0] * du_inf_init - state_u0[:, 1] * u_inf_init)
+        # W0 = rho * (u0' * uinf - u0 * uinf')
+        W0 = rho[-1] * (state_u0[:, 1] * u_inf_init - state_u0[:, 0] * du_inf_init)
 
         results = (rho.unsqueeze(0) * u0 * uinf) / W0.unsqueeze(1)
         self.last_u0 = u0

@@ -142,9 +142,9 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
         }
     }
 
-    // Compute Wronskian W0 = rho * (u0 * uinf' - u0' * uinf)
+    // Compute Wronskian W0 = rho * (u0' * uinf - u0 * uinf')
     // We can compute it at rho_max
-    double complex W0 = rho_max * (u0[N-1] * sinf.du - du0_last * uinf[N-1]);
+    double complex W0 = rho_max * (du0_last * uinf[N-1] - u0[N-1] * sinf.du);
     
     for (int i = 0; i < N; i++) {
         results[i] = (profile.rho[i] * u0[i] * uinf[i]) / W0;
