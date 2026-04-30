@@ -2,7 +2,8 @@
 from sage.all import *
 
 # Define symbols
-rho, m, ml, e, F, lambd = var('rho m ml e F lambd')
+rho, m, ml, e, F, lambd, sigma3 = var('rho m ml e F lambd sigma3')
+u = function('u')(rho)
 Aphi = function('Aphi')(rho)
 
 # Define B-field and V_ml
