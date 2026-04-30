@@ -39,7 +39,7 @@ def test_zero_field_cancellation():
     
     # Assert action is zero
     assert torch.abs(action) < 1e-8, f"Action should be zero for zero field, got {action.item()}"
-    print("Zero-field test passed!")
+    print("Zero-field cancellation validated: Renormalized action is zero as expected for zero magnetic flux.")
 
 if __name__ == "__main__":
     test_zero_field_cancellation()

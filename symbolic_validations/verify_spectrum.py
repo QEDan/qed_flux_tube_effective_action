@@ -34,3 +34,4 @@ def verify_spectrum():
 
 if __name__ == "__main__":
     verify_spectrum()
+    print("Validation complete: Verified the theoretical link between the radial operator spectrum and the Whittaker solution structure.")
