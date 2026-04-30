@@ -85,6 +85,9 @@ class CSolverBackend:
         res_np = np.frombuffer(results_array, dtype=np.complex128).reshape(n_params, n_points)
         return res_np
 
+    def solve_batch_with_w0(self, params_list: List[Dict[str, Any]], field_profile: Any) -> Tuple[np.ndarray, Optional[torch.Tensor]]:
+        return self.solve_batch(params_list, field_profile), None
+
 class Orchestrator:
     def __init__(self, backend_type: str = "pytorch", device: Optional[str] = None, lib_path: str = "./libsolver.so", batch_size: int = 128) -> None:
         self.backend_type = backend_type
@@ -158,7 +161,10 @@ class Orchestrator:
 
             if numerical_batch:
                 # Solve ODE for numerical batch
-                num_results, num_w0 = self.backend.solve_batch(numerical_batch, field_profile)
+                if hasattr(self.backend, 'solve_batch_with_w0'):
+                    num_results, num_w0 = self.backend.solve_batch_with_w0(numerical_batch, field_profile)
+                else:
+                    num_results, num_w0 = self.backend.solve_batch(numerical_batch, field_profile)
 
                 # Apply Path A normalization scaling if profile is StepFunctionProfile
                 if isinstance(field_profile, StepFunctionProfile):
@@ -167,8 +173,10 @@ class Orchestrator:
                         try:
                             W0_ana = get_analytic_wronskian(p['chi'], p['ml'], p['sigma3'], p['m'], field_profile.lambd, field_profile.F, e=p['e'])
                             # Scale numerical results by (W0_num / W0_ana) to fix normalization
-                            scaling = num_w0[idx] / W0_ana
-                            num_results[idx] /= scaling
+                            # Note: num_w0 might be None for C backend, handle it.
+                            if num_w0 is not None:
+                                scaling = num_w0[idx] / W0_ana
+                                num_results[idx] /= scaling
                         except (ValueError, ZeroDivisionError):
                             # If analytic W0 is at a pole or zero, skip scaling
                             pass

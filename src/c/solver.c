@@ -17,16 +17,17 @@ static State f(double r, State s, Parameters params, double a, double da) {
     double ml = (double)params.ml;
     double s3 = (double)params.sigma3;
     
-    double v_ml = e * s3 * (a/r + da) + (ml*ml - 1.0)/(r*r) + e*e*a*a - 2.0*e*ml*a/r;
+    double r_eps = r + 1e-15;
+    double v_ml = e * s3 * (a/r_eps + da) + (ml*ml - 1.0)/(r_eps*r_eps) + e*e*a*a - 2.0*e*ml*a/r_eps;
     
     // Convert chi to complex
     double complex chi = params.chi.real + params.chi.imag * I;
     
     // ODE: u'' + 1/r * u' - (v_ml + 1/r^2 - (chi^2 - m^2)) u = 0
     // Effective potential term for u''
-    double complex v_eff = v_ml + 1.0/(r*r) - (chi * chi - params.m * params.m);
+    double complex v_eff = v_ml + 1.0/(r_eps*r_eps) - (chi * chi - params.m * params.m);
     
-    ds.du = -1.0/r * s.du + v_eff * s.u;
+    ds.du = -1.0/r_eps * s.du + v_eff * s.u;
     return ds;
 }
 

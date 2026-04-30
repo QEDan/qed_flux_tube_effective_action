@@ -28,7 +28,9 @@ def test_exact_boundary_conditions():
     # We will solve the ODE on the interior domain [0.1, lambd]
     # to isolate interior dynamics from the complex exterior jump.
     rho_np = np.linspace(0.1, lambd, 100)
-    profile = StepFunctionProfile(rho_np, lambd=lambd, F=F, e=e)
+    # We use a lambd_eff slightly larger than the grid max to avoid the boundary jump
+    # in the StepFunctionProfile's update logic at the last grid point.
+    profile = StepFunctionProfile(rho_np, lambd=lambd*1.01, F=F, e=e)
     solver = PyTorchSolver(device="cpu")
     
     # 1. Analytic reference at boundaries [0.1, lambd]

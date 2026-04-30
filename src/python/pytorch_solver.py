@@ -20,11 +20,14 @@ class PyTorchSolver:
         chi = params['chi']
         m = params['m']
         
+        # Add epsilon to r to avoid division by zero
+        r_eps = r + 1e-15
+        
         # V_ml(rho) = e*sigma3 * (Aphi/rho + dAphi/drho) + (ml^2-1)/rho^2 + e^2*Aphi^2 - 2*e*ml*Aphi/rho
-        v_ml = e * s3 * (a_phi / r + da_phi) + (ml*ml - 1.0) / (r*r) + (e * a_phi)*(e * a_phi) - 2.0 * e * ml * a_phi / r
+        v_ml = e * s3 * (a_phi / r_eps + da_phi) + (ml*ml - 1.0) / (r_eps*r_eps) + (e * a_phi)*(e * a_phi) - 2.0 * e * ml * a_phi / r_eps
         
         # ODE: u'' + 1/rho * u' - [V_ml + 1/rho^2 - (chi^2 - m^2)] u = 0
-        return v_ml + 1.0 / (r*r) - (chi*chi - m*m)
+        return v_ml + 1.0 / (r_eps*r_eps) - (chi*chi - m*m)
 
 
     def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> torch.Tensor:
