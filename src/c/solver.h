@@ -4,7 +4,12 @@
 #include <complex.h>
 
 typedef struct {
-    double complex chi;
+    double real;
+    double imag;
+} Complex128;
+
+typedef struct {
+    Complex128 chi;
     int ml;
     int sigma3;
     double m;

@@ -29,6 +29,15 @@ def test_pytorch_vs_c():
     results_pt, _ = orc_pt.backend.solve_batch(params_grid, profile)
     
     # Compare
+    res_c = results_c[0]
+    res_pt = results_pt[0].detach().numpy()
+    print(f"C backend [0]: {res_c[0]}")
+    print(f"PT backend [0]: {res_pt[0]}")
+    print(f"C backend [mid]: {res_c[len(rho)//2]}")
+    print(f"PT backend [mid]: {res_pt[len(rho)//2]}")
+    print(f"C backend [-1]: {res_c[-1]}")
+    print(f"PT backend [-1]: {res_pt[-1]}")
+    
     max_diff = np.max(np.abs(results_c - results_pt.detach().numpy()))
     assert max_diff < 1e-10, f"Difference too large: {max_diff}"
 

@@ -165,12 +165,12 @@ class Orchestrator:
                     from analytic import get_analytic_wronskian
                     for idx, p in enumerate(numerical_batch):
                         try:
-                            W0_ana = get_analytic_wronskian(p['chi'], p['ml'], p['sigma3'], p['m'], field_profile.lambd, field_profile.F)
+                            W0_ana = get_analytic_wronskian(p['chi'], p['ml'], p['sigma3'], p['m'], field_profile.lambd, field_profile.F, e=p['e'])
                             # Scale numerical results by (W0_num / W0_ana) to fix normalization
                             scaling = num_w0[idx] / W0_ana
                             num_results[idx] /= scaling
-                        except ValueError:
-                            # If analytic W0 is at a pole, skip scaling or use alternative approach
+                        except (ValueError, ZeroDivisionError):
+                            # If analytic W0 is at a pole or zero, skip scaling
                             pass
 
                 # Get G0 and UV sub for numerical batch

@@ -19,9 +19,12 @@ static State f(double r, State s, Parameters params, double a, double da) {
     
     double v_ml = e * s3 * (a/r + da) + (ml*ml - 1.0)/(r*r) + e*e*a*a - 2.0*e*ml*a/r;
     
+    // Convert chi to complex
+    double complex chi = params.chi.real + params.chi.imag * I;
+    
     // ODE: u'' + 1/r * u' - (v_ml + 1/r^2 - (chi^2 - m^2)) u = 0
     // Effective potential term for u''
-    double complex v_eff = v_ml + 1.0/(r*r) - (params.chi * params.chi - params.m * params.m);
+    double complex v_eff = v_ml + 1.0/(r*r) - (chi * chi - params.m * params.m);
     
     ds.du = -1.0/r * s.du + v_eff * s.u;
     return ds;
@@ -53,6 +56,8 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     double complex* u0 = malloc(N * sizeof(double complex));
     double complex* uinf = malloc(N * sizeof(double complex));
     
+    double complex chi = params.chi.real + params.chi.imag * I;
+    
     // Boundary condition for u0 at small rho
     double rho_min = profile.rho[0];
     State s0;
@@ -70,13 +75,6 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     for (int i = 0; i < N - 1; i++) {
         double h = profile.rho[i+1] - profile.rho[i];
         
-        // Delta jump condition
-        if (params.lambd > 0 && profile.rho[i] < params.lambd && profile.rho[i+1] >= params.lambd) {
-            double F_cal = params.e * params.F / (2.0 * M_PI);
-            double jump_coeff = -2.0 * F_cal / (params.lambd * params.lambd);
-            curr.du += jump_coeff * curr.u;
-        }
-        
         double a_mid = 0.5 * (profile.a_phi[i] + profile.a_phi[i+1]);
         double da_mid = 0.5 * (profile.da_phi[i] + profile.da_phi[i+1]);
         curr = rk4_step(profile.rho[i], h, curr, params, 
@@ -84,30 +82,49 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
                         a_mid, da_mid,
                         profile.a_phi[i+1], profile.da_phi[i+1]);
         u0[i+1] = curr.u;
+
+        // Delta jump condition
+        if (params.lambd > 0 && profile.rho[i] < params.lambd && profile.rho[i+1] >= params.lambd) {
+            double F_cal = params.e * params.F / (2.0 * M_PI);
+            double jump_coeff = -2.0 * F_cal / (params.lambd * params.lambd);
+            curr.du += jump_coeff * curr.u;
+        }
     }
     double complex du0_last = curr.du;
 
     // Boundary condition for uinf at large rho
     double rho_max = profile.rho[N-1];
-    double complex k = csqrt(params.chi * params.chi - params.m * params.m);
-    // Ensure Re(k) > 0 for decay or Im(k) > 0
-    if (creal(k) < 0) k = -k;
+    double complex k2_ext = chi * chi - params.m * params.m;
     
+    if (cabs(k2_ext) < 1e-12) k2_ext = 1e-12;
+
+    // n = ml - F_cal_ext
+    double F_cal_ext = params.e * params.F / (2.0 * M_PI);
+    double n_order = (double)params.ml - F_cal_ext;
+
     State sinf;
-    sinf.u = cexp(-k * rho_max) / csqrt(rho_max);
-    sinf.du = (-k - 0.5/rho_max) * sinf.u;
+    if (creal(k2_ext) > 0) {
+        // Oscillatory regime: u ~ sqrt(2 / (pi * k * rho)) * sin(k*rho - n*pi/2 - pi/4)
+        double k_val = sqrt(creal(k2_ext));
+        double phase = k_val * rho_max - n_order * M_PI / 2.0 - M_PI / 4.0;
+        double ampl = sqrt(2.0 / (M_PI * k_val * rho_max));
+        
+        sinf.u = ampl * sin(phase);
+        // Approximation for derivative: u' ~ k * ampl * cos(phase)
+        sinf.du = k_val * ampl * cos(phase) - 0.5 * sinf.u / rho_max;
+    } else {
+        // Decaying regime: u ~ sqrt(pi / (2 * kappa * rho)) * e^(-kappa * rho)
+        double kappa = sqrt(-creal(k2_ext));
+        double ampl = sqrt(M_PI / (2.0 * kappa * rho_max));
+        
+        sinf.u = ampl * exp(-kappa * rho_max);
+        sinf.du = (-kappa - 0.5/rho_max) * sinf.u;
+    }
     
     uinf[N-1] = sinf.u;
     curr = sinf;
     for (int i = N - 1; i > 0; i--) {
         double h = profile.rho[i-1] - profile.rho[i];
-
-        // Delta jump condition (backward)
-        if (params.lambd > 0 && profile.rho[i] > params.lambd && profile.rho[i-1] <= params.lambd) {
-            double F_cal = params.e * params.F / (2.0 * M_PI);
-            double jump_coeff = 2.0 * F_cal / (params.lambd * params.lambd);
-            curr.du += jump_coeff * curr.u;
-        }
 
         double a_mid = 0.5 * (profile.a_phi[i] + profile.a_phi[i-1]);
         double da_mid = 0.5 * (profile.da_phi[i] + profile.da_phi[i-1]);
@@ -116,11 +133,18 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
                         a_mid, da_mid,
                         profile.a_phi[i-1], profile.da_phi[i-1]);
         uinf[i-1] = curr.u;
+
+        // Delta jump condition (backward)
+        if (params.lambd > 0 && profile.rho[i] > params.lambd && profile.rho[i-1] <= params.lambd) {
+            double F_cal = params.e * params.F / (2.0 * M_PI);
+            double jump_coeff = 2.0 * F_cal / (params.lambd * params.lambd);
+            curr.du += jump_coeff * curr.u;
+        }
     }
 
-    // Compute Wronskian W0 = rho * (u0' * uinf - u0 * uinf')
+    // Compute Wronskian W0 = rho * (u0 * uinf' - u0' * uinf)
     // We can compute it at rho_max
-    double complex W0 = rho_max * (du0_last * uinf[N-1] - u0[N-1] * sinf.du);
+    double complex W0 = rho_max * (u0[N-1] * sinf.du - du0_last * uinf[N-1]);
     
     for (int i = 0; i < N; i++) {
         results[i] = (profile.rho[i] * u0[i] * uinf[i]) / W0;

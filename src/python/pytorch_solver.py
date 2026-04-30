@@ -12,6 +12,7 @@ class PyTorchSolver:
     def get_v_eff(self, r: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
         """
         Computes the effective potential for a batch of parameters.
+        Matches Eq 2.50 in greensfunc.tex.
         """
         e = params['e']
         ml = params['ml'].to(torch.float64)
@@ -22,31 +23,13 @@ class PyTorchSolver:
         # V_ml(rho) = e*sigma3 * (Aphi/rho + dAphi/drho) + (ml^2-1)/rho^2 + e^2*Aphi^2 - 2*e*ml*Aphi/rho
         v_ml = e * s3 * (a_phi / r + da_phi) + (ml*ml - 1.0) / (r*r) + (e * a_phi)*(e * a_phi) - 2.0 * e * ml * a_phi / r
         
-        # ODE term: v_ml + 1/r^2 - (chi^2 - m^2)
-        # matches Eq 2.50 k^2 = chi^2 - m^2 - ...
+        # ODE: u'' + 1/rho * u' - [V_ml + 1/rho^2 - (chi^2 - m^2)] u = 0
         return v_ml + 1.0 / (r*r) - (chi*chi - m*m)
 
 
-    def _finalize_results(self, rho, u0, uinf, state_u0_match, state_uinf_match, match_idx):
-        # Match at match_idx
-        u0_match = state_u0_match[:, 0]
-        du0_match = state_u0_match[:, 1]
-        uinf_match = state_uinf_match[:, 0]
-        duinf_match = state_uinf_match[:, 1]
-
-        # W0 = rho * (u0' * uinf - u0 * uinf')
-        W0 = rho[match_idx] * (du0_match * uinf_match - u0_match * duinf_match)
-
-        # G(rho, rho) = (rho * u0 * uinf) / W0
-        # This matches Eq 2.54 and 2.57 in greensfunc.tex
-        results = (rho.unsqueeze(0) * u0 * uinf) / W0.unsqueeze(1)
-        self.last_u0 = u0
-        self.last_uinf = uinf
-        return results, W0
-
     def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> torch.Tensor:
         """
-        Solves the ODE using a matching condition at a central point.
+        Solves the ODE using full-domain integration for both regular solutions.
         Includes handling of delta-function jump conditions at profile boundaries.
         """
         # Get tensors
@@ -70,10 +53,7 @@ class PyTorchSolver:
             'e': torch.tensor([p['e'] for p in params_list], device=self.device, dtype=torch.float64),
         }
 
-        # Match at central point (n_points // 2)
-        match_idx = n_points // 2
-
-        # Integrate forward from rho[0] (Regular at origin)
+        # 1. Integrate forward from rho[0] (Regular at origin)
         u0 = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
         abs_ml = torch.abs(params['ml']).to(torch.float64)
         u0[:, 0] = torch.where(abs_ml == 0, 1.0+0j, torch.pow(rho[0], abs_ml) + 0j)
@@ -82,53 +62,67 @@ class PyTorchSolver:
 
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
-
-            # Apply delta jump if crossing lambda
-            if lambd is not None and rho[i] < lambd <= rho[i+1]:
-                F_cal = params['e'] * F / (2.0 * np.pi)
-                # Jump: u'(l+) = u'(l-) - (2*F_cal / lambd^2) * u(l)
-                # Equation 2.75: -2*F_cal/lambda^2 * delta(rho - lambda)
-                jump_coeff = -2.0 * F_cal / (lambd**2)
-                state_u0[:, 1] += jump_coeff * state_u0[:, 0]
-
             state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
                                      a_phi[i], da_phi[i],
                                      0.5*(a_phi[i]+a_phi[i+1]), 0.5*(da_phi[i]+da_phi[i+1]),
                                      a_phi[i+1], da_phi[i+1])
             u0[:, i+1] = state_u0[:, 0]
-            if i + 1 == match_idx:
-                state_u0_match = state_u0.clone()
 
-        # Integrate backward from rho[-1] (Regular at infinity)
+            # Apply delta jump
+            if lambd is not None and F is not None and rho[i] < lambd <= rho[i+1]:
+                F_cal = params['e'] * F / (2.0 * np.pi)
+                jump_coeff = -2.0 * F_cal / (lambd**2)
+                state_u0[:, 1] += jump_coeff * state_u0[:, 0]
+
+        # 2. Integrate backward from rho[-1] (Regular at infinity)
         uinf = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
+        k2_ext = params['chi']*params['chi'] - params['m']*params['m']
+        k2_ext = torch.where(torch.abs(k2_ext) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2_ext)
+        
+        u_inf_init = torch.zeros(n_batch, device=self.device, dtype=torch.complex128)
+        du_inf_init = torch.zeros(n_batch, device=self.device, dtype=torch.complex128)
+        
+        from scipy.special import yv, yvp, kv, kvp
+        rho_max = rho[-1].item()
+        F_ext = F if F is not None else 0.0
+        F_cal_ext = params['e'] * F_ext / (2.0 * np.pi)
+        n_order = params['ml'].to(torch.float64) - F_cal_ext
 
-        # Using analytic BC at rho[-1] for stability
-        k = torch.sqrt(params['chi']*params['chi'] - params['m']*params['m'])
-        u_inf_init = torch.exp(-k * rho[-1]) / torch.sqrt(rho[-1])
-        du_inf_init = (-k - 0.5/rho[-1]) * u_inf_init
+        for b in range(n_batch):
+            k2 = k2_ext[b].item()
+            ord_val = n_order[b].item()
+            if k2.real > 0:
+                k = np.sqrt(k2)
+                u_inf_init[b] = yv(ord_val, k * rho_max)
+                du_inf_init[b] = k * yvp(ord_val, k * rho_max)
+            else:
+                kappa = np.sqrt(-k2)
+                u_inf_init[b] = kv(ord_val, kappa * rho_max)
+                du_inf_init[b] = kappa * kvp(ord_val, kappa * rho_max)
 
         state_uinf = torch.stack([u_inf_init, du_inf_init], dim=1)
         uinf[:, -1] = state_uinf[:, 0]
 
         for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
-
-            # Apply delta jump if crossing lambda (backward)
-            # u'(l-) = u'(l+) + (2*F_cal / lambd^2) * u(l)
-            if lambd is not None and rho[i] > lambd >= rho[i-1]:
-                F_cal = params['e'] * F / (2.0 * np.pi)
-                jump_coeff = 2.0 * F_cal / (lambd**2)
-                state_uinf[:, 1] += jump_coeff * state_uinf[:, 0]
-
             state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
                                        a_phi[i], da_phi[i],
                                        0.5*(a_phi[i]+a_phi[i-1]), 0.5*(da_phi[i]+da_phi[i-1]),
                                        a_phi[i-1], da_phi[i-1])
             uinf[:, i-1] = state_uinf[:, 0]
-            if i - 1 == match_idx:
-                state_uinf_match = state_uinf.clone()
+            if lambd is not None and F is not None and rho[i] > lambd >= rho[i-1]:
+                F_cal = params['e'] * F / (2.0 * np.pi)
+                jump_coeff = 2.0 * F_cal / (lambd**2)
+                state_uinf[:, 1] += jump_coeff * state_uinf[:, 0]
 
-        return self._finalize_results(rho, u0, uinf, state_u0_match, state_uinf_match, match_idx)
+        # 3. Wronskian at rho_max
+        # W0 = rho * (u0 * uinf' - u0' * uinf)
+        W0 = rho[-1] * (state_u0[:, 0] * du_inf_init - state_u0[:, 1] * u_inf_init)
+
+        results = (rho.unsqueeze(0) * u0 * uinf) / W0.unsqueeze(1)
+        self.last_u0 = u0
+        self.last_uinf = uinf
+        return results, W0
 
 
     def f(self, r: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:

@@ -73,6 +73,7 @@ def test_exact_boundary_conditions():
 
     # Backward: Integrate uinf from rho[-1] with analytic ICs
     curr_state_uinf = torch.tensor([[uinf_ana[-1], duinf_ana]], dtype=torch.complex128)
+    print(f"IC uinf: {curr_state_uinf[0,0].item()}, duinf: {curr_state_uinf[0,1].item()}")
     uinf_num = np.zeros(len(rho_np), dtype=np.complex128)
     uinf_num[-1] = curr_state_uinf[0, 0].item()
     for i in range(len(rho_np)-1, 0, -1):
@@ -82,11 +83,17 @@ def test_exact_boundary_conditions():
                                           0.5*(a_phi_t[i]+a_phi_t[i-1]), 0.5*(da_phi_t[i]+da_phi_t[i-1]),
                                           a_phi_t[i-1], da_phi_t[i-1])
         uinf_num[i-1] = curr_state_uinf[0, 0].item()
-
+        if i == len(rho_np)-1:
+            print(f"First backward step: rho={rho_np[i]}, h={h_step}, next_uinf={uinf_num[i-1]}, ana_uinf={uinf_ana[i-1]}")
+            
     # Compare results
     # u0 should match analytic u0, uinf should match analytic uinf
     err_u0 = np.max(np.abs(u0_num - u0_ana))
     err_uinf = np.max(np.abs(uinf_num - uinf_ana))
+    
+    print(f"Uinf[0]: num={uinf_num[0]}, ana={uinf_ana[0]}")
+    print(f"Uinf[mid]: num={uinf_num[len(rho_np)//2]}, ana={uinf_ana[len(rho_np)//2]}")
+    print(f"Uinf[-1]: num={uinf_num[-1]}, ana={uinf_ana[-1]}")
     
     print(f"\nMax diff u0 (Exact BC): {err_u0:.2e}")
     print(f"Max diff uinf (Exact BC): {err_uinf:.2e}")
