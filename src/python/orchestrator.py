@@ -166,6 +166,21 @@ class Orchestrator:
                 else:
                     num_results, num_w0 = self.backend.solve_batch(numerical_batch, field_profile)
 
+                # Apply Path A normalization scaling if profile is StepFunctionProfile
+                if isinstance(field_profile, StepFunctionProfile):
+                    from analytic import get_analytic_wronskian
+                    for idx, p in enumerate(numerical_batch):
+                        try:
+                            W0_ana = get_analytic_wronskian(p['chi'], p['ml'], p['sigma3'], p['m'], field_profile.lambd, field_profile.F, e=p['e'])
+                            # Scale numerical results by (W0_num / W0_ana) to fix normalization
+                            # Note: num_w0 might be None for C backend, handle it.
+                            if num_w0 is not None:
+                                scaling = num_w0[idx] / W0_ana
+                                num_results[idx] /= scaling
+                        except (ValueError, ZeroDivisionError):
+                            # If analytic W0 is at a pole or zero, skip scaling
+                            pass
+
                 # Get G0 and UV sub for numerical batch
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
                 num_ml = torch.tensor([p['ml'] for p in numerical_batch], device=self.device, dtype=torch.int32)
