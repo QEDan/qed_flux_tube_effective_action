@@ -39,20 +39,18 @@ def compare_analytic_vs_numerical():
     fig, axes = plt.subplots(3, 1, figsize=(10, 15), sharex=True)
     
     # 1. Real part
-    axes[0].plot(rho_full, res_num.real, label="Numerical G", linestyle='--')
-    axes[0].plot(rho_full, ana_full.real, label="Matched Analytic G")
+    axes[0].plot(rho_full, res_num.real, label=r"$G_{\rm num}(\rho, \rho)$", linestyle='--')
+    axes[0].plot(rho_full, ana_full.real, label=r"$G_{\rm ana}(\rho, \rho)$")
     axes[0].axvline(lambd, color='k', linestyle=':', label=r'$\lambda$')
-    axes[0].set_title("Green's Function Comparison: Real Part")
-    axes[0].set_ylabel("Re(G)")
+    axes[0].set_ylabel(r"$\mathfrak{Re}\{G(\rho, \rho)\}$")
     axes[0].legend()
     axes[0].grid(True)
     
     # 2. Imaginary part
-    axes[1].plot(rho_full, res_num.imag, label="Numerical G", linestyle='--')
-    axes[1].plot(rho_full, ana_full.imag, label="Matched Analytic G")
+    axes[1].plot(rho_full, res_num.imag, label=r"$G_{\rm num}(\rho, \rho)$", linestyle='--')
+    axes[1].plot(rho_full, ana_full.imag, label=r"$G_{\rm ana}(\rho, \rho)$")
     axes[1].axvline(lambd, color='k', linestyle=':', label=r'$\lambda$')
-    axes[1].set_title("Green's Function Comparison: Imaginary Part")
-    axes[1].set_ylabel("Im(G)")
+    axes[1].set_ylabel(r"$\mathfrak{Im}\{G(\rho, \rho)\}$")
     axes[1].legend()
     axes[1].grid(True)
 
@@ -61,11 +59,11 @@ def compare_analytic_vs_numerical():
     max_abs_err = np.max(residuals)
     max_rel_err = np.max(residuals / (np.abs(ana_full) + 1e-10))
     
-    axes[2].plot(rho_full, residuals, label="Absolute Residual", color='red')
+    axes[2].plot(rho_full, residuals, label=r"$|G_{\rm num} - G_{\rm ana}|$", color='red')
     axes[2].axvline(lambd, color='k', linestyle=':', label=r'$\lambda$')
-    axes[2].set_title(f"Numerical Residuals (Max Abs Error: {max_abs_err:.2e})")
-    axes[2].set_xlabel("Radial coordinate rho")
-    axes[2].set_ylabel("Absolute Error")
+
+    axes[2].set_xlabel(r"$\rho$")
+    axes[2].set_ylabel(r"$|G_{\rm num} - G_{\rm ana}|$")
     axes[2].set_yscale('log')
     axes[2].legend()
     axes[2].grid(True)

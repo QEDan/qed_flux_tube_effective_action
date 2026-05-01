@@ -207,7 +207,12 @@ class Orchestrator:
                 num_g0 = self.renormalizer.compute_g0(num_chi, num_ml, m, rho)
                 num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
 
+                print(f"DEBUG: G_num max: {torch.max(torch.abs(num_results)).item()}")
+                print(f"DEBUG: G_0 max:   {torch.max(torch.abs(num_g0)).item()}")
+                print(f"DEBUG: UV_sub max: {torch.max(torch.abs(num_uv)).item()}")
+
                 num_renorm = num_results - num_g0 - num_uv
+                print(f"DEBUG: Renorm max: {torch.max(torch.abs(num_renorm)).item()}")
 
                 # Place into renormalized_g
                 num_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) <= chi_threshold]

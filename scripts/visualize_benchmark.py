@@ -62,11 +62,10 @@ def visualize_test_benchmark():
 
     # Visualization
     plt.figure(figsize=(10, 6))
-    plt.plot(rho_np, u0_num.real, label="Numerical (Absolute)", linestyle='--')
-    plt.plot(rho_np, u0_ana.real, label="Analytic (Absolute)")
-    plt.title("Visual Validation of Absolute Numerical Agreement")
-    plt.xlabel("Radial coordinate rho")
-    plt.ylabel("u0 Amplitude (Real)")
+    plt.plot(rho_np, u0_num.real, label=r"Numerical $\mathfrak{Re}\{u_0\}", linestyle='--')
+    plt.plot(rho_np, u0_ana.real, label=r"Analytic \mathfrak{Re}\{u_0\}")
+    plt.xlabel(r"$\rho$")
+    plt.ylabel(r"$\mathfrak{Re}\{u_0\}$")
     plt.legend()
     plt.grid(True)
     plt.savefig("results/test_benchmark_absolute_visualization.png")

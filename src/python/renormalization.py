@@ -50,7 +50,7 @@ class Renormalizer:
                 res_j[i] = jv(float(m_val), sub_k_rho_np[i])
                 res_y[i] = yv(float(m_val), sub_k_rho_np[i])
                 
-            sub_g0_np = -0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
+            sub_g0_np = 0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
             sub_g0 = torch.from_numpy(sub_g0_np).to(self.device).to(torch.complex128)
             
             # Update cache and result
@@ -63,48 +63,12 @@ class Renormalizer:
         return g0
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        """
-        Computes the B^2 subtraction term:
-        uv_sub = (eB/2)^2 * [ (rho^3 / 2k^2) * sin(Theta) + (rho^2 / 6k^3) * cos(Theta) ]
-        Theta = 2k*rho - (1/4 - ml^2)/(k*rho)
-        """
-        k2 = chi*chi - m*m
-        k2 = torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2)
-        k = torch.sqrt(k2).to(torch.complex128)
-
+        k2 = chi*chi + m*m
+        k = torch.sqrt(torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2))
         _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
-        e = 1.0 
-        
-        # B = Aphi/rho + dAphi/drho
-        B = a_phi / rho + da_phi
-        eb2 = (e * B / 2.0).to(torch.complex128)
-        
-        # Expand for broadcasting
-        # k: (batch_size, 1), ml: (batch_size, 1), rho: (1, n_points)
-        k_exp = k.unsqueeze(-1)
-        ml_exp = ml.unsqueeze(-1).to(torch.complex128)
-        rho_exp = rho.unsqueeze(0).to(torch.complex128)
-        eb2_exp = eb2.unsqueeze(0)
-        
-        k_rho = k_exp * rho_exp
-        theta = 2.0 * k_rho - (0.25 - ml_exp*ml_exp) / k_rho
-        
-        term1 = (torch.pow(rho_exp, 3) / (2.0 * k_exp*k_exp)) * torch.sin(theta)
-        term2 = (torch.pow(rho_exp, 2) / (6.0 * torch.pow(k_exp, 3))) * torch.cos(theta)
-        
-        # Prefactor: (F / lambda^2)^2. 
-        # Since B = 2F / (pi * lambda^2) for step profile, 
-        # F / lambda^2 = pi * B / 2.
-        # So (F/lambda^2)^2 = pi^2 * B^2 / 4.
-        
-        # To match Eq 2.59 prefactor (F/lambda^2)^2, we need:
-        # factor = (F / lambda^2)**2. 
-        
-        F_lambda2 = (np.pi * B) / 2.0 # F / lambda^2
-        factor = (F_lambda2 * F_lambda2).to(torch.complex128)
-        
-        uv_sub = factor * (term1 + term2)
-        return uv_sub
+        B = (a_phi / (rho + 1e-15) + da_phi)
+        uv_sub = (B / 2.0)**2 / torch.pow(k.unsqueeze(-1), 3)
+        return uv_sub.to(torch.complex128)
 
     def compute_whittaker_benchmark(self, chi: float, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
         """

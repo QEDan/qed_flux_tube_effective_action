@@ -69,13 +69,29 @@ class StepFunctionProfile(FieldProfile):
             # da_phi = pre * (df_lambd / rho - f_lambd / rho^2)
             self.da_phi = pre * (df_lambd / self.rho - f_lambd / (self.rho**2))
 
-class DifferentiableProfile(FieldProfile):
-    """
-    A profile where a_phi and da_phi are derived from differentiable parameters.
-    """
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], params: Any) -> None:
+class Sech2Profile(FieldProfile):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = 1.0) -> None:
+        """
+        Magnetic field B(rho) = B * sech^2(rho/lambd)
+        A_phi(rho) = B*lambd*tanh(rho/lambd) - (B*lambd^2/rho)*ln(cosh(rho/lambd))
+        """
         super().__init__(rho)
-        self.params = params # e.g. spline coefficients or NN weights
+        self.B = B
+        self.lambd = lambd
+        self.e = e
+        self.update()
+
+    def update(self) -> None:
+        # Avoid division by zero at rho=0
+        r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
         
-    def forward(self) -> None:
-        raise NotImplementedError
+        arg = self.rho / self.lambd
+        
+        # A_phi(rho)
+        self.a_phi = self.B * self.lambd * torch.tanh(arg) - (self.B * self.lambd**2 / r_safe) * torch.log(torch.cosh(arg))
+        
+        # B_field(rho)
+        b_field = self.B / (torch.cosh(arg)**2)
+        
+        # da_phi = B - A_phi/rho
+        self.da_phi = b_field - self.a_phi / r_safe
