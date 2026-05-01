@@ -58,24 +58,35 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     double complex* uinf = malloc(N * sizeof(double complex));
     
     double complex chi = params.chi.real + params.chi.imag * I;
+    double m = params.m;
+    double e = params.e;
     
-    // Boundary condition for u0 at small rho
+    // 1. Forward Integration for u0
     double rho_min = profile.rho[0];
     State s0;
     int abs_ml = abs(params.ml);
+    
+    // Improved IC (Second order)
+    double a0 = profile.a_phi[0];
+    double da0 = profile.da_phi[0];
+    double s3 = (double)params.sigma3;
+    double v_ml0 = e * s3 * (a0/rho_min + da0) + (abs_ml*abs_ml - 1.0)/(rho_min*rho_min) + e*e*a0*a0 - 2.0*e*abs_ml*a0/rho_min;
+    double complex v_eff0 = v_ml0 + 1.0/(rho_min*rho_min) - (chi*chi - m*m);
+    double complex k_eff2 = -(v_eff0 - (double)(abs_ml*abs_ml)/(rho_min*rho_min));
+
     if (abs_ml == 0) {
-        s0.u = 1.0;
-        s0.du = 0.0;
+        s0.u = 1.0 - k_eff2 * rho_min * rho_min / 4.0;
+        s0.du = -k_eff2 * rho_min / 2.0;
     } else {
-        s0.u = cpow(rho_min, abs_ml);
-        s0.du = abs_ml * cpow(rho_min, abs_ml - 1);
+        double complex scale = 1.0 - k_eff2 * rho_min * rho_min / (4.0 * (abs_ml + 1.0));
+        s0.u = cpow(rho_min, abs_ml) * scale;
+        s0.du = abs_ml * cpow(rho_min, abs_ml - 1.0) * scale - cpow(rho_min, abs_ml) * (k_eff2 * rho_min / (2.0 * (abs_ml + 1.0)));
     }
     
     u0[0] = s0.u;
     State curr = s0;
     for (int i = 0; i < N - 1; i++) {
         double h = profile.rho[i+1] - profile.rho[i];
-        
         double a_mid = 0.5 * (profile.a_phi[i] + profile.a_phi[i+1]);
         double da_mid = 0.5 * (profile.da_phi[i] + profile.da_phi[i+1]);
         curr = rk4_step(profile.rho[i], h, curr, params, 
@@ -93,32 +104,33 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     }
     double complex du0_last = curr.du;
 
-    // Boundary condition for uinf at large rho
+    // 2. Backward Integration for uinf
     double rho_max = profile.rho[N-1];
     double complex k2_ext = chi * chi - params.m * params.m;
-    
     if (cabs(k2_ext) < 1e-12) k2_ext = 1e-12;
+    double complex k_ext = csqrt(k2_ext);
+    
+    // Ensure Im(k) >= 0 for stability/decay
+    if (cimag(k_ext) < 0) k_ext = -k_ext;
 
-    // n = ml - F_cal_ext
     double F_cal_ext = params.e * params.F / (2.0 * M_PI);
     double n_order = (double)params.ml - F_cal_ext;
 
     State sinf;
-    if (creal(k2_ext) > 0) {
-        // Oscillatory regime: u ~ sqrt(2 / (pi * k * rho)) * sin(k*rho - n*pi/2 - pi/4)
-        double k_val = sqrt(creal(k2_ext));
+    // For consistency with PyTorch yv/kv switching:
+    if (creal(k2_ext) > 0 && fabs(cimag(k2_ext)) < 1e-10) {
+        // Oscillatory (Real k)
+        double k_val = creal(k_ext);
         double phase = k_val * rho_max - n_order * M_PI / 2.0 - M_PI / 4.0;
         double ampl = sqrt(2.0 / (M_PI * k_val * rho_max));
-        
         sinf.u = ampl * sin(phase);
-        // Approximation for derivative: u' ~ k * ampl * cos(phase)
         sinf.du = k_val * ampl * cos(phase) - 0.5 * sinf.u / rho_max;
     } else {
-        // Decaying regime: u ~ sqrt(pi / (2 * kappa * rho)) * e^(-kappa * rho)
-        double kappa = sqrt(-creal(k2_ext));
-        double ampl = sqrt(M_PI / (2.0 * kappa * rho_max));
-        
-        sinf.u = ampl * exp(-kappa * rho_max);
+        // Complex or Decaying
+        double complex kappa = -I * k_ext;
+        if (creal(kappa) < 0) kappa = -kappa;
+        double complex c_ampl = csqrt(M_PI / (2.0 * kappa * rho_max));
+        sinf.u = c_ampl * cexp(-kappa * rho_max);
         sinf.du = (-kappa - 0.5/rho_max) * sinf.u;
     }
     
@@ -144,7 +156,6 @@ void solve_greens_function(Parameters params, Profile profile, double complex* r
     }
 
     // Compute Wronskian W0 = rho * (u0' * uinf - u0 * uinf')
-    // We can compute it at rho_max
     double complex W0 = rho_max * (du0_last * uinf[N-1] - u0[N-1] * sinf.du);
     
     for (int i = 0; i < N; i++) {

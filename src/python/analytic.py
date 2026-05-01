@@ -130,7 +130,8 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     g_full = np.zeros(len(rho_grid), dtype=complex)
     
     # W0 = rho * (u0' * uinf - u0 * uinf')
-    W0 = -2.0 * coeffs_u0[0] / (np.pi * k_ext)
+    # Using rho * W(A*J+B*Y, Y) = A * rho * W(J, Y) = A * (-2/pi)
+    W0 = -2.0 * coeffs_u0[0] / np.pi
     
     for i, r in enumerate(rho_grid):
         if r <= lambd:
@@ -151,9 +152,9 @@ def get_analytic_wronskian(chi: complex, ml: int, sigma3: int, m: float, lambd: 
     """
     F_cal, _, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F, e)
     
-    # M W' - M' W = -gamma(1+2*mu) / gamma(1/2+mu-kappa)
-    # Use mpmath for complex gamma
-    wronskian_mw = -mpmath.gamma(1 + 2 * mu) / mpmath.gamma(0.5 + mu - kappa)
+    # M' W - M W' = +gamma(1+2*mu) / gamma(1/2+mu-kappa)
+    # rho * W_radial = 2 * beta * (M' W - M W')
+    wronskian_mw = mpmath.gamma(1 + 2 * mu) / mpmath.gamma(0.5 + mu - kappa)
     
     W0 = (2.0 * F_cal / lambd**2) * complex(wronskian_mw)
     return W0
