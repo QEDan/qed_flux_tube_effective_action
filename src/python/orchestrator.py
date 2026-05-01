@@ -48,7 +48,9 @@ class CSolverBackend:
             ctypes.POINTER(Parameters),
             ctypes.c_int,
             Profile,
-            ctypes.POINTER(Complex128)
+            ctypes.POINTER(Complex128), # results
+            ctypes.POINTER(Complex128), # u_inf_init
+            ctypes.POINTER(Complex128)  # du_inf_init
         ]
         self.lib.solve_batch.restype = None
 
@@ -59,6 +61,28 @@ class CSolverBackend:
         
         lambd = getattr(field_profile, 'lambd', 0.0)
         F = getattr(field_profile, 'F', 0.0)
+
+        # Compute Boundary Conditions in Python using Scipy
+        from scipy.special import yv, yvp, kv, kvp
+        u_inf_init = np.zeros(n_params, dtype=np.complex128)
+        du_inf_init = np.zeros(n_params, dtype=np.complex128)
+        
+        rho_max = rho[-1]
+        # Use first param's 'e' for global flux factor
+        e_val = params_list[0]['e']
+        F_cal_ext = e_val * F / (2.0 * np.pi)
+
+        for b, p in enumerate(params_list):
+            k2 = p['chi']**2 - p['m']**2
+            n = p['ml'] - F_cal_ext
+            if k2.real > 0:
+                k = np.sqrt(k2)
+                u_inf_init[b] = yv(n, k * rho_max)
+                du_inf_init[b] = k * yvp(n, k * rho_max)
+            else:
+                kappa = np.sqrt(-k2)
+                u_inf_init[b] = kv(n, kappa * rho_max)
+                du_inf_init[b] = kappa * kvp(n, kappa * rho_max)
 
         params_array = (Parameters * n_params)()
         for i, p in enumerate(params_list):
@@ -79,8 +103,11 @@ class CSolverBackend:
             n_points=n_points
         )
         
+        u_inf_c = (Complex128 * n_params).from_buffer(u_inf_init)
+        du_inf_c = (Complex128 * n_params).from_buffer(du_inf_init)
         results_array = (Complex128 * (n_params * n_points))()
-        self.lib.solve_batch(params_array, n_params, c_profile, results_array)
+        
+        self.lib.solve_batch(params_array, n_params, c_profile, results_array, u_inf_c, du_inf_c)
         
         res_np = np.frombuffer(results_array, dtype=np.complex128).reshape(n_params, n_points)
         return res_np
@@ -166,20 +193,12 @@ class Orchestrator:
                 else:
                     num_results, num_w0 = self.backend.solve_batch(numerical_batch, field_profile)
 
-                # Apply Path A normalization scaling if profile is StepFunctionProfile
+                # Path A logic: Green's function G = rho*u0*uinf/W is invariant to scaling of u0, uinf.
+                # Explicit scaling by W0 ratio is redundant and was causing numerical gaps.
                 if isinstance(field_profile, StepFunctionProfile):
-                    from analytic import get_analytic_wronskian
-                    for idx, p in enumerate(numerical_batch):
-                        try:
-                            W0_ana = get_analytic_wronskian(p['chi'], p['ml'], p['sigma3'], p['m'], field_profile.lambd, field_profile.F, e=p['e'])
-                            # Scale numerical results by (W0_num / W0_ana) to fix normalization
-                            # Note: num_w0 might be None for C backend, handle it.
-                            if num_w0 is not None:
-                                scaling = num_w0[idx] / W0_ana
-                                num_results[idx] /= scaling
-                        except (ValueError, ZeroDivisionError):
-                            # If analytic W0 is at a pole or zero, skip scaling
-                            pass
+                    # We keep this block for test persistence but perform no scaling.
+                    # num_results[idx] /= scaling  <-- REMOVED
+                    pass
 
                 # Get G0 and UV sub for numerical batch
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)

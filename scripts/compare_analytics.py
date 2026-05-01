@@ -21,11 +21,10 @@ def compare_analytic_vs_numerical():
     sigma3 = 1
     
     # Grid: Full domain
-    rho_full = np.linspace(0.1, 2.0, 400)
+    rho_full = np.linspace(0.1, 2.0, 1000)
     
-    # Use smoothed profile to allow numerical solver to handle boundary
-    smooth = 0.05
-    profile = StepFunctionProfile(rho_full, lambd=lambd, F=F, smooth_width=smooth)
+    # Use sharp profile to match analytic benchmark exactly
+    profile = StepFunctionProfile(rho_full, lambd=lambd, F=F, smooth_width=None)
     
     # Numerical solver
     orc = Orchestrator(backend_type="pytorch", device="cpu")
@@ -59,9 +58,12 @@ def compare_analytic_vs_numerical():
 
     # 3. Residuals
     residuals = np.abs(res_num - ana_full)
+    max_abs_err = np.max(residuals)
+    max_rel_err = np.max(residuals / (np.abs(ana_full) + 1e-10))
+    
     axes[2].plot(rho_full, residuals, label="Absolute Residual", color='red')
     axes[2].axvline(lambd, color='k', linestyle=':', label=r'$\lambda$')
-    axes[2].set_title("Numerical Residuals (|Numerical - Analytic|)")
+    axes[2].set_title(f"Numerical Residuals (Max Abs Error: {max_abs_err:.2e})")
     axes[2].set_xlabel("Radial coordinate rho")
     axes[2].set_ylabel("Absolute Error")
     axes[2].set_yscale('log')
@@ -70,7 +72,8 @@ def compare_analytic_vs_numerical():
     
     plt.tight_layout()
     plt.savefig("results/analytic_vs_numerical.png")
-    print("Validation complete. Plot saved to results/analytic_vs_numerical.png. Scientist: Verify high-degree overlap in the top two panels and confirm residuals in the bottom panel are near machine precision (allowing for slight peaks at the boundary due to smoothing).")
+    print(f"Validation complete. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
+    print("Plot saved to results/analytic_vs_numerical.png. Scientist: Verify high-degree overlap in the top two panels and confirm residuals in the bottom panel are sufficiently small (allowing for smoothing peaks).")
 
 if __name__ == "__main__":
     compare_analytic_vs_numerical()

@@ -27,9 +27,9 @@ typedef struct {
 
 // Solves the radial ODE and returns the value of [u0(rho)*uinf(rho)/W0] at each rho point.
 // results must be an allocated array of size profile.n_points
-void solve_greens_function(Parameters params, Profile profile, double complex* results);
+void solve_greens_function(Parameters params, Profile profile, double complex* results, double complex u_inf_init, double complex du_inf_init);
 
 // Batch solver using OpenMP
-void solve_batch(Parameters* params_array, int n_params, Profile profile, double complex* results_array);
+void solve_batch(Parameters* params_array, int n_params, Profile profile, double complex* results_array, double complex* u_inf_init_array, double complex* du_inf_init_array);
 
 #endif

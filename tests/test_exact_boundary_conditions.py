@@ -27,25 +27,28 @@ def test_exact_boundary_conditions():
     
     # We will solve the ODE on the interior domain [0.1, lambd]
     # to isolate interior dynamics from the complex exterior jump.
-    rho_np = np.linspace(0.1, lambd, 100)
+    rho_np = np.linspace(0.1, lambd, 500)
     # We use a lambd_eff slightly larger than the grid max to avoid the boundary jump
     # in the StepFunctionProfile's update logic at the last grid point.
-    profile = StepFunctionProfile(rho_np, lambd=lambd*1.01, F=F, e=e)
+    # CRITICAL: We MUST use the SAME lambda for the analytic reference.
+    lambd_eff = lambd * 1.05
+    profile = StepFunctionProfile(rho_np, lambd=lambd_eff, F=F, e=e)
     solver = PyTorchSolver(device="cpu")
     
-    # 1. Analytic reference at boundaries [0.1, lambd]
-    u0_ana, uinf_ana = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd, F)
+    # 1. Analytic reference at boundaries [0.1, rho_np[-1]]
+    # We use lambd_eff to match the profile.
+    u0_ana, uinf_ana = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd_eff, F)
     
     # Finite difference derivatives for exact ICs
     h = 1e-5
     # Start: rho[0]
-    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd, F)
-    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd, F)
+    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd_eff, F)
+    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd_eff, F)
     du0_ana = (u0_p[0] - u0_m[0]) / (2 * h)
     
-    # End: rho[-1] (lambd)
-    uinf_p, _ = get_interior_solutions(np.array([lambd + h]), chi, ml, sigma3, m, lambd, F)
-    uinf_m, _ = get_interior_solutions(np.array([lambd - h]), chi, ml, sigma3, m, lambd, F)
+    # End: rho[-1]
+    _, uinf_p = get_interior_solutions(np.array([rho_np[-1] + h]), chi, ml, sigma3, m, lambd_eff, F)
+    _, uinf_m = get_interior_solutions(np.array([rho_np[-1] - h]), chi, ml, sigma3, m, lambd_eff, F)
     duinf_ana = (uinf_p[0] - uinf_m[0]) / (2 * h)
 
     # 2. Manual RK4 integration using Exact BCs

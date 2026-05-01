@@ -11,7 +11,7 @@ def test_pytorch_vs_c():
     """
     Compare PyTorch backend results with C backend results.
     """
-    rho = np.linspace(0.01, 5.0, 200)
+    rho = np.linspace(0.01, 50.0, 500)
     profile = StepFunctionProfile(rho, lambd=1.0, F=2*np.pi)
     
     # Small grid for comparison

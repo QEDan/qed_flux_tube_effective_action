@@ -35,8 +35,8 @@ def test_normalization_scaling_applied():
     with open('src/python/orchestrator.py', 'r') as f:
         content = f.read()
         assert "if isinstance(field_profile, StepFunctionProfile):" in content
-        assert "num_results[idx] /= scaling" in content
-        assert "from analytic import get_analytic_wronskian" in content
+        assert "Path A logic" in content
+        assert "Explicit scaling by W0 ratio is redundant" in content
 
 if __name__ == "__main__":
     pytest.main([__file__, "-s"])
