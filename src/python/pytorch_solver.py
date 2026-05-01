@@ -59,9 +59,22 @@ class PyTorchSolver:
         # 1. Integrate forward from rho[0] (Regular at origin)
         u0 = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
         abs_ml = torch.abs(params['ml']).to(torch.float64)
-        u0[:, 0] = torch.where(abs_ml == 0, 1.0+0j, torch.pow(rho[0], abs_ml) + 0j)
-        du0 = torch.where(abs_ml == 0, 0.0+0j, abs_ml * torch.pow(rho[0], abs_ml - 1) + 0j)
-        state_u0 = torch.stack([u0[:, 0], du0], dim=1)
+        
+        # Improved IC: u ~ rho^|ml| * (1 - k_eff^2 * rho^2 / (4 * (|ml| + 1)))
+        # where k_eff^2 = -v_eff_singular_removed
+        v_eff_at_start = self.get_v_eff(rho[0], params, a_phi[0], da_phi[0])
+        k_eff2 = -(v_eff_at_start - (abs_ml*abs_ml) / (rho[0]*rho[0]))
+        
+        u0_start = torch.pow(rho[0], abs_ml) * (1.0 - k_eff2 * rho[0]*rho[0] / (4.0 * (abs_ml + 1.0)))
+        du0_start = abs_ml * torch.pow(rho[0], abs_ml - 1.0) * (1.0 - k_eff2 * rho[0]*rho[0] / (4.0 * (abs_ml + 1.0))) \
+                    - torch.pow(rho[0], abs_ml) * (k_eff2 * rho[0] / (2.0 * (abs_ml + 1.0)))
+        
+        # Handle ml=0 case specifically
+        u0_start = torch.where(abs_ml == 0, 1.0 - k_eff2 * rho[0]*rho[0] / 4.0, u0_start)
+        du0_start = torch.where(abs_ml == 0, -k_eff2 * rho[0] / 2.0, du0_start)
+        
+        u0[:, 0] = u0_start + 0j
+        state_u0 = torch.stack([u0[:, 0], du0_start + 0j], dim=1)
 
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
@@ -122,6 +135,8 @@ class PyTorchSolver:
         # W0 = rho * (u0' * uinf - u0 * uinf')
         W0 = rho[-1] * (state_u0[:, 1] * u_inf_init - state_u0[:, 0] * du_inf_init)
 
+        # Standard Green's function definition for L = -nabla^2 + V matches results = (rho * u0 * uinf) / W0
+        # Given our current W0 definition (rho*(u0'*uinf - u0*uinf')), G = (rho*u0*uinf)/W0 matches the Renormalizer.
         results = (rho.unsqueeze(0) * u0 * uinf) / W0.unsqueeze(1)
         self.last_u0 = u0
         self.last_uinf = uinf
