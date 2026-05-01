@@ -65,3 +65,6 @@ validate: all
 
 
 .PHONY: all clean validate
+
+test: all
+	pytest tests
