@@ -34,8 +34,12 @@ def test_sech2_exact():
     print(f"Renormalized Action (Dunne & Hall profile B=0.5, lambda=1.0): {action.item()}")
     
     # Basic sanity check: action should be negative for magnetic fields
-    assert action.real < 0, "Effective action should be negative for magnetic field backgrounds."
-    print("Test passed: Effective action is negative and finite.")
+    try:
+        assert action.real < 0, "Effective action should be negative for magnetic field backgrounds."
+        print("✅ Test passed: Effective action is negative and finite.")
+    except AssertionError as e:
+        print(f"❌ Test failed: {e}")
+        raise
 
 if __name__ == "__main__":
     test_sech2_exact()

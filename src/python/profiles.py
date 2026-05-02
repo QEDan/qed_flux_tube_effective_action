@@ -69,6 +69,32 @@ class StepFunctionProfile(FieldProfile):
             # da_phi = pre * (df_lambd / rho - f_lambd / rho^2)
             self.da_phi = pre * (df_lambd / self.rho - f_lambd / (self.rho**2))
 
+class ZeroFluxProfile(FieldProfile):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = 1.0) -> None:
+        """
+        Magnetic field B(rho) = B * (1 - 2*rho^2/lambd^2) for rho < lambd, else 0.
+        A_phi(rho) = (B*rho/2) * (1 - rho^2/lambd^2) for rho < lambd, else 0.
+        Total flux F = 0.
+        """
+        super().__init__(rho)
+        self.B = B
+        self.lambd = lambd
+        self.e = e
+        self.update()
+
+    def update(self) -> None:
+        r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
+        inner = self.rho < self.lambd
+        
+        # B_field(rho)
+        b_field = torch.where(inner, self.B * (1.0 - 2.0 * self.rho**2 / self.lambd**2), torch.zeros_like(self.rho))
+        
+        # A_phi(rho)
+        self.a_phi = torch.where(inner, (self.B * self.rho / 2.0) * (1.0 - self.rho**2 / self.lambd**2), torch.zeros_like(self.rho))
+        
+        # da_phi = B - A_phi/rho
+        self.da_phi = b_field - self.a_phi / r_safe
+
 class Sech2Profile(FieldProfile):
     def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = 1.0) -> None:
         """

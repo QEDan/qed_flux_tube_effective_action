@@ -38,8 +38,12 @@ def test_zero_field_cancellation():
     print(f"Renormalized action for zero field: {action.item()}")
     
     # Assert action is zero
-    assert torch.abs(action) < 1e-3, f"Action should be zero for zero field, got {action.item()}"
-    print("Zero-field cancellation validated: Renormalized action is zero as expected for zero magnetic flux.")
+    try:
+        assert torch.abs(action) < 1e-3, f"Action should be zero for zero field, got {action.item()}"
+        print("✅ Zero-field cancellation validated: Renormalized action is zero as expected for zero magnetic flux.")
+    except AssertionError as e:
+        print(f"❌ Zero-field cancellation failed: {e}")
+        raise
 
 if __name__ == "__main__":
     test_zero_field_cancellation()

@@ -1,3 +1,5 @@
+import torch
+import numpy as np
 from pytorch_solver import PyTorchSolver
 from renormalization import Renormalizer
 from profiles import StepFunctionProfile
@@ -15,6 +17,12 @@ class Orchestrator:
         """
         Computes the full effective action by integrating over chi and summing over ml.
         Implements batching to manage memory and UV renormalization.
+
+        Dimensions:
+        chi: [L^-1]
+        m: [L^-1]
+        e: [L^0]
+        Action output: [L^0] (dimensionless vacuum potential energy density in natural units)
         """
         rho, _, _ = field_profile.get_arrays(as_numpy=False)
         rho = rho.to(self.device)
@@ -79,8 +87,8 @@ class Orchestrator:
             if collect_density:
                 density_integrand += torch.sum(renormalized_g, dim=0)
 
-            # Integration over rho: Eq 2.59 uses rho^2 * (G_dim - G0_dim)
-            inner_int = torch.sum(renormalized_g * (rho**2) * rho_factor, dim=-1) # (batch_size,)
+            # Integration over rho: Eq 2.59 uses rho * (G_dim - G0_dim)
+            inner_int = torch.sum(renormalized_g * rho * rho_factor, dim=-1) # (batch_size,)
 
             # Accumulate into total_inner_sum based on chi
             for idx, p in enumerate(batch):

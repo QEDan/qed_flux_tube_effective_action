@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.join(os.getcwd(), 'src/python'))
+
 import torch
 import numpy as np
 import pytest

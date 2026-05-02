@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import Union, Dict, List, Any, Optional
+from typing import Union, Dict, List, Any, Optional, Tuple
 
 class PyTorchSolver:
     def __init__(self, device: Optional[str] = None) -> None:
@@ -13,6 +13,7 @@ class PyTorchSolver:
         """
         Computes the effective potential for a batch of parameters.
         Matches Eq 2.50 in greensfunc.tex.
+        All terms are dimensionally consistent [L^-2].
         """
         e = params['e']
         ml = params['ml'].to(torch.float64)
@@ -24,16 +25,20 @@ class PyTorchSolver:
         r_eps = r + 1e-15
         
         # V_ml(rho) = e*sigma3 * (Aphi/rho + dAphi/drho) + (ml^2-1)/rho^2 + e^2*Aphi^2 - 2*e*ml*Aphi/rho
+        # Dimensional analysis:
+        # Aphi/rho, dAphi/drho: [L^-2]
+        # (ml^2-1)/rho^2: [L^-2]
+        # e^2*Aphi^2: [L^-2]
         v_ml = e * s3 * (a_phi / r_eps + da_phi) + (ml*ml - 1.0) / (r_eps*r_eps) + (e * a_phi)*(e * a_phi) - 2.0 * e * ml * a_phi / r_eps
         
         # ODE: u'' + 1/rho * u' - [V_ml + 1/rho^2 - (chi^2 - m^2)] u = 0
         return v_ml + 1.0 / (r_eps*r_eps) - (chi*chi - m*m)
 
 
-    def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> torch.Tensor:
+    def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Solves the ODE using full-domain integration for both regular solutions.
-        Includes handling of delta-function jump conditions at profile boundaries.
+        Returns the dimensionless Green's function results and the constant Wronskian W0 [L^0].
         """
         # Get tensors
         rho, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
@@ -144,6 +149,17 @@ class PyTorchSolver:
 
 
     def f(self, r: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
+        """
+        ODE system:
+        u' = du
+        du' = -1/rho * du + V_eff * u
+        
+        Dimensions:
+        r: [L]
+        u: [L^0]
+        du: [L^-1]
+        V_eff: [L^-2]
+        """
         u = state[:, 0]
         du = state[:, 1]
         v_eff = self.get_v_eff(r, params, a_phi, da_phi)
@@ -156,6 +172,11 @@ class PyTorchSolver:
                  a_p_start: torch.Tensor, da_p_start: torch.Tensor, 
                  a_p_mid: torch.Tensor, da_p_mid: torch.Tensor, 
                  a_p_end: torch.Tensor, da_p_end: torch.Tensor) -> torch.Tensor:
+        """
+        Perform an RK4 step. Dimensions are consistent with ODE defined in `f`.
+        r, h: [L]
+        state: [L^0, L^-1]
+        """
         k1 = self.f(r, state, params, a_p_start, da_p_start)
         k2 = self.f(r + 0.5*h, state + 0.5*h*k1, params, a_p_mid, da_p_mid)
         k3 = self.f(r + 0.5*h, state + 0.5*h*k2, params, a_p_mid, da_p_mid)

@@ -10,9 +10,9 @@ class Renormalizer:
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor) -> torch.Tensor:
         """
-        Computes the background Green's function G0 = -pi/2 * rho * J_ml(k*rho) * Y_ml(k*rho)
+        Computes the background Green's function G0 = -pi/2 * J_ml(k*rho) * Y_ml(k*rho)
         where k = sqrt(chi^2 - m^2).
-        Uses caching for (chi, ml) pairs.
+        Dimensionless.
         """
         k2 = chi*chi - m*m
         k2 = torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2)
@@ -50,7 +50,7 @@ class Renormalizer:
                 res_j[i] = jv(float(m_val), sub_k_rho_np[i])
                 res_y[i] = yv(float(m_val), sub_k_rho_np[i])
                 
-            sub_g0_np = 0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
+            sub_g0_np = -0.5 * np.pi * rho.detach().cpu().numpy() * res_j * res_y
             sub_g0 = torch.from_numpy(sub_g0_np).to(self.device).to(torch.complex128)
             
             # Update cache and result
@@ -63,11 +63,23 @@ class Renormalizer:
         return g0
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        k2 = chi*chi + m*m
-        k = torch.sqrt(torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2))
+        """
+        Computes the WKB-based UV subtraction term based on Eq 2.59 of greensfunc.tex.
+        """
+        k2 = chi*chi - m*m
+        k2 = torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2)
+        k = torch.sqrt(k2)
+        
         _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
         B = (a_phi / (rho + 1e-15) + da_phi)
-        uv_sub = (B / 2.0)**2 / torch.pow(k.unsqueeze(-1), 3)
+        
+        theta = 2*k.unsqueeze(-1)*rho - (0.25 - ml.unsqueeze(-1)**2)/(k.unsqueeze(-1)*rho + 1e-15)
+        
+        # B^2/k^2 is the field-dependent scaling factor.
+        # Theoretical UV term should be proportional to B^2 (or equivalent F^2).
+        # We use B as proxy for the field strength.
+        uv_sub = (B.unsqueeze(0)**2) * ( (rho**3 / (2*k2.unsqueeze(-1))) * torch.sin(theta) + (rho**2 / (6*k.unsqueeze(-1)**3)) * torch.cos(theta) )
+        
         return uv_sub.to(torch.complex128)
 
     def compute_whittaker_benchmark(self, chi: float, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:

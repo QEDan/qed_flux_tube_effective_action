@@ -1,21 +1,4 @@
-CC = gcc
-CFLAGS = -O3 -fPIC -fopenmp -Wall
-LDFLAGS = -shared -fopenmp
 
-TARGET = libsolver.so
-SRCS = src/c/solver.c
-OBJS = $(SRCS:.c=.o)
-
-all: $(TARGET)
-
-$(TARGET): $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^ -lm
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-clean:
-	rm -f $(OBJS) $(TARGET)
 VALIDATION_PY = scripts/test_zero_field.py scripts/compare_analytics.py \
                 scripts/visualize_benchmark.py
 
@@ -25,7 +8,7 @@ VALIDATION_SAGEMATH_PY = symbolic_validations/numerical_spectrum.py symbolic_val
                          symbolic_validations/verify_uv_subtraction.py
 VALIDATION_SAGE = symbolic_validations/verify_ode.sage
 
-validate: all
+validate: 
 	@if ! command -v sage > /dev/null; then \
 		echo "Error: 'sage' command not found. Please activate your SageMath environment (e.g., 'conda activate sage') before running validations."; \
 		exit 1; \
