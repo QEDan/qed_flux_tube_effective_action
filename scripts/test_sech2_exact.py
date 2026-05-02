@@ -27,7 +27,7 @@ def test_sech2_exact():
     sigma3_values = [1, -1]
     m = 1.0
     
-    orc = Orchestrator(backend_type="pytorch", device="cpu")
+    orc = Orchestrator(device="cpu")
     
     action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
     

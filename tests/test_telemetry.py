@@ -21,7 +21,7 @@ def test_telemetry_density_integrand():
     ml_values = [0]
     sigma3_values = [1]
     
-    orch = Orchestrator(backend_type="pytorch", batch_size=4)
+    orch = Orchestrator(batch_size=4)
     
     # Run with telemetry
     action, density = orch.compute_effective_action(

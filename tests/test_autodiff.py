@@ -31,7 +31,7 @@ def test_autodiff_action():
     rho = torch.linspace(0.1, 5.0, 100, dtype=torch.float64)
     profile = OptimizableProfile(rho, A0=0.1)
     
-    orc = Orchestrator(backend_type="pytorch", device="cpu")
+    orc = Orchestrator(device="cpu")
     
     chi_values = [1.0, 2.0]
     ml_values = [0, 1]

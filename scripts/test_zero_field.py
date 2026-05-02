@@ -24,7 +24,7 @@ def test_zero_field_cancellation():
     profile = StepFunctionProfile(rho, lambd=lambd, F=F)
     
     # Backend
-    orc = Orchestrator(backend_type="pytorch", device="cpu")
+    orc = Orchestrator(device="cpu")
     
     # Integration parameters
     chi_values = [1.0, 2.0, 5.0]

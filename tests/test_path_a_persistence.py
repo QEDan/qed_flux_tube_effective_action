@@ -19,7 +19,7 @@ def test_normalization_scaling_applied():
     lambd = 0.5
     F = 1.0
     profile = StepFunctionProfile(np.linspace(0.1, 0.4, 10), lambd=lambd, F=F)
-    orch = Orchestrator(backend_type="pytorch", device="cpu")
+    orch = Orchestrator(device="cpu")
     
     chi = 1.0 + 0.1j
     params = [{'chi': chi, 'ml': 1, 'sigma3': 1, 'm': 1.0, 'e': 1.0}]

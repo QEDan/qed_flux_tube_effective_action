@@ -1,158 +1,25 @@
-import ctypes
-import numpy as np
-import os
-import torch
 from pytorch_solver import PyTorchSolver
 from renormalization import Renormalizer
 from profiles import StepFunctionProfile
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 
-# Define ctypes structures
-class Complex128(ctypes.Structure):
-    _fields_ = [("real", ctypes.c_double), ("imag", ctypes.c_double)]
-
-    @classmethod
-    def from_complex(cls, c: complex) -> 'Complex128':
-        return cls(c.real, c.imag)
-
-class Parameters(ctypes.Structure):
-    _fields_ = [
-        ("chi", Complex128),
-        ("ml", ctypes.c_int),
-        ("sigma3", ctypes.c_int),
-        ("m", ctypes.c_double),
-        ("e", ctypes.c_double),
-        ("lambd", ctypes.c_double),
-        ("F", ctypes.c_double),
-    ]
-
-class Profile(ctypes.Structure):
-    _fields_ = [
-        ("rho", ctypes.POINTER(ctypes.c_double)),
-        ("a_phi", ctypes.POINTER(ctypes.c_double)),
-        ("da_phi", ctypes.POINTER(ctypes.c_double)),
-        ("n_points", ctypes.c_int),
-    ]
-
-class CSolverBackend:
-    def __init__(self, lib_path: str = "./libsolver.so") -> None:
-        if not os.path.exists(lib_path):
-             # Try to find it in the project root if called from elsewhere
-             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-             lib_path = os.path.join(project_root, "libsolver.so")
-             
-        self.lib = ctypes.CDLL(os.path.abspath(lib_path))
-        
-        self.lib.solve_batch.argtypes = [
-            ctypes.POINTER(Parameters),
-            ctypes.c_int,
-            Profile,
-            ctypes.POINTER(Complex128), # results
-            ctypes.POINTER(Complex128), # u_inf_init
-            ctypes.POINTER(Complex128)  # du_inf_init
-        ]
-        self.lib.solve_batch.restype = None
-
-    def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> np.ndarray:
-        n_params = len(params_list)
-        rho, a_phi, da_phi = field_profile.get_arrays()
-        n_points = len(rho)
-        
-        lambd = getattr(field_profile, 'lambd', 0.0)
-        F = getattr(field_profile, 'F', 0.0)
-
-        # Compute Boundary Conditions in Python using Scipy
-        from scipy.special import yv, yvp, kv, kvp
-        u_inf_init = np.zeros(n_params, dtype=np.complex128)
-        du_inf_init = np.zeros(n_params, dtype=np.complex128)
-        
-        rho_max = rho[-1]
-        # Use first param's 'e' for global flux factor
-        e_val = params_list[0]['e']
-        F_cal_ext = e_val * F / (2.0 * np.pi)
-
-        for b, p in enumerate(params_list):
-            k2 = p['chi']**2 - p['m']**2
-            n = p['ml'] - F_cal_ext
-            if k2.real > 0:
-                k = np.sqrt(k2)
-                u_inf_init[b] = yv(n, k * rho_max)
-                du_inf_init[b] = k * yvp(n, k * rho_max)
-            else:
-                kappa = np.sqrt(-k2)
-                u_inf_init[b] = kv(n, kappa * rho_max)
-                du_inf_init[b] = kappa * kvp(n, kappa * rho_max)
-
-        params_array = (Parameters * n_params)()
-        for i, p in enumerate(params_list):
-            params_array[i] = Parameters(
-                chi=Complex128.from_complex(complex(p['chi'])),
-                ml=int(p['ml']),
-                sigma3=int(p['sigma3']),
-                m=float(p['m']),
-                e=float(p['e']),
-                lambd=float(lambd),
-                F=float(F)
-            )
-            
-        c_profile = Profile(
-            rho=rho.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            a_phi=a_phi.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            da_phi=da_phi.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-            n_points=n_points
-        )
-        
-        u_inf_c = (Complex128 * n_params).from_buffer(u_inf_init)
-        du_inf_c = (Complex128 * n_params).from_buffer(du_inf_init)
-        results_array = (Complex128 * (n_params * n_points))()
-        
-        self.lib.solve_batch(params_array, n_params, c_profile, results_array, u_inf_c, du_inf_c)
-        
-        res_np = np.frombuffer(results_array, dtype=np.complex128).reshape(n_params, n_points)
-        return res_np
-
-    def solve_batch_with_w0(self, params_list: List[Dict[str, Any]], field_profile: Any) -> Tuple[np.ndarray, Optional[torch.Tensor]]:
-        return self.solve_batch(params_list, field_profile), None
-
 class Orchestrator:
-    def __init__(self, backend_type: str = "pytorch", device: Optional[str] = None, lib_path: str = "./libsolver.so", batch_size: int = 128) -> None:
-        self.backend_type = backend_type
+    def __init__(self, device: Optional[str] = None, batch_size: int = 128) -> None:
+        self.backend = PyTorchSolver(device=device)
+        self.device = self.backend.device
+        self.renormalizer = Renormalizer(device=self.device)
         self.batch_size = batch_size
-        if backend_type == "pytorch":
-            self.backend = PyTorchSolver(device=device)
-            self.device = self.backend.device
-            self.renormalizer = Renormalizer(device=self.device)
-        elif backend_type == "c":
-            self.backend = CSolverBackend(lib_path=lib_path)
-            self.device = torch.device("cpu")
-            self.renormalizer = Renormalizer(device="cpu")
-        else:
-            raise ValueError(f"Unknown backend type: {backend_type}")
 
     def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0, chi_threshold: float = 100.0, collect_density: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         """
         Computes the full effective action by integrating over chi and summing over ml.
         Implements batching to manage memory and UV renormalization.
-
-        Note on Normalization: The numerical solvers (C/PyTorch) use arbitrary normalization
-        for homogeneous solutions u0, uinf. To align with analytic results from
-        greensfunc.tex, the numerical results are scaled by (W0_num / W0_ana) 
-        where W0_ana is computed analytically. This ensures the Green's function
-        normalization matches the standard Bessel definition G0 = -pi/2 * rho * J * Y.
-
-        If collect_density is True, returns (action, density_integrand).
         """
         rho, _, _ = field_profile.get_arrays(as_numpy=False)
         rho = rho.to(self.device)
         n_points = len(rho)
         
-        # ... (rest of implementation remains same, but we need to inject the scaling here)
-        # However, modifying the batch logic is complex. I'll implement a simpler approach
-        # by checking for the StepFunctionProfile type and scaling automatically.
-        rho = rho.to(self.device)
-        n_points = len(rho)
-
         # Integration weights for rho (trapezoidal)
         rho_weights = torch.zeros_like(rho)
         rho_weights[1:-1] = (rho[2:] - rho[:-2]) / 2.0
@@ -188,17 +55,7 @@ class Orchestrator:
 
             if numerical_batch:
                 # Solve ODE for numerical batch
-                if hasattr(self.backend, 'solve_batch_with_w0'):
-                    num_results, num_w0 = self.backend.solve_batch_with_w0(numerical_batch, field_profile)
-                else:
-                    num_results, num_w0 = self.backend.solve_batch(numerical_batch, field_profile)
-
-                # Path A logic: Green's function G = rho*u0*uinf/W is invariant to scaling of u0, uinf.
-                # Explicit scaling by W0 ratio is redundant and was causing numerical gaps.
-                if isinstance(field_profile, StepFunctionProfile):
-                    # We keep this block for test persistence but perform no scaling.
-                    # num_results[idx] /= scaling  <-- REMOVED
-                    pass
+                num_results, num_w0 = self.backend.solve_batch(numerical_batch, field_profile)
 
                 # Get G0 and UV sub for numerical batch
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
@@ -207,12 +64,9 @@ class Orchestrator:
                 num_g0 = self.renormalizer.compute_g0(num_chi, num_ml, m, rho)
                 num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
 
-                print(f"DEBUG: G_num max: {torch.max(torch.abs(num_results)).item()}")
-                print(f"DEBUG: G_0 max:   {torch.max(torch.abs(num_g0)).item()}")
-                print(f"DEBUG: UV_sub max: {torch.max(torch.abs(num_uv)).item()}")
-
+                # Path A matching: G_num and G_0 are now both dimensionless.
+                # Renorm = G_num - G_0 - UV_sub
                 num_renorm = num_results - num_g0 - num_uv
-                print(f"DEBUG: Renorm max: {torch.max(torch.abs(num_renorm)).item()}")
 
                 # Place into renormalized_g
                 num_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) <= chi_threshold]
@@ -225,8 +79,8 @@ class Orchestrator:
             if collect_density:
                 density_integrand += torch.sum(renormalized_g, dim=0)
 
-            # Integration over rho
-            inner_int = torch.sum(renormalized_g * rho_factor, dim=-1) # (batch_size,)
+            # Integration over rho: Eq 2.59 uses rho^2 * (G_dim - G0_dim)
+            inner_int = torch.sum(renormalized_g * (rho**2) * rho_factor, dim=-1) # (batch_size,)
 
             # Accumulate into total_inner_sum based on chi
             for idx, p in enumerate(batch):
@@ -244,11 +98,9 @@ class Orchestrator:
         else:
             chi_weights[0] = 1.0
 
-        # k_vac = sqrt(chi^2 - m^2)
-        k_vac = torch.sqrt(chi_tensor*chi_tensor - m*m)
-
-        # Eq 2.59: -hbar * pi * sum * int(chi^3 * k_vac * total_inner_sum)
-        action = -torch.pi * torch.sum(chi_tensor**3 * k_vac * total_inner_sum * chi_weights)
+        # Coefficient -1/(8*pi^2) accounts for 4D momentum measure (1/8pi^2) and spin degeneracy (2) 
+        # and the -1/2 from the Tr ln expansion. Total = -1/(8*pi^2).
+        action = -1.0 / (8.0 * np.pi**2) * torch.sum(chi_tensor**3 * total_inner_sum * chi_weights)
 
         if collect_density:
             return action, density_integrand

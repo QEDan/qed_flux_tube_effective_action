@@ -27,7 +27,7 @@ def compare_analytic_vs_numerical():
     profile = StepFunctionProfile(rho_full, lambd=lambd, F=F, smooth_width=None)
     
     # Numerical solver
-    orc = Orchestrator(backend_type="pytorch", device="cpu")
+    orc = Orchestrator(device="cpu")
     params = [{'chi': chi, 'ml': ml, 'sigma3': sigma3, 'm': m, 'e': 1.0}]
     results_num, _ = orc.backend.solve_batch(params, profile)
     res_num = results_num[0].detach().numpy()

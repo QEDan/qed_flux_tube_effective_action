@@ -19,7 +19,7 @@ def test_full_orchestrator_pytorch():
     
     profile = StepFunctionProfile(rho, lambd=1.0, F=1.0)
     
-    orch = Orchestrator(backend_type="pytorch", batch_size=4)
+    orch = Orchestrator(batch_size=4)
     action = orch.compute_effective_action(profile, chi_values, ml_values, sigma3_values)
     
     assert action is not None
@@ -36,7 +36,7 @@ def test_full_orchestrator_asymptotic():
     
     profile = StepFunctionProfile(rho, lambd=1.0, F=1.0)
     
-    orch = Orchestrator(backend_type="pytorch", batch_size=4)
+    orch = Orchestrator(batch_size=4)
     # Threshold is 100.0 by default, so 1000.0 should trigger asymptotic regime
     action = orch.compute_effective_action(profile, chi_values, ml_values, sigma3_values, chi_threshold=100.0)
     
