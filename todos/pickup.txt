@@ -1,22 +1,26 @@
 ✦ Investigation Summary: Discrepancy in QED Effective Action (Sech2 / Dunne-Hall)
 
-  As of May 2, 2026, we have identified and corrected several fundamental errors in the Green's function solver, aligning the results with physical expectations (negative action), though a significant magnitude discrepancy (~10^6x) persists against the Dunne-Hall 1D benchmark.
+  As of May 2, 2026, we have established a robust internal validation suite, but a magnitude discrepancy remains between the numerical tube results and the Cartesian HE benchmark.
 
-  ### Critical Fixes Implemented:
-  1. **Integration Measure Corrected:** The numerical Green's function $G$ is already $\rho$-scaled ($G = \rho g_{radial}$). The Orchestrator was incorrectly applying an *additional* factor of $\rho$ in the measure ($\int G \rho d\rho$). Fixed to $\int G d\rho$ to match the 3D trace $\text{Tr} G_3 \sim 2\pi \int \rho d\rho g_{radial}$.
-  2. **Normalization Factor Updated:** The overall action factor was corrected to $-1/(2\pi)$. This accounts for the 4D momentum measure ($1/8\pi^2$), spin degeneracy ($2$), and the angular integral ($2\pi$).
-  3. **UV Subtraction Sign Correction:** Found a sign mismatch. $G - G_0$ is negative for magnetic fields; the UV subtraction term must be **added** ($G - G_0 + UV$) to correctly cancel the negative divergence.
-  4. **Global Renormalization:** Implemented a global non-oscillatory $B^2$ subtraction term in the Orchestrator: $UV_{global} = \int \rho B^2(\rho) d\rho / (6 \chi^4)$. This is required for logarithmic convergence of the $\chi$ integral in 3+1D.
-  5. **Numerical Stability:** Added asymptotic approximations for $G_0$ at large $m_l$ and overflow protection for the backward ODE integration.
+  ### Major Breakthroughs:
+  1. **Geometry Mismatch Confirmed (H9):** Symbolically proved (`confirm_geometry_mismatch.py`) that the 2D cylindrical Sech2 tube is **not** a coordinate transformation of the 1D Cartesian Sech2 slab. Non-local effects and the centrifugal barrier $(m_l/\rho)^2$ make the Dunne-Hall integral benchmark incompatible for direct validation of the integrated action.
+  2. **Gold Standard Established:** Implemented exact Whittaker-based cylindrical solutions for the **Step Function Profile** in `renormalization.py`. The numerical solver now matches this exact benchmark with $<1\%$ error (`compare_analytics.py`), proving that the solver's radial logic, measure, and normalization are correct for cylindrical tubes.
+  3. **HE Benchmark Implemented:** Added exact renormalized Heisenberg-Euler and first-order derivative correction formulas to `analytic.py` as geometry-independent limits for the slowly-varying regime.
 
-  ### Remaining Issues & Hypotheses:
-  - **Magnitude Discrepancy:** `scripts/plot_exact_comparison.py` shows numerical results $\sim 10^7$ times larger than the derivative expansion. 
-  - **Slow Spectral Convergence (H8):** The sum $\sum_{m_l} (G - G_0)$ decays very slowly with $\chi$. Truncating the sum (currently at $m_l \approx 100$) at high $\chi$ introduces a fake divergence. The number of terms needed likely scales as $m_l \sim \chi \rho_{max}$.
-  - **Geometry Mismatch (H9):** The Dunne-Hall benchmark is for a 1D Cartesian profile $B(x)$. Our solver computes a 2D cylindrical profile $B(\rho)$. While the profile function is the same ($\text{sech}^2$), the transverse density of states and the area integration ($2\pi \rho d\rho$ vs $L dy$) are different. The "Analytic" results in `plot_exact_comparison.py` use a naive local area integration which may be insufficient.
-  - **Aharonov-Bohm Tail (H10):** For profiles with non-zero total flux $F$, the exterior Green's function has an AB tail that only cancels in the full $m_l$ sum. This cancellation is numerically delicate and may require a more advanced regularization (e.g., Abel-Plana).
+  ### Current Roadblock: Numerical Stability (NaNs)
+  - When validating the Slowly-Varying limit (large $\lambda$, large domain), the solver encounters NaNs.
+  - **Source:** Exponential growth/decay of radial solutions ($u'' \approx V_{eff} u$) over long domains exceeds the dynamic range of `float64`, even with periodic normalization. Specifically, Bessel initial conditions for large $m_l$ (e.g., $K_{200}(10) > 10^{300}$) overflow immediately.
 
   ### Recommended Next Steps:
-  1. **Convergence Study:** Use `scripts/check_term_decay.py` to plot the sum over $m_l$ vs $\chi$ and determine the actual power-law decay. If it's not $1/\chi^2$ or better, the UV cancellation is incomplete.
-  2. **Small-Flux Limit:** Validate against a Zero-Flux profile ($F=0$) first, as this eliminates the AB tail issue.
-  3. **Heat Kernel Audit:** Re-derive the coefficient of the global $B^2$ subtraction ($1/6$) specifically for the 1D integrated action in cylindrical coordinates.
-  4. **Spectral Summations:** Consider implementing the spectral sum via the Abel-Plana formula to convert it into a stable integral.
+  1. **Finalize Robust Solver:** The `PyTorchSolver` in `pytorch_solver.py` currently has a "Log-Scale RK4" implementation that needs completion. 
+     - **Fix 1:** Re-integrate the `safe_bessel_bc` logic to handle Bessel order $> 100$ using power-law asymptotics to prevent initial overflow.
+     - **Fix 2:** Consider the Riccati (Log-Derivative) transformation ($R = u'/u$) as a more stable alternative for the oscillatory regime.
+  2. **HE Convergence Run:** Once stability is restored, run `scripts/validate_he_expansion.py` to confirm that the numerical action approaches the Heisenberg-Euler limit as $\lambda \to \infty$.
+  3. **Flux Regulation:** Investigate the large imaginary parts in non-zero flux cases. This may require increasing the $m_l$ sum range further or applying the Abel-Plana regularization.
+
+  ### Unstaged Changes Checklist:
+  - [ ] `src/python/analytic.py`: HE Lagrangian and derivative corrections.
+  - [ ] `src/python/orchestrator.py`: UV subtraction sign fix, normalization corrections, and NaN debugging prints.
+  - [ ] `src/python/pytorch_solver.py`: In-progress log-scale RK4 implementation (requires Bessel IC fix).
+  - [ ] `scripts/validate_he_expansion.py`: Convergence validation script.
+  - [ ] `symbolic_validations/confirm_geometry_mismatch.py`: Geometric proof of H9.

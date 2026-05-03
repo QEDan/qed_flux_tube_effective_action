@@ -49,20 +49,15 @@ class Renormalizer:
             for i, m_val in enumerate(sub_ml_np):
                 m_abs = np.abs(m_val)
                 z = sub_k_rho_np[i]
-                # Use approximation for large ml or small z to avoid overflow in Y_ml
-                # Overflow occurs when (z/2)^-m > 10^308. 
-                # For z=0.01, z/2=0.005=1/200. (200)^m > 10^308 => m*log10(200) > 308 => m*2.3 > 308 => m > 134.
-                # Let's be safe and use 50.
-                mask_approx = m_abs > 50
                 
-                # G_radial_0 = -pi/2 * J * Y. 
-                # For m >> z: J ~ (z/2)^m / m!, Y ~ -(m-1)! / pi (z/2)^m
-                # So G_radial_0 ~ -pi/2 * [ -1 / (pi * m) ] = 1 / (2*m)
-                # Correcting for z: G_radial_0 = 1 / (2 * sqrt(m^2 - z^2))
-                
-                # We apply the mask per point if z is large, but usually z is small
+                # Use approximation for large ml to avoid overflow in Y_ml
+                # For m >> z: G_radial_0 = 1 / (2 * sqrt(m^2 - z^2))
+                # For z >> m: G_radial_0 = -i / (2 * sqrt(z^2 - m^2))
+                # Both are handled by complex square root.
                 if m_abs > 50:
-                    sub_g0_np[i] = 0.5 / np.sqrt(m_abs**2 - z**2 + 1e-15)
+                    # Dimension: [L^0] for G_radial_0 (scale invariant part)
+                    val = 0.5 / np.lib.scimath.sqrt(m_abs**2 - z**2 + 1e-15)
+                    sub_g0_np[i] = val
                 else:
                     res_j = jv(float(m_val), z)
                     res_y = yv(float(m_val), z)
@@ -106,9 +101,38 @@ class Renormalizer:
         
         return (uv_osc * damping).to(torch.complex128)
 
-    def compute_whittaker_benchmark(self, chi: float, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
+    def compute_whittaker_benchmark(self, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
         """
         Analytic solution for Step Function profile using Whittaker functions.
-        Used for verification as per implementation_strategy.md Section 6.
+        Matches Eq 2.76 / 2.100 of greensfunc.tex.
+        Dimension: [L] (rho-scaled Green's function)
         """
-        return torch.zeros_like(rho, dtype=torch.complex128)
+        from analytic import M_whittaker, W_whittaker
+        import mpmath
+        
+        e = 1.0
+        F_cal = (e * F) / (2.0 * np.pi)
+        k2 = chi*chi - m*m
+        
+        # kappa = lambda^2 * k^2 / (4 * F_cal)
+        # mu = ml / 2
+        # z = (F_cal / lambda^2) * rho^2
+        kappa = (lambd**2 * k2) / (4.0 * F_cal)
+        mu = abs(ml) / 2.0
+        
+        rho_np = rho.detach().cpu().numpy()
+        z = (F_cal / lambd**2) * (rho_np**2)
+        
+        # G_radial = (lambda^2 / 2*F_cal) * (Gamma(1/2 + mu - kappa) / ml!) * W * M
+        # We need to handle the Gamma function carefully for poles
+        gamma_factor = complex(mpmath.gamma(0.5 + mu - kappa))
+        denom = float(mpmath.factorial(abs(ml)))
+        
+        # Solve for W and M
+        W_vals = W_whittaker(z, kappa, mu)
+        M_vals = M_whittaker(z, kappa, mu)
+        
+        g_radial = (lambd**2 / (2.0 * F_cal)) * (gamma_factor / denom) * W_vals * M_vals
+        
+        # Result is rho * g_radial
+        return torch.from_numpy(rho_np * g_radial).to(self.device).to(torch.complex128)

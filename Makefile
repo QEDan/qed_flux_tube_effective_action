@@ -5,7 +5,8 @@ VALIDATION_PY = scripts/test_zero_field.py scripts/compare_analytics.py \
 VALIDATION_SAGEMATH_PY = symbolic_validations/numerical_spectrum.py symbolic_validations/verify_analytic_spectrum.py \
                          symbolic_validations/verify_isomorphism.py symbolic_validations/verify_ode.py \
                          symbolic_validations/verify_spectrum.py symbolic_validations/verify_step_interior.py \
-                         symbolic_validations/verify_uv_subtraction.py
+                         symbolic_validations/verify_uv_subtraction.py \
+                         symbolic_validations/confirm_geometry_mismatch.py
 VALIDATION_SAGE = symbolic_validations/verify_ode.sage
 
 validate: 

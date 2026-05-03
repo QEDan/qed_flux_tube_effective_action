@@ -5,6 +5,71 @@ from typing import Union, Tuple, Any
 # Set precision for mpmath
 mpmath.mp.dps = 25
 
+def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> float:
+    """
+    Computes the exact renormalized Heisenberg-Euler Lagrangian density for a constant B field.
+    Includes all orders in B, but excludes derivative terms.
+    Matches the finite part of Eq 11 in Dunne & Hall (1997).
+    """
+    from scipy.integrate import quad
+    
+    if abs(B) < 1e-10:
+        return 0.0
+        
+    def integrand(s):
+        # (s*coth(s) - 1 - s^2/3) / s^3
+        # Expansion: 1 + s^2/3 - s^4/45 + 2s^6/945
+        # f(s) = (1 + s^2/3 - s^4/45 - 1 - s^2/3) / s^3 = -s/45
+        if s < 1e-4:
+            return -s/45.0 + 2.0*s**3/945.0
+        
+        # Guard against large s in sinh/cosh
+        if s > 100.0:
+            # coth(s) -> 1
+            return (s - 1.0 - s**2/3.0) / s**3 * np.exp(-m**2 * s / (e * abs(B)))
+            
+        return (1.0/s**3) * np.exp(-m**2 * s / (e * abs(B))) * (s/np.tanh(s) - 1.0 - s**2/3.0)
+    
+    # Use a finite upper bound to avoid issues with divergent integrands in quad
+    # The exponential factor exp(-2s) (for m=1, B=0.5) suppresses the integrand.
+    val, _ = quad(integrand, 0, 500.0)
+    return - (e * B)**2 / (8.0 * np.pi**2) * val
+
+def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: float = 1.0) -> float:
+    """
+    Computes the first-order derivative correction to the effective Lagrangian.
+    Matches Eq 15 in Dunne & Hall (1997).
+    """
+    from scipy.integrate import quad
+    
+    if abs(B) < 1e-10:
+        return 0.0
+        
+    def integrand(s):
+        # (s*coth(s))'''
+        # Small s: -8/15 * s
+        if s < 1e-4:
+            return -8.0/15.0 * s
+        
+        if s > 100.0:
+            # (s*coth(s))' -> 1, (s*coth(s))'' -> 0, (s*coth(s))''' -> 0
+            return 0.0
+            
+        # Stable form for f''' = (s*coth(s))'''
+        # f = s/tanh(s)
+        # f' = coth(s) - s*csch^2(s)
+        # f'' = -2*csch^2(s) + 2*s*csch^2(s)*coth(s)
+        # f''' = 4*csch^2(s)*coth(s) - 2*csch^2(s)*coth(s)*2*s*coth(s) - 4*s*csch^4(s)
+        #      = 4*csch^2*coth - 4*s*csch^2*coth^2 - 4*s*csch^4
+        cs = 1.0/np.sinh(s)
+        ct = 1.0/np.tanh(s)
+        f3 = 4*cs**2*ct - 4*s*cs**2*ct**2 - 4*s*cs**4
+        
+        return (1.0/s) * np.exp(-m**2 * s / (e * abs(B))) * f3
+        
+    val, _ = quad(integrand, 0, 500.0)
+    return - e * (dB**2) / (64.0 * np.pi**2 * abs(B)) * val
+
 def M_whittaker(z: Union[float, np.ndarray], kappa: complex, mu: float) -> Union[complex, np.ndarray]:
     """
     Whittaker M function: M_{kappa, mu}(z)

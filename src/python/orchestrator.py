@@ -64,7 +64,7 @@ class Orchestrator:
             if numerical_batch:
                 # Solve ODE for numerical batch
                 num_results, _ = self.backend.solve_batch(numerical_batch, field_profile)
-
+                
                 # Get G0 and UV sub for numerical batch
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
                 num_ml = torch.tensor([p['ml'] for p in numerical_batch], device=self.device, dtype=torch.int32)
@@ -89,6 +89,12 @@ class Orchestrator:
 
             # Integration over rho: Since results/g0 are already rho-scaled [L], 
             # the 3D trace leads to a simple radial integral over rho.
+            if torch.isnan(renormalized_g).any():
+                print("❌ NaN in renormalized_g!")
+                print(f"  num_results max: {torch.max(torch.abs(num_results))}")
+                print(f"  num_g0 max: {torch.max(torch.abs(num_g0))}")
+                print(f"  num_uv max: {torch.max(torch.abs(num_uv))}")
+
             inner_int = torch.sum(renormalized_g * rho_factor, dim=-1) # (batch_size,) [L^2]
 
             # Accumulate into total_inner_sum based on chi
@@ -108,9 +114,14 @@ class Orchestrator:
         area_b2 = torch.sum(rho * b_field_prof**2 * rho_factor).real
         
         # k2 for global UV subtraction (clamped for stability)
-        k2_global = torch.clamp(chi_real**2 - m**2, min=1e-3)
+        # We need chi^2 - m^2. If chi~m, this is very small.
+        # k2_global is chi^2 - m^2
+        k2_global = chi_real**2 - m**2
+        # Clamp it to a safe positive value for the denominator
+        k2_safe = torch.clamp(torch.abs(k2_global), min=1e-3)
+        
         # Factor 1/6 accounts for the a2 heat kernel term and the spectral sum normalization
-        uv_global = area_b2 / (6.0 * k2_global**2)
+        uv_global = area_b2 / (6.0 * k2_safe**2)
         
         # Only add UV subtraction to chi values that were processed numerically
         num_mask = (torch.abs(chi_tensor) <= chi_threshold).to(self.device)
