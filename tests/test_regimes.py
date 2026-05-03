@@ -50,7 +50,7 @@ def test_regime_smoothness():
     # Check that decaying regime actually decays
     assert np.abs(res_dec[-1]) < np.abs(res_dec[len(rho)//2])
     
-    print("Regime smoothness tests passed.")
+    print("✅ Regime smoothness tests passed.")
 
 if __name__ == "__main__":
     test_regime_smoothness()

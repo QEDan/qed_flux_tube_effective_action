@@ -30,4 +30,4 @@ def verify_analytic_spectrum():
 if __name__ == "__main__":
     eigs = solve_numerical_spectrum()
     print(f"Sample eigenvalues: {eigs[:5]}")
-    print("Numerical validation complete: Successfully computed sample eigenvalues for the radial ODE operator using finite differences.")
+    print("✅ Numerical validation complete: Successfully computed sample eigenvalues for the radial ODE operator using finite differences.")

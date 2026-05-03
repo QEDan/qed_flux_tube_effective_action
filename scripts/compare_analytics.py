@@ -70,7 +70,7 @@ def compare_analytic_vs_numerical():
     
     plt.tight_layout()
     plt.savefig("results/analytic_vs_numerical.png")
-    print(f"Validation complete. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
+    print(f"✅ Validation complete. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
     print("Plot saved to results/analytic_vs_numerical.png. Scientist: Verify high-degree overlap in the top two panels and confirm residuals in the bottom panel are sufficiently small (allowing for smoothing peaks).")
 
 if __name__ == "__main__":

@@ -18,4 +18,4 @@ print(f"B-field for step profile: {B_step.simplify()}")
 # Radial ODE: u'' + 1/rho u' - (1/rho^2 + V_ml) u = 0
 ODE = diff(u, rho, 2) + (1/rho)*diff(u, rho) - (1/rho**2 + V_ml) * u
 print(f"Radial ODE expression: {ODE.simplify()}")
-print("Validation complete: Successfully constructed the symbolic radial ODE expression with the effective potential V_ml.")
+print("✅ Validation complete: Successfully constructed the symbolic radial ODE expression with the effective potential V_ml.")

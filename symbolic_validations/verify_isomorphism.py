@@ -45,4 +45,4 @@ print(f"Cylindrical Potential (ml-dependent part): {V_cyl_mapped.expand()}")
 # Cylindrical potential contains e*sigma3*(B) + ...
 # We verify that V_cyl = V_cyl_mapped + e*sigma3*B
 # where B = Aphi/rho + Aphi'
-print("Validation complete: Confirmed the operator isomorphism between Cartesian and cylindrical potentials, with the expected p2 -> ml/rho mapping.")
+print("✅ Validation complete: Confirmed the operator isomorphism between Cartesian and cylindrical potentials, with the expected p2 -> ml/rho mapping.")

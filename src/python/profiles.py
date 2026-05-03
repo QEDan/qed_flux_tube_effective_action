@@ -100,11 +100,13 @@ class Sech2Profile(FieldProfile):
         """
         Magnetic field B(rho) = B * sech^2(rho/lambd)
         A_phi(rho) = B*lambd*tanh(rho/lambd) - (B*lambd^2/rho)*ln(cosh(rho/lambd))
+        Total flux F = 2*pi * B * lambd^2 * ln(2)
         """
         super().__init__(rho)
         self.B = B
         self.lambd = lambd
         self.e = e
+        self.F = 2.0 * np.pi * B * (lambd**2) * np.log(2.0)
         self.update()
 
     def update(self) -> None:

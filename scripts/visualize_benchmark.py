@@ -69,7 +69,7 @@ def visualize_test_benchmark():
     plt.legend()
     plt.grid(True)
     plt.savefig("results/test_benchmark_absolute_visualization.png")
-    print("Validation complete. Plot saved to results/test_benchmark_absolute_visualization.png. Scientist: Confirm that the dashed numerical integration curve perfectly tracks the solid analytic benchmark for the absolute amplitude.")
+    print("✅ Validation complete. Plot saved to results/test_benchmark_absolute_visualization.png. Scientist: Confirm that the dashed numerical integration curve perfectly tracks the solid analytic benchmark for the absolute amplitude.")
 
 if __name__ == "__main__":
     visualize_test_benchmark()

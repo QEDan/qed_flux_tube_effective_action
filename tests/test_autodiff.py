@@ -51,7 +51,7 @@ def test_autodiff_action():
     
     assert grad is not None
     assert not torch.isnan(grad)
-    print("Auto-Diff successful!")
+    print("✅ Auto-Diff successful!")
 
 if __name__ == "__main__":
     test_autodiff_action()

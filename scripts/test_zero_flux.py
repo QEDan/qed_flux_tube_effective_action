@@ -23,7 +23,7 @@ def exact_zero_flux_ea(B_peak, lambd, m):
     B_safe = np.where(np.abs(B_profile) < 1e-10, 1e-10, B_profile)
     L_eff = (e * B_safe)**2 / (24.0 * np.pi**2) * np.log(m**2 / (e * np.abs(B_safe)))
     
-    return 2.0 * np.pi * np.trapz(rho_grid * L_eff, rho_grid)
+    return 2.0 * np.pi * np.trapezoid(rho_grid * L_eff, rho_grid)
 
 def test_zero_flux_matching():
     lambd = 1.0
@@ -48,7 +48,11 @@ def test_zero_flux_matching():
     
     print(f"Numerical Action: {num_val}")
     print(f"Analytic EH:     {ana_val}")
-    print(f"Ratio:           {num_val / ana_val if ana_val != 0 else 'inf'}")
+    
+    if abs(num_val / ana_val - 1.0) < 0.2:
+        print("✅ Test passed: Numerical result matches analytic expectation for zero flux profile.")
+    else:
+        print(f"❌ Test failed: Ratio is {num_val / ana_val if ana_val != 0 else 'inf'}")
 
 if __name__ == "__main__":
     test_zero_flux_matching()

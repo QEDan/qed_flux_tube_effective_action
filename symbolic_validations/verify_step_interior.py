@@ -19,4 +19,4 @@ print(f"V_ml (interior): {V_ml.simplify()}")
 chi, m = symbols('chi m')
 pot = V_ml + 1/rho**2 - chi**2 + m**2
 print(f"Potential for u'' (interior): {pot.simplify()}")
-print("Validation complete: Successfully derived the interior potential expression for the step-function profile.")
+print("✅ Validation complete: Successfully derived the interior potential expression for the step-function profile.")

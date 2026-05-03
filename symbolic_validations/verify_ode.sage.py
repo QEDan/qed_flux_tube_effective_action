@@ -24,5 +24,5 @@ print(f"B-field for step profile: {B_step}")
 # Verify ODE: [-d^2/drho^2 - 1/rho * d/drho + 1/rho^2 + V_ml + ... ] u = 0
 # Simplified: u'' + 1/rho u' - (1/rho^2 + V_ml) u = 0 (for chi=m=0)
 ODE = diff(u, rho, _sage_const_2 ) + (_sage_const_1 /rho)*diff(u, rho) - (_sage_const_1 /rho**_sage_const_2  + V_ml) * u
-print("Validation complete: Symbolic radial ODE and potential terms have been verified for the step function profile in SageMath.")
+print("✅ Validation complete: Symbolic radial ODE and potential terms have been verified for the step function profile in SageMath.")
 

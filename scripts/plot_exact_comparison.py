@@ -28,7 +28,7 @@ def exact_dunne_hall_expansion(B_peak, m, lambd):
     
     L_eff = (e * B_safe)**2 / (24.0 * np.pi**2) * np.log(m**2 / (e * B_safe))
     
-    action_per_length = 2.0 * np.pi * np.trapz(rho_grid * L_eff, rho_grid)
+    action_per_length = 2.0 * np.pi * np.trapezoid(rho_grid * L_eff, rho_grid)
     return action_per_length
 
 def plot_exact_comparison():

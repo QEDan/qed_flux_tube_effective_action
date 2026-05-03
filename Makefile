@@ -34,11 +34,11 @@ validate:
 	if [ $$failed -eq 0 ]; then \
 		echo ""; \
 		echo "------------------------------------"; \
-		echo "All automated validations PASSED."; \
+		echo "✅ All automated validations PASSED."; \
 	else \
 		echo ""; \
 		echo "------------------------------------"; \
-		echo "Some validations FAILED. Check output above."; \
+		echo "❌ Some validations FAILED. Check output above."; \
 		exit 1; \
 	fi
 	@echo ""

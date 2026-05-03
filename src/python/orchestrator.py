@@ -22,7 +22,7 @@ class Orchestrator:
         chi: [L^-1]
         m: [L^-1]
         e: [L^0]
-        Action output: [L^0] (dimensionless vacuum potential energy density in natural units)
+        Action output: [L^-2] (1D integrated action per unit length)
         """
         rho, _, _ = field_profile.get_arrays(as_numpy=False)
         rho = rho.to(self.device)
@@ -63,7 +63,7 @@ class Orchestrator:
 
             if numerical_batch:
                 # Solve ODE for numerical batch
-                num_results, num_w0 = self.backend.solve_batch(numerical_batch, field_profile)
+                num_results, _ = self.backend.solve_batch(numerical_batch, field_profile)
 
                 # Get G0 and UV sub for numerical batch
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
@@ -72,9 +72,9 @@ class Orchestrator:
                 num_g0 = self.renormalizer.compute_g0(num_chi, num_ml, m, rho)
                 num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
 
-                # Path A matching: G_num and G_0 are now both dimensionless.
-                # Renorm = G_num - G_0 - UV_sub
-                num_renorm = num_results - num_g0 - num_uv
+                # Path A matching: G_num and G_0 are both rho-scaled [L].
+                # Renorm = G_num - G_0 + UV_sub (Sign corrected to match TeX)
+                num_renorm = num_results - num_g0 + num_uv
 
                 # Place into renormalized_g
                 num_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) <= chi_threshold]
@@ -87,8 +87,9 @@ class Orchestrator:
             if collect_density:
                 density_integrand += torch.sum(renormalized_g, dim=0)
 
-            # Integration over rho: Eq 2.59 uses rho * (G_dim - G0_dim)
-            inner_int = torch.sum(renormalized_g * rho * rho_factor, dim=-1) # (batch_size,)
+            # Integration over rho: Since results/g0 are already rho-scaled [L], 
+            # the 3D trace leads to a simple radial integral over rho.
+            inner_int = torch.sum(renormalized_g * rho_factor, dim=-1) # (batch_size,) [L^2]
 
             # Accumulate into total_inner_sum based on chi
             for idx, p in enumerate(batch):
@@ -98,6 +99,23 @@ class Orchestrator:
         # Final integration over chi
         chi_tensor = torch.tensor([complex(c) for c in chi_values], device=self.device, dtype=torch.complex128)
         chi_real = chi_tensor.real
+
+        # Global Non-oscillatory UV Subtraction (B^2 term)
+        # This term removes the logarithmic divergence in the 1D integrated action.
+        _, a_phi_prof, da_phi_prof = field_profile.get_arrays(as_numpy=False)
+        b_field_prof = (a_phi_prof / (rho + 1e-15) + da_phi_prof)
+        # Area factor for 1D integrated action per unit length
+        area_b2 = torch.sum(rho * b_field_prof**2 * rho_factor).real
+        
+        # k2 for global UV subtraction (clamped for stability)
+        k2_global = torch.clamp(chi_real**2 - m**2, min=1e-3)
+        # Factor 1/6 accounts for the a2 heat kernel term and the spectral sum normalization
+        uv_global = area_b2 / (6.0 * k2_global**2)
+        
+        # Only add UV subtraction to chi values that were processed numerically
+        num_mask = (torch.abs(chi_tensor) <= chi_threshold).to(self.device)
+        total_inner_sum += uv_global * num_mask
+
         chi_weights = torch.zeros_like(chi_real)
         if len(chi_real) > 1:
             chi_weights[1:-1] = (chi_real[2:] - chi_real[:-2]) / 2.0
@@ -106,14 +124,13 @@ class Orchestrator:
         else:
             chi_weights[0] = 1.0
 
-        # Coefficient -1/(8*pi^2) accounts for 4D momentum measure (1/8pi^2) and spin degeneracy (2) 
-        # and the -1/2 from the Tr ln expansion. Total = -1/(8*pi^2).
-        action = -1.0 / (8.0 * np.pi**2) * torch.sum(chi_tensor**3 * total_inner_sum * chi_weights)
+        # Coefficient -1/(2*pi) accounts for the 4D measure, spin, and angular integration.
+        # 2 * (1/8pi^2) * 2pi * pi = 1/2pi
+        action = -1.0 / (2.0 * np.pi) * torch.sum(chi_tensor**3 * total_inner_sum * chi_weights)
 
         if collect_density:
             return action, density_integrand
         return action
-
 
 
 def generate_params_grid(chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0) -> List[Dict[str, Any]]:

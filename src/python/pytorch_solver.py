@@ -114,12 +114,25 @@ class PyTorchSolver:
             ord_val = n_order[b].item()
             if k2.real > 0:
                 k = np.sqrt(k2)
-                u_inf_init[b] = yv(ord_val, k * rho_max)
-                du_inf_init[b] = k * yvp(ord_val, k * rho_max)
+                val = yv(ord_val, k * rho_max)
+                dval = k * yvp(ord_val, k * rho_max)
+                # Scale if huge
+                if np.abs(val) > 1e100:
+                    scale = 1e-100 / np.abs(val)
+                    val *= scale
+                    dval *= scale
+                u_inf_init[b] = val
+                du_inf_init[b] = dval
             else:
                 kappa = np.sqrt(-k2)
-                u_inf_init[b] = kv(ord_val, kappa * rho_max)
-                du_inf_init[b] = kappa * kvp(ord_val, kappa * rho_max)
+                val = kv(ord_val, kappa * rho_max)
+                dval = kappa * kvp(ord_val, kappa * rho_max)
+                if np.abs(val) > 1e100:
+                    scale = 1e-100 / np.abs(val)
+                    val *= scale
+                    dval *= scale
+                u_inf_init[b] = val
+                du_inf_init[b] = dval
 
         state_uinf = torch.stack([u_inf_init, du_inf_init], dim=1)
         uinf[:, -1] = state_uinf[:, 0]

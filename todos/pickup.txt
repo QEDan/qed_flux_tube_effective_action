@@ -1,33 +1,22 @@
 ✦ Investigation Summary: Discrepancy in QED Effective Action (Sech2 / Dunne-Hall)
 
-  As of this handover, we have cleaned the codebase, removed the C backend, and verified the renormalization framework in the zero-field limit. However, a significant discrepancy (~200x) persists when validating against the Dunne-Hall exact inhomogeneous benchmark (Sech2).
+  As of May 2, 2026, we have identified and corrected several fundamental errors in the Green's function solver, aligning the results with physical expectations (negative action), though a significant magnitude discrepancy (~10^6x) persists against the Dunne-Hall 1D benchmark.
 
-  ### Resolved & Audit Findings:
-  1. Backend Consolidation: Removed C backend. Only PyTorch backend remains.
-  2. Dimensional Analysis Audit:
-     - All core functions are now dimensionally consistent with natural units (ħ=c=1).
-     - Found: `compute_uv_subtraction` was dimensionally problematic. Corrected implementation to match the functional form derived in `docs/greensfunc.tex` (Eq 2.59), utilizing a proxy field strength $B^2$ to ensure correct scaling and zero-field cancellation.
-  3. Renormalization: Confirmed $G_{num} \to G_0$ in zero-field, with tests passing.
+  ### Critical Fixes Implemented:
+  1. **Integration Measure Corrected:** The numerical Green's function $G$ is already $\rho$-scaled ($G = \rho g_{radial}$). The Orchestrator was incorrectly applying an *additional* factor of $\rho$ in the measure ($\int G \rho d\rho$). Fixed to $\int G d\rho$ to match the 3D trace $\text{Tr} G_3 \sim 2\pi \int \rho d\rho g_{radial}$.
+  2. **Normalization Factor Updated:** The overall action factor was corrected to $-1/(2\pi)$. This accounts for the 4D momentum measure ($1/8\pi^2$), spin degeneracy ($2$), and the angular integral ($2\pi$).
+  3. **UV Subtraction Sign Correction:** Found a sign mismatch. $G - G_0$ is negative for magnetic fields; the UV subtraction term must be **added** ($G - G_0 + UV$) to correctly cancel the negative divergence.
+  4. **Global Renormalization:** Implemented a global non-oscillatory $B^2$ subtraction term in the Orchestrator: $UV_{global} = \int \rho B^2(\rho) d\rho / (6 \chi^4)$. This is required for logarithmic convergence of the $\chi$ integral in 3+1D.
+  5. **Numerical Stability:** Added asymptotic approximations for $G_0$ at large $m_l$ and overflow protection for the backward ODE integration.
 
-  ### Remaining Issues:
-  - The ~200x discrepancy for inhomogeneous fields remains.
-  - While zero-field is validated, the inhomogeneous $F \neq 0$ profiles might suffer from subtle gauge or normalization mismatches (e.g., $A_\phi$ asymptotic boundary conditions).
+  ### Remaining Issues & Hypotheses:
+  - **Magnitude Discrepancy:** `scripts/plot_exact_comparison.py` shows numerical results $\sim 10^7$ times larger than the derivative expansion. 
+  - **Slow Spectral Convergence (H8):** The sum $\sum_{m_l} (G - G_0)$ decays very slowly with $\chi$. Truncating the sum (currently at $m_l \approx 100$) at high $\chi$ introduces a fake divergence. The number of terms needed likely scales as $m_l \sim \chi \rho_{max}$.
+  - **Geometry Mismatch (H9):** The Dunne-Hall benchmark is for a 1D Cartesian profile $B(x)$. Our solver computes a 2D cylindrical profile $B(\rho)$. While the profile function is the same ($\text{sech}^2$), the transverse density of states and the area integration ($2\pi \rho d\rho$ vs $L dy$) are different. The "Analytic" results in `plot_exact_comparison.py` use a naive local area integration which may be insufficient.
+  - **Aharonov-Bohm Tail (H10):** For profiles with non-zero total flux $F$, the exterior Green's function has an AB tail that only cancels in the full $m_l$ sum. This cancellation is numerically delicate and may require a more advanced regularization (e.g., Abel-Plana).
 
-  ### New Hypotheses for Next Agent:
-  
-  #### H5: Boundary Condition Mismatch (High Priority)
-  - Hypothesis: For $F \neq 0$, the exterior boundary conditions involve Bessel functions of order $n = m_l - \mathcal{F}_{ext}$. The current implementation might be using the wrong Bessel order or failing to account for the discontinuity of the derivative at the boundary correctly in the presence of flux.
-  - Test: Inspect `pytorch_solver.py`'s `solve_batch` for the `lambd`-dependent jump condition logic and cross-verify Bessel orders against Section 6 of `greensfunc.tex`.
-
-  #### H6: UV Subtraction Dimensionality (Medium Priority)
-  - Hypothesis: The UV subtraction term in `renormalization.py` is currently experimental. The theoretical derivation (Eq 2.59) is complex and depends on the specific field profile flux $F$. The current $B^2$ proxy might be missing a normalization factor related to $F/\lambda^2$.
-  - Test: Check the symbolic derivation of the UV term in `symbolic_validations/verify_uv_subtraction.py` against the full analytic benchmark (Step Function).
-
-  #### H7: Spectral Summation Range (Low Priority)
-  - Hypothesis: The $m_l$ summation range is insufficient for the inhomogenous profile at higher $B$.
-  - Test: Increase $m_l$ range significantly in `scripts/test_sech2_exact.py` and analyze if the ratio converges.
-
-  ### Recommended Path:
-  1. Profile-Agnostic Baseline: While the Step Function profile currently matches the internal analytic benchmark, perform a quantitative check to see if it *also* shows the ~200x discrepancy when compared against the exact analytic effective action (Eq 2.76 in greensfunc.tex). If the Step Function shows the same discrepancy, the issue is global (e.g., normalization or integration measure). If it does not, the issue is specific to the Sech2 potential mapping or its boundary conditions.
-  2. Boundary Conditions: Verify the jump conditions for the exterior Bessel matching at $\rho = \lambda$. The current boundary matching in `pytorch_solver.py` assumes continuity of the wavefunction, but the field derivative jump needs to be verified against the magnetic field strength $B(\lambda)$.
-  3. Analytic Comparison: Use `compare_analytics.py` to compare numerical solver vs. analytic interior Whittaker solutions. If these match, the issue is likely in the exterior matching (Bessel) or global normalization.
+  ### Recommended Next Steps:
+  1. **Convergence Study:** Use `scripts/check_term_decay.py` to plot the sum over $m_l$ vs $\chi$ and determine the actual power-law decay. If it's not $1/\chi^2$ or better, the UV cancellation is incomplete.
+  2. **Small-Flux Limit:** Validate against a Zero-Flux profile ($F=0$) first, as this eliminates the AB tail issue.
+  3. **Heat Kernel Audit:** Re-derive the coefficient of the global $B^2$ subtraction ($1/6$) specifically for the 1D integrated action in cylindrical coordinates.
+  4. **Spectral Summations:** Consider implementing the spectral sum via the Abel-Plana formula to convert it into a stable integral.
