@@ -1,6 +1,6 @@
 
 VALIDATION_PY = scripts/test_zero_field.py scripts/compare_analytics.py \
-                scripts/visualize_benchmark.py
+                scripts/visualize_benchmark.py scripts/validate_he_expansion.py
 
 VALIDATION_SAGEMATH_PY = symbolic_validations/numerical_spectrum.py symbolic_validations/verify_analytic_spectrum.py \
                          symbolic_validations/verify_isomorphism.py symbolic_validations/verify_ode.py \
