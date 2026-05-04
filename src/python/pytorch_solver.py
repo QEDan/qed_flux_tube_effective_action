@@ -34,6 +34,23 @@ class PyTorchSolver:
         res = state + (h/6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
         return res
 
+    def rk4_step(self, r: torch.Tensor, h: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], 
+                 a_p_start: torch.Tensor, da_p_start: torch.Tensor, 
+                 a_p_mid: torch.Tensor, da_p_mid: torch.Tensor, 
+                 a_p_end: torch.Tensor, da_p_end: torch.Tensor) -> torch.Tensor:
+        def f(r_val, state_val, a_p, da_p):
+            u, du = state_val[:, 0], state_val[:, 1]
+            v_eff = self.get_v_eff(r_val, params, a_p, da_p)
+            d2u = v_eff * u - (1.0/r_val) * du
+            return torch.stack([du, d2u], dim=1)
+
+        k1 = f(r, state, a_p_start, da_p_start)
+        k2 = f(r + 0.5*h, state + 0.5*h*k1, a_p_mid, da_p_mid)
+        k3 = f(r + 0.5*h, state + 0.5*h*k2, a_p_mid, da_p_mid)
+        k4 = f(r + h, state + h*k3, a_p_end, da_p_end)
+        res = state + (h/6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
+        return res
+
     def solve_batch(self, params_list: List[Dict[str, Any]], field_profile: Any) -> Tuple[torch.Tensor, torch.Tensor]:
         rho, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
         rho = rho.to(self.device)
@@ -58,19 +75,14 @@ class PyTorchSolver:
         
         abs_ml = torch.abs(params['ml']).to(torch.float64)
         v_eff_start = self.get_v_eff(rho[0], params, a_phi[0], da_phi[0])
-        # k_eff^2 = - (V_eff - ml^2/r^2)
         k_eff2 = -(v_eff_start - (abs_ml*abs_ml) / (rho[0]*rho[0]))
         
-        # Use log-space logic to handle power-law underflow: u ~ rho^|ml|
-        # Instead of computing rho^|ml| directly, we start with u=1, du=|ml|/rho 
-        # and add the log(rho^|ml|) to the accumulator.
         u0_start_norm = 1.0 - k_eff2 * rho[0]*rho[0] / (4.0 * (abs_ml + 1.0))
         du0_start_norm = (abs_ml / rho[0]) * u0_start_norm - (k_eff2 * rho[0] / (2.0 * (abs_ml + 1.0)))
         
         state_u0 = torch.stack([u0_start_norm + 0j, du0_start_norm + 0j], dim=1)
         norm0 = torch.norm(state_u0, dim=1, keepdim=True) + 1e-100
         state_u0 = state_u0 / norm0
-        # log_acc = log(rho^|ml|) + log(initial_normalization)
         log_acc_u0 = abs_ml * torch.log(rho[0]) + torch.log(norm0.squeeze(1))
         
         u0[:, 0] = state_u0[:, 0]
@@ -78,11 +90,8 @@ class PyTorchSolver:
 
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
-            
-            # Jump condition (if applicable to this profile)
             if lambd is not None and F is not None and rho[i] < lambd <= rho[i+1]:
-                F_cal = params['e'] * F / (2.0 * np.pi)
-                state_u0[:, 1] += (-2.0 * F_cal / lambd**2) * state_u0[:, 0]
+                state_u0[:, 1] += (-2.0 * (params['e'] * F / (2.0 * np.pi)) / lambd**2) * state_u0[:, 0]
 
             state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
                                      a_phi[i], da_phi[i],
@@ -103,9 +112,7 @@ class PyTorchSolver:
         import mpmath
         rho_max = rho[-1].item()
         k2_ext = params['chi']*params['chi'] - params['m']*params['m']
-        # Avoid division by zero in mpmath. Synchronized with Renormalizer.
         k2_ext = torch.where(torch.abs(k2_ext) < 1e-12, torch.tensor(1e-12 + 0j, dtype=torch.complex128), k2_ext)
-        # The external order n = ml - F_cal
         n_order = params['ml'].to(torch.float64) - (params['e'] * (F if F is not None else 0.0) / (2.0 * np.pi))
 
         u_inf_init = torch.zeros(n_batch, device=self.device, dtype=torch.complex128)
@@ -117,7 +124,6 @@ class PyTorchSolver:
             if k2.real > 0:
                 k_val = np.sqrt(k2)
                 z = k_val * rho_max
-                # Use mpmath for robust Bessel evaluation and derivative
                 u_mp = mpmath.bessely(ord_val, z)
                 du_mp = mpmath.diff(lambda x: mpmath.bessely(ord_val, x), z) * k_val
             else:
@@ -125,8 +131,6 @@ class PyTorchSolver:
                 z = kappa * rho_max
                 u_mp = mpmath.besselk(ord_val, z)
                 du_mp = mpmath.diff(lambda x: mpmath.besselk(ord_val, x), z) * kappa
-            
-            # Normalize in mpmath to avoid complex overflow
             mag_mp = mpmath.sqrt(abs(u_mp)**2 + abs(du_mp)**2)
             u_inf_init[b] = complex(u_mp / mag_mp)
             du_inf_init[b] = complex(du_mp / mag_mp)
@@ -134,12 +138,14 @@ class PyTorchSolver:
 
         state_uinf = torch.stack([u_inf_init, du_inf_init], dim=1)
         log_acc_uinf = log_acc_uinf_init.clone()
-        
         uinf[:, -1] = state_uinf[:, 0]
         log_scale_uinf[:, -1] = log_acc_uinf
 
         for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
+            if lambd is not None and F is not None and rho[i] > lambd >= rho[i-1]:
+                state_uinf[:, 1] += (2.0 * (params['e'] * F / (2.0 * np.pi)) / lambd**2) * state_uinf[:, 0]
+
             state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
                                        a_phi[i], da_phi[i],
                                        0.5*(a_phi[i]+a_phi[i-1]), 0.5*(da_phi[i]+da_phi[i-1]),
@@ -150,12 +156,8 @@ class PyTorchSolver:
                 log_acc_uinf += torch.log(norm.squeeze(1))
             uinf[:, i-1] = state_uinf[:, 0]
             log_scale_uinf[:, i-1] = log_acc_uinf
-            if lambd is not None and F is not None and rho[i] > lambd >= rho[i-1]:
-                state_uinf[:, 1] += (2.0 * (params['e'] * F / (2.0 * np.pi)) / lambd**2) * state_uinf[:, 0]
 
-        # W0 = rho * (u0' * uinf - u0 * uinf')
-        # We evaluate at rho[-1] where state_uinf is still (u_inf_init, du_inf_init)
         W0 = rho[-1] * (state_u0[:, 1] * u_inf_init - state_u0[:, 0] * du_inf_init)
-        
-        log_diff = (log_scale_u0 + log_scale_uinf) - (log_scale_u0[:, -1] + log_scale_uinf[:, -1]).unsqueeze(1)
-        return (rho.unsqueeze(0) * u0 * uinf * torch.exp(log_diff)) / (W0.unsqueeze(1) + 1e-300), W0
+        log_diff = (log_scale_u0 + log_scale_uinf) - (log_acc_u0 + log_acc_uinf_init).unsqueeze(1)
+        res = (rho.unsqueeze(0) * u0 * uinf * torch.exp(log_diff)) / (W0.unsqueeze(1) + 1e-300)
+        return res, W0

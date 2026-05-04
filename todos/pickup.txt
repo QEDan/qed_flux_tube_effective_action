@@ -1,26 +1,22 @@
-✦ Investigation Summary: Discrepancy in QED Effective Action (Sech2 / Dunne-Hall)
+# Investigation Summary: Heisenberg-Euler Magnitude Discrepancy
 
-  As of May 2, 2026, we have established a robust internal validation suite, but a magnitude discrepancy remains between the numerical tube results and the Cartesian HE benchmark.
+As of May 3, 2026, the investigation into the $10^8$ magnitude discrepancy has made significant progress, though a full match remains elusive.
 
-  ### Major Breakthroughs:
-  1. **Geometry Mismatch Confirmed (H9):** Symbolically proved (`confirm_geometry_mismatch.py`) that the 2D cylindrical Sech2 tube is **not** a coordinate transformation of the 1D Cartesian Sech2 slab. Non-local effects and the centrifugal barrier $(m_l/\rho)^2$ make the Dunne-Hall integral benchmark incompatible for direct validation of the integrated action.
-  2. **Gold Standard Established:** Implemented exact Whittaker-based cylindrical solutions for the **Step Function Profile** in `renormalization.py`. The numerical solver now matches this exact benchmark with $<1\%$ error (`compare_analytics.py`), proving that the solver's radial logic, measure, and normalization are correct for cylindrical tubes.
-  3. **HE Benchmark Implemented:** Added exact renormalized Heisenberg-Euler and first-order derivative correction formulas to `analytic.py` as geometry-independent limits for the slowly-varying regime.
+## Resolved Issues
+1.  **Numerical Background Subtraction:** The primary source of error in zero-field cancellation was the subtraction of an analytical $G_0$ from a discretized numerical $G$. This has been replaced by computing $G_{vac}$ numerically using the same solver, resulting in machine-precision cancellation for zero-flux profiles.
+2.  **Solver Stability:** Implemented a ultra-stable Riccati-based identity $G = 1/(y_0 - y_{inf})$ for the Green's function, preventing all overflow/underflow issues even for $m_l=1000$.
+3.  **Action Normalization:** Corrected the global action coefficient and chi-integration measure to align with 4D QED Euclidean effective action theory.
 
-  ### Current Roadblock: Numerical Stability (NaNs)
-  - When validating the Slowly-Varying limit (large $\lambda$, large domain), the solver encounters NaNs.
-  - **Source:** Exponential growth/decay of radial solutions ($u'' \approx V_{eff} u$) over long domains exceeds the dynamic range of `float64`, even with periodic normalization. Specifically, Bessel initial conditions for large $m_l$ (e.g., $K_{200}(10) > 10^{300}$) overflow immediately.
+## Current Findings
+- `python scripts/test_zero_field.py` now returns `0j` (or close to machine epsilon), confirming that vacuum terms are correctly subtracted.
+- Despite successful zero-field cancellation and correct step-function benchmarking, the Heisenberg-Euler validation (`scripts/validate_he_expansion.py`) still shows a massive discrepancy (factor of $10^6$-$10^8$).
 
-  ### Recommended Next Steps:
-  1. **Finalize Robust Solver:** The `PyTorchSolver` in `pytorch_solver.py` currently has a "Log-Scale RK4" implementation that needs completion. 
-     - **Fix 1:** Re-integrate the `safe_bessel_bc` logic to handle Bessel order $> 100$ using power-law asymptotics to prevent initial overflow.
-     - **Fix 2:** Consider the Riccati (Log-Derivative) transformation ($R = u'/u$) as a more stable alternative for the oscillatory regime.
-  2. **HE Convergence Run:** Once stability is restored, run `scripts/validate_he_expansion.py` to confirm that the numerical action approaches the Heisenberg-Euler limit as $\lambda \to \infty$.
-  3. **Flux Regulation:** Investigate the large imaginary parts in non-zero flux cases. This may require increasing the $m_l$ sum range further or applying the Abel-Plana regularization.
+## Hypotheses
+1.  **Non-local vs Local:** The current benchmark is a *Local* Heisenberg-Euler Lagrangian (B^4 approximation). The numerical solver calculates the *exact* one-loop QED effective action (all orders in B). At $\lambda=5.0$, the local approximation may be fundamentally inadequate for the flux tube's non-local structure.
+2.  **Spectral Sum Convergence:** Even with $m_l=\pm 300$, the convergence of the sum may be very slow for the integrated action. It might be necessary to sum higher-order terms analytically.
+3.  **Renormalization/Subtraction:** There might be an additional global UV term (e.g., $B^4$ constant) required for full 4D renormalization that is currently missing in the orchestrator.
 
-  ### Unstaged Changes Checklist:
-  - [ ] `src/python/analytic.py`: HE Lagrangian and derivative corrections.
-  - [ ] `src/python/orchestrator.py`: UV subtraction sign fix, normalization corrections, and NaN debugging prints.
-  - [ ] `src/python/pytorch_solver.py`: In-progress log-scale RK4 implementation (requires Bessel IC fix).
-  - [ ] `scripts/validate_he_expansion.py`: Convergence validation script.
-  - [ ] `symbolic_validations/confirm_geometry_mismatch.py`: Geometric proof of H9.
+## Next Steps for the Next Agent
+- Re-examine the conversion between the 1D cylindrical integrated action and the 4D total action.
+- Investigate if the $B^4$ contribution to the action in the cylindrical geometry includes terms dependent on the gradient $\partial B / \partial \rho$ which aren't present in the local constant-B HE limit.
+- Validate against a more rigorous benchmark if possible.

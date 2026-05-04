@@ -70,10 +70,6 @@ def compare_analytic_vs_numerical():
     
     plt.tight_layout()
     plt.savefig("results/analytic_vs_numerical.png")
-    if max_rel_err < 0.05:
-        print(f"✅ Validation complete. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
-    else:
-        print(f"❌ Validation failed. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
         
     # Sample point comparison
     mid_idx = len(rho_full) // 2
@@ -82,6 +78,12 @@ def compare_analytic_vs_numerical():
     print(f"  Analytic:  {ana_full[mid_idx]}")
     
     print("Plot saved to results/analytic_vs_numerical.png. Scientist: Verify high-degree overlap in the top two panels and confirm residuals in the bottom panel are sufficiently small (allowing for smoothing peaks).")
+
+    if max_rel_err < 0.05:
+        print(f"✅ Validation complete. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
+    else:
+        print(f"❌ Validation failed. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
+        raise AssertionError
 
 if __name__ == "__main__":
     compare_analytic_vs_numerical()

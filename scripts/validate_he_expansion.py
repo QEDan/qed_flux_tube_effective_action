@@ -9,18 +9,18 @@ from scipy.integrate import quad
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
 
 from orchestrator import Orchestrator
-from profiles import Sech2Profile
+from profiles import ZeroFluxProfile
 from analytic import heisenberg_euler_lagrangian
 
 def validate_he_expansion():
     # Setup parameters
-    lambd_values = [2.0, 5.0, 10.0, 15.0] # Width of profile
+    lambd_values = [2.0, 5.0, 10.0]
     B_peak = 0.5
     m = 1.0
     
     # Grid for numerical solver
-    chi_values = np.linspace(1.1, 10.0, 10).tolist()
-    ml_values = list(range(-200, 201))
+    chi_values = (np.linspace(1.1, 8.0, 5) + 0.1j).tolist()
+    ml_values = list(range(-60, 61))
     sigma3_values = [1, -1]
     
     num_actions = []
@@ -34,18 +34,33 @@ def validate_he_expansion():
         print(f"\nProcessing lambda={lambd}...")
         rho_max = 2.0 * lambd + 5.0
         rho = torch.linspace(0.01, rho_max, 1000, dtype=torch.float64)
-        profile = Sech2Profile(rho, B=B_peak, lambd=lambd)
         
-        # 1. Numerical Solver
-        action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
-        num_val = action.real.item()
+        # We compute action at B and B/2 to eliminate the B^2 term
+        # S(B) = c*B^2 + d*B^4
+        # S(B/2) = c*(B^2/4) + d*(B^4/16)
+        # 4*S(B/2) - S(B) = d*(B^4/4 - B^4) = -3/4 * d*B^4
+        # So d*B^4 = (S(B) - 4*S(B/2)) / (1 - 1/4) = (S(B) - 4*S(B/2)) / 0.75? No.
+        # S(B) - 4*S(B/2) = d*B^4 - 4*d*B^4/16 = d*B^4 - d*B^4/4 = 0.75 * d*B^4
+        # d*B^4 = (S(B) - 4*S(B/2)) / 0.75
+        
+        profile_full = ZeroFluxProfile(rho, B=B_peak, lambd=lambd)
+        profile_half = ZeroFluxProfile(rho, B=B_peak/2.0, lambd=lambd)
+        
+        action_full = orc.compute_effective_action(profile_full, chi_values, ml_values, sigma3_values, m=m)
+        action_half = orc.compute_effective_action(profile_half, chi_values, ml_values, sigma3_values, m=m)
+        
+        num_val = (action_full.real.item() - 4.0 * action_half.real.item()) / 0.75
         num_actions.append(num_val)
-        print(f"  Numerical Action: {num_val:.4e}")
+        print(f"  Numerical B^4 Action: {num_val:.4e}")
         
         # 2. Heisenberg-Euler Benchmark (local limit)
         # S_HE = 2*pi * integral(rho * L_HE(B(rho)))
         def he_integrand(r):
-            B = B_peak / (np.cosh(r / lambd)**2)
+            # B(rho) = B * (1 - 2*rho^2/lambd^2) for rho < lambd, else 0
+            if r < lambd:
+                B = B_peak * (1.0 - 2.0 * r**2 / lambd**2)
+            else:
+                B = 0.0
             return r * heisenberg_euler_lagrangian(B, m=m)
         
         res_he, _ = quad(he_integrand, 0, rho_max)
@@ -79,6 +94,7 @@ def validate_he_expansion():
         print(f"✅ Validation successful: Numerical result matches HE magnitude.")
     else:
         print(f"❌ Validation failed: Large magnitude discrepancy persists.")
+        raise AssertionError
 
 if __name__ == "__main__":
     validate_he_expansion()

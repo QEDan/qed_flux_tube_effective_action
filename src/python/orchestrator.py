@@ -50,6 +50,10 @@ class Orchestrator:
         # Mapping chi index for easy summation
         chi_map = {chi: i for i, chi in enumerate(chi_values)}
 
+        # Create numerical vacuum profile for background subtraction
+        from profiles import FieldProfile
+        vacuum_profile = FieldProfile(rho)
+
         # Process in batches
         for i in range(0, len(all_params), self.batch_size):
             batch = all_params[i : i + self.batch_size]
@@ -62,19 +66,22 @@ class Orchestrator:
             renormalized_g = torch.zeros((len(batch), n_points), device=self.device, dtype=torch.complex128)
 
             if numerical_batch:
-                # Solve ODE for numerical batch
+                # Solve ODE for numerical batch (with field)
                 num_results, _ = self.backend.solve_batch(numerical_batch, field_profile)
                 
-                # Get G0 and UV sub for numerical batch
+                # Solve ODE for numerical background (vacuum)
+                # Using the same solver and grid ensures that discretization/IC errors cancel.
+                num_bg, _ = self.backend.solve_batch(numerical_batch, vacuum_profile)
+                
+                # Get UV sub for numerical batch
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
                 num_ml = torch.tensor([p['ml'] for p in numerical_batch], device=self.device, dtype=torch.int32)
 
-                num_g0 = self.renormalizer.compute_g0(num_chi, num_ml, m, rho)
                 num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
 
-                # Path A matching: G_num and G_0 are both rho-scaled [L].
-                # Renorm = G_num - G_0 + UV_sub (Sign corrected to match TeX)
-                num_renorm = num_results - num_g0 + num_uv
+                # Path A matching: G_num and G_bg are both rho-scaled [L].
+                # Renorm = G_num - G_bg - UV_sub
+                num_renorm = num_results - num_bg - num_uv
 
                 # Place into renormalized_g
                 num_indices = [idx for idx, p in enumerate(batch) if abs(p['chi']) <= chi_threshold]
@@ -87,14 +94,8 @@ class Orchestrator:
             if collect_density:
                 density_integrand += torch.sum(renormalized_g, dim=0)
 
-            # Integration over rho: Since results/g0 are already rho-scaled [L], 
-            # the 3D trace leads to a simple radial integral over rho.
-            if torch.isnan(renormalized_g).any():
-                print("❌ NaN in renormalized_g!")
-                print(f"  num_results max: {torch.max(torch.abs(num_results))}")
-                print(f"  num_g0 max: {torch.max(torch.abs(num_g0))}")
-                print(f"  num_uv max: {torch.max(torch.abs(num_uv))}")
-
+            # Integration over rho: Since results are already rho-scaled [L], 
+            # the radial integral is simple summation over d_rho.
             inner_int = torch.sum(renormalized_g * rho_factor, dim=-1) # (batch_size,) [L^2]
 
             # Accumulate into total_inner_sum based on chi
@@ -111,17 +112,15 @@ class Orchestrator:
         _, a_phi_prof, da_phi_prof = field_profile.get_arrays(as_numpy=False)
         b_field_prof = (a_phi_prof / (rho + 1e-15) + da_phi_prof)
         # Area factor for 1D integrated action per unit length
-        area_b2 = torch.sum(rho * b_field_prof**2 * rho_factor).real
+        area_b2 = torch.sum(rho * b_field_prof**2 * rho_weights).real
         
         # k2 for global UV subtraction (clamped for stability)
-        # We need chi^2 - m^2. If chi~m, this is very small.
-        # k2_global is chi^2 - m^2
         k2_global = chi_real**2 - m**2
-        # Clamp it to a safe positive value for the denominator
         k2_safe = torch.clamp(torch.abs(k2_global), min=1e-3)
         
-        # Factor 1/6 accounts for the a2 heat kernel term and the spectral sum normalization
-        uv_global = area_b2 / (6.0 * k2_safe**2)
+        # Factor 1/(4*pi) accounts for the quadratic part of the 2D Green's function Trace.
+        # Tr(G_B2) = (eB)^2 / (4*pi*k^4)
+        uv_global = area_b2 / (4.0 * np.pi * k2_safe**2)
         
         # Only add UV subtraction to chi values that were processed numerically
         num_mask = (torch.abs(chi_tensor) <= chi_threshold).to(self.device)
@@ -135,9 +134,8 @@ class Orchestrator:
         else:
             chi_weights[0] = 1.0
 
-        # Coefficient -1/(2*pi) accounts for the 4D measure, spin, and angular integration.
-        # 2 * (1/8pi^2) * 2pi * pi = 1/2pi
-        action = -1.0 / (2.0 * np.pi) * torch.sum(chi_tensor**3 * total_inner_sum * chi_weights)
+        # Factor 1.0 accounts for the log-det integration and 2D momentum measure.
+        action = 1.0 * torch.sum(chi_tensor * total_inner_sum * chi_weights)
 
         if collect_density:
             return action, density_integrand
