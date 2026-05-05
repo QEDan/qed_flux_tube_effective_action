@@ -90,13 +90,8 @@ class PyTorchSolver:
 
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
-            if lambd is not None and F is not None and rho[i] < lambd <= rho[i+1]:
-                # Correct jump: u' -> u' + delta_jump * u
-                # delta_jump = -2*e*F/(2*pi*lambd^2) = -e*F/(pi*lambd^2)
-                # Note: The field strength F is total flux. 
-                # Step function interior B = F / (pi * lambd^2).
-                # Jump in da_phi = B_int - B_ext = B_int.
-                # Actually, the jump condition is in the derivative of the Green's function.
+            # Discontinuity jump condition (only for StepFunctionProfile)
+            if lambd is not None and F is not None and abs(F) > 1e-12 and lambd > 0 and rho[i] < lambd <= rho[i+1]:
                 state_u0[:, 1] += (-params['e'] * F / (np.pi * lambd**2)) * state_u0[:, 0]
 
             state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
@@ -153,7 +148,8 @@ class PyTorchSolver:
 
         for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
-            if lambd is not None and F is not None and rho[i] > lambd >= rho[i-1]:
+            # Discontinuity jump condition (only for StepFunctionProfile)
+            if lambd is not None and F is not None and abs(F) > 1e-12 and lambd > 0 and rho[i] > lambd >= rho[i-1]:
                 state_uinf[:, 1] += (params['e'] * F / (np.pi * lambd**2)) * state_uinf[:, 0]
 
             state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
