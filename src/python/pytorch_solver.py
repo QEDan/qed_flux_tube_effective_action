@@ -91,17 +91,27 @@ class PyTorchSolver:
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
             if lambd is not None and F is not None and rho[i] < lambd <= rho[i+1]:
-                state_u0[:, 1] += (-2.0 * (params['e'] * F / (2.0 * np.pi)) / lambd**2) * state_u0[:, 0]
+                # Correct jump: u' -> u' + delta_jump * u
+                # delta_jump = -2*e*F/(2*pi*lambd^2) = -e*F/(pi*lambd^2)
+                # Note: The field strength F is total flux. 
+                # Step function interior B = F / (pi * lambd^2).
+                # Jump in da_phi = B_int - B_ext = B_int.
+                # Actually, the jump condition is in the derivative of the Green's function.
+                state_u0[:, 1] += (-params['e'] * F / (np.pi * lambd**2)) * state_u0[:, 0]
 
             state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
                                      a_phi[i], da_phi[i],
                                      0.5*(a_phi[i]+a_phi[i+1]), 0.5*(da_phi[i]+da_phi[i+1]),
                                      a_phi[i+1], da_phi[i+1])
             
-            if (i+1) % 50 == 0:
-                norm = torch.norm(state_u0, dim=1, keepdim=True) + 1e-100
-                state_u0 = state_u0 / norm
-                log_acc_u0 += torch.log(norm.squeeze(1))
+            # Normalize whenever the state grows too large
+            norm = torch.norm(state_u0, dim=1, keepdim=True)
+            mask = norm.squeeze(1) > 1e10
+            if torch.any(mask):
+                scale = torch.where(mask, norm.squeeze(1), torch.ones_like(norm.squeeze(1)))
+                state_u0 = state_u0 / scale.unsqueeze(1)
+                log_acc_u0 += torch.log(scale)
+            
             u0[:, i+1] = state_u0[:, 0]
             log_scale_u0[:, i+1] = log_acc_u0
 
@@ -144,16 +154,20 @@ class PyTorchSolver:
         for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
             if lambd is not None and F is not None and rho[i] > lambd >= rho[i-1]:
-                state_uinf[:, 1] += (2.0 * (params['e'] * F / (2.0 * np.pi)) / lambd**2) * state_uinf[:, 0]
+                state_uinf[:, 1] += (params['e'] * F / (np.pi * lambd**2)) * state_uinf[:, 0]
 
             state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
                                        a_phi[i], da_phi[i],
                                        0.5*(a_phi[i]+a_phi[i-1]), 0.5*(da_phi[i]+da_phi[i-1]),
                                        a_phi[i-1], da_phi[i-1])
-            if (n_points - i) % 50 == 0:
-                norm = torch.norm(state_uinf, dim=1, keepdim=True) + 1e-100
-                state_uinf = state_uinf / norm
-                log_acc_uinf += torch.log(norm.squeeze(1))
+            
+            norm = torch.norm(state_uinf, dim=1, keepdim=True)
+            mask = norm.squeeze(1) > 1e10
+            if torch.any(mask):
+                scale = torch.where(mask, norm.squeeze(1), torch.ones_like(norm.squeeze(1)))
+                state_uinf = state_uinf / scale.unsqueeze(1)
+                log_acc_uinf += torch.log(scale)
+                
             uinf[:, i-1] = state_uinf[:, 0]
             log_scale_uinf[:, i-1] = log_acc_uinf
 

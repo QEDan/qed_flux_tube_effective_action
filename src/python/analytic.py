@@ -13,9 +13,14 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
     """
     from scipy.integrate import quad
     
-    if abs(B) < 1e-10:
+    if abs(B) < 1e-12:
         return 0.0
         
+    # For small B, use the B^4 expansion to avoid numerical issues with quad
+    # L_HE = (eB)^4 / (360 * pi^2 * m^4)
+    if abs(e * B) < 0.05 * m**2:
+        return (e * B)**4 / (360.0 * np.pi**2 * m**4)
+
     def integrand(s):
         # (s*coth(s) - 1 - s^2/3) / s^3
         # Expansion: 1 + s^2/3 - s^4/45 + 2s^6/945

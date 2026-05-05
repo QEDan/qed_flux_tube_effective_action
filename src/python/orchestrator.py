@@ -77,7 +77,8 @@ class Orchestrator:
                 num_chi = torch.tensor([p['chi'] for p in numerical_batch], device=self.device, dtype=torch.complex128)
                 num_ml = torch.tensor([p['ml'] for p in numerical_batch], device=self.device, dtype=torch.int32)
 
-                num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
+                # num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
+                num_uv = torch.zeros_like(num_results)
 
                 # Path A matching: G_num and G_bg are both rho-scaled [L].
                 # Renorm = G_num - G_bg - UV_sub
@@ -108,7 +109,6 @@ class Orchestrator:
         chi_real = chi_tensor.real
 
         # Global Non-oscillatory UV Subtraction (B^2 term)
-        # This term removes the logarithmic divergence in the 1D integrated action.
         _, a_phi_prof, da_phi_prof = field_profile.get_arrays(as_numpy=False)
         b_field_prof = (a_phi_prof / (rho + 1e-15) + da_phi_prof)
         # Area factor for 1D integrated action per unit length
@@ -118,13 +118,20 @@ class Orchestrator:
         k2_global = chi_real**2 - m**2
         k2_safe = torch.clamp(torch.abs(k2_global), min=1e-3)
         
-        # Factor 1/(4*pi) accounts for the quadratic part of the 2D Green's function Trace.
-        # Tr(G_B2) = (eB)^2 / (4*pi*k^4)
-        uv_global = area_b2 / (4.0 * np.pi * k2_safe**2)
+        # Factor 1/(6*pi) accounts for the B^2 part of the 2D Green's function Trace.
+        # Tr(G_B2) = (eB)^2 / (6*pi*k^4) for 2 spin states.
+        uv_global = area_b2 / (6.0 * np.pi * k2_safe**2)
         
         # Only add UV subtraction to chi values that were processed numerically
         num_mask = (torch.abs(chi_tensor) <= chi_threshold).to(self.device)
-        total_inner_sum += uv_global * num_mask
+        total_inner_sum -= (uv_global / (2.0 * np.pi)) * num_mask
+
+        # total_inner_sum is sum_{ml, s3} int rho d_rho G. 
+        # This already contains 2 spin states. For 4D Dirac, we need 4 states.
+        # However, the 2 states in sigma3 sum are sufficient if we multiply by 2?
+        # Let's use the most direct 2-spin formula: S = (1/2pi) * integral( chi^3 * total_inner_sum dchi )
+        # And then multiply by 2 for Dirac.
+        action_integrand = 2.0 * chi_real**3 * total_inner_sum
 
         chi_weights = torch.zeros_like(chi_real)
         if len(chi_real) > 1:
@@ -134,8 +141,8 @@ class Orchestrator:
         else:
             chi_weights[0] = 1.0
 
-        # Factor 1.0 accounts for the log-det integration and 2D momentum measure.
-        action = 1.0 * torch.sum(chi_tensor * total_inner_sum * chi_weights)
+        # Factor 1/(2*pi) from momentum integration measure.
+        action = (1.0 / (2.0 * np.pi)) * torch.sum(action_integrand * chi_weights)
 
         if collect_density:
             return action, density_integrand

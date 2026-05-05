@@ -114,11 +114,11 @@ class Renormalizer:
         F_cal = (e * F) / (2.0 * np.pi)
         k2 = chi*chi - m*m
         
-        # kappa = lambda^2 * k^2 / (4 * F_cal)
+        # kappa = lambda^2 * k^2 / (4 * F_cal) + (ml - sigma3)/2
         # mu = ml / 2
         # z = (F_cal / lambda^2) * rho^2
-        kappa = (lambd**2 * k2) / (4.0 * F_cal)
-        mu = abs(ml) / 2.0
+        kappa = (lambd**2 * k2) / (4.0 * F_cal) + 0.5 * (float(ml) - float(sigma3))
+        mu = abs(float(ml)) / 2.0
         
         rho_np = rho.detach().cpu().numpy()
         z = (F_cal / lambd**2) * (rho_np**2)
