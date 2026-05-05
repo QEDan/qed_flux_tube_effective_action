@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Dict, Any, Tuple, Union, Optional
 
 class PyTorchSolver:
-    def __init__(self, device: Optional[str] = None) -> None:
+    def __init__(self, device: Optional[str] = 'cpu') -> None:  # 'cpu' device because it benchmarked faster than gpu
         self.device = torch.device(device if device else ("cuda" if torch.cuda.is_available() else "cpu"))
 
     def get_v_eff(self, r: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:

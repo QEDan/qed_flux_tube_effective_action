@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 
 
 class Orchestrator:
-    def __init__(self, device: Optional[str] = None, batch_size: int = 128) -> None:
+    def __init__(self, device: Optional[str] = None, batch_size: int = 512) -> None:
         self.backend = PyTorchSolver(device=device)
         self.device = self.backend.device
         self.renormalizer = Renormalizer(device=self.device)
