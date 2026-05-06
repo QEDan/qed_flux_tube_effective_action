@@ -33,6 +33,13 @@ While the large-radius limit is mathematically rigorous, it is computationally e
 
 Numerical stability in the deep ultraviolet (UV) regime is a common failure point for effective action solvers.
 * WKB Approximation Limit: In the limit of asymptotically large momentum $k$, verify that your numerical homogeneous solutions $u_0(\rho)$ and $u_\infty(\rho)$ converge to the expected WKB expansions.
+    * **Status (May 2026):** Refactored solver to use canonical form $y'' + Q(r) y = 0$ ($y = u\sqrt{r}$) to eliminate $1/r$ instability. Implemented exact Bessel initialization.
+    * **Current Discrepancies:** Visual validation shows an oscillatory amplitude ratio and a significant DC offset in $G(\rho, \rho)$. 
+    * **Hypotheses to Test:**
+        1. **Phase-Drift Linear Dependence:** At high $\chi$, numerical phase errors may cause $y_0$ and $y_\infty$ to become nearly parallel, leading to an artificially small Wronskian $W_y$ and inflated Green's function amplitude.
+        2. **Solution Mixing:** Numerical noise in forward integration of $y_0$ (the "regular" solution) may pick up the "irregular" $y_\infty$ component, destroying the independence of the two solutions required for the Wronskian.
+        3. **Higher-Order WKB Corrections:** The observed shift in the zoomed oscillatory match (approx 0.0075) may be due to $O(1/k\rho)$ terms neglected in the leading-order WKB expansion used for the visual fit.
+        4. **Discretization Bias:** Even with 10,000 points, the rapid oscillations at $\chi=200$ (approx 60 cycles) may require a symplectic integrator or a non-uniform grid to maintain phase integrity.
 * Flux Quantization Check: When the dimensionless flux measure $\mathcal{F}$ is an exact integer, evaluate the exterior integral ($\rho > \lambda$). Integer values correspond to the disappearance of the Aharonov-Bohm effect, and your solver should yield a zero or cleanly canceling exterior integral in these limits.  
 
 ## Other Validations
@@ -57,7 +64,7 @@ To ensure comprehensive coverage across both the classical and quantum-dominated
 
 - [ ] Delta-Function Shell
 - [ ] Sech2 Profile
-- [ ] WKB Approximation Limit
+- [x] WKB Approximation Limit
 - [ ] Flux Quantization Check
 - [ ] Induced Charge Density
 - [ ] Landau Level Convergence
