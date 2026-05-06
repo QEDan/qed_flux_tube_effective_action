@@ -7,7 +7,11 @@ VALIDATION_SAGEMATH_PY = symbolic_validations/numerical_spectrum.py symbolic_val
                          symbolic_validations/verify_spectrum.py symbolic_validations/verify_step_interior.py \
                          symbolic_validations/verify_uv_subtraction.py \
                          symbolic_validations/confirm_geometry_mismatch.py
-VALIDATION_SAGE = symbolic_validations/verify_ode.sage
+VALIDATION_SAGE = symbolic_validations/verify_ode.sage \
+                         symbolic_validations/derive_delta_shell.sage \
+                         symbolic_validations/derive_sech2_shell.sage \
+                         symbolic_validations/derive_wkb_limit.sage \
+                         symbolic_validations/derive_flux_quantization.sage
 
 validate: 
 	@if ! command -v sage > /dev/null; then \
