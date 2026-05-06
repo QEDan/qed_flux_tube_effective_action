@@ -1,13 +1,13 @@
 import torch
 import numpy as np
-from pytorch_solver import PyTorchSolver
-from renormalization import Renormalizer
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.renormalization import Renormalizer
+from src.python.profiles import StepFunctionProfile
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 
 class Orchestrator:
-    def __init__(self, device: Optional[str] = None, batch_size: int = 512) -> None:
+    def __init__(self, device: Optional[str] = 'cpu', batch_size: int = 512) -> None:
         self.backend = PyTorchSolver(device=device)
         self.device = self.backend.device
         self.renormalizer = Renormalizer(device=self.device)
@@ -51,7 +51,7 @@ class Orchestrator:
         chi_map = {chi: i for i, chi in enumerate(chi_values)}
 
         # Create numerical vacuum profile for background subtraction
-        from profiles import FieldProfile
+        from src.python.profiles import FieldProfile
         vacuum_profile = FieldProfile(rho)
 
         # Process in batches

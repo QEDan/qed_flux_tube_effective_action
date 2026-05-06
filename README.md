@@ -35,3 +35,6 @@ The solvers are validated by:
 1. Verifying the constancy of the Wronskian $r(u_0' u_\infty - u_0 u_\infty')$ across the radial domain.
 2. Analytic benchmarks: Ensuring numerical results match exact solutions for zero-flux and simple profiles.
 3. Automated regression tests for renormalization and UV subtraction consistency.
+4. Symbolic Derivations & Numerical Benchmarks: Comprehensive suite of SageMath derivations and profile-specific numerical validations, including:
+   - **Delta-Function Shell Profile:** Numerical verification of finite action and boundary matching.
+   - **Analytic Asymptotics:** Symbolic derivation and validation of WKB limits, flux quantization, Landau levels, and small-mass scaling laws.

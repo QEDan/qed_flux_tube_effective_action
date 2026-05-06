@@ -60,7 +60,7 @@ To ensure comprehensive coverage across both the classical and quantum-dominated
 
 ## The Checklist
 
-- [ ] Delta-Function Shell (Mathematical framework validated in `symbolic_validations/derive_delta_shell.sage`)
+- [x] Delta-Function Shell (Validated numerically in `scripts/test_delta_shell_validation.py`)
 - [ ] Sech2 Profile (Mathematical framework validated in `symbolic_validations/derive_sech2_shell.sage`)
 - [ ] WKB Approximation Limit (Mathematical framework validated in `symbolic_validations/derive_wkb_limit.sage`)
 - [ ] Flux Quantization Check (Mathematical framework validated in `symbolic_validations/derive_flux_quantization.sage`)
