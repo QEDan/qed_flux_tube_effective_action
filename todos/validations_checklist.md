@@ -43,6 +43,14 @@ Numerical stability in the deep ultraviolet (UV) regime is a common failure poin
 ## Other Validations
 
 1.  **Induced Charge Density**: Verify the vacuum polarization charge density $\rho_{ind}(r) = e \langle \bar{\psi}\gamma^0\psi \rangle$ for a step function flux tube. This is a well-studied result in QED flux tubes (e.g., Sivers, 1980s) and is less sensitive to global integration measure errors than the total action.
+
+    *   **Learnings from Attempt (May 2026):**
+        1.  **Radial Oscillations:** Numerical density oscillations were found to be highly sensitive to the continuity of the Green's function at the flux tube radius $R$. Standard RK4 integration through the boundary requires split-step logic to prevent phase errors.
+        2.  **UV Subtraction:** The induced charge density requires a WKB-derived counter-term that must scale with $1/\rho$ to correctly match the radial trace measure.
+        3.  **Mode Sum Truncation:** Numerical results suffer from Gibbs-like oscillations in the tail region ($r > R$) due to finite angular momentum ($m_l$) mode summation truncation. Lanczos windowing or similar apodization is recommended to suppress these artifacts.
+        4.  **Normalization:** The Dirac trace and Sivers total charge theorem require careful normalization factors; ensure the factor $1/(2\pi^2)$ is matched to the physical trace definition.
+
+2.  **Landau Level Convergence**: For a constant $B$ interior, the partial trace $\text{Tr} G_{m_l}(r, r)$ should show peaks corresponding to Landau levels. We can verify the solver by comparing the numerical mode-sum density with the analytic Landau level density in the interior region.
 2.  **Landau Level Convergence**: For a constant $B$ interior, the partial trace $\text{Tr} G_{m_l}(r, r)$ should show peaks corresponding to Landau levels. We can verify the solver by comparing the numerical mode-sum density with the analytic Landau level density in the interior region.
 3.  **Schwinger Rate (Imaginary Part)**: For fields $B > m^2/e$, the effective action develops an imaginary part representing pair production. Validating the ratio $\text{Im}(S_{num}) / \text{Im}(S_{Schwinger})$ for a supercritical field provides a direct test of the high-field non-perturbative regime.
 4.  **Small-Mass Asymptotics**: The effective action has a known logarithmic scaling as $m \to 0$. Testing if $\partial S / \partial \log(m)$ matches the expected coefficient (proportional to the trace anomaly) would verify the global renormalization scale.
