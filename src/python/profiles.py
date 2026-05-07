@@ -95,31 +95,15 @@ class ZeroFluxProfile(FieldProfile):
         # da_phi = B - A_phi/rho
         self.da_phi = b_field - self.a_phi / r_safe
 
-class Sech2Profile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = 1.0) -> None:
-        """
-        Magnetic field B(rho) = B * sech^2(rho/lambd)
-        A_phi(rho) = B*lambd*tanh(rho/lambd) - (B*lambd^2/rho)*ln(cosh(rho/lambd))
-        Total flux F = 2*pi * B * lambd^2 * ln(2)
-        """
+class MLPProfile(FieldProfile):
+    def __init__(self, rho: torch.Tensor, B_vals: torch.Tensor, a_phi: torch.Tensor, e: float = 1.0) -> None:
         super().__init__(rho)
-        self.B = B
-        self.lambd = lambd
+        self.B_vals = B_vals
+        self.a_phi = a_phi
         self.e = e
-        self.F = 2.0 * np.pi * B * (lambd**2) * np.log(2.0)
         self.update()
 
     def update(self) -> None:
-        # Avoid division by zero at rho=0
         r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
-        
-        arg = self.rho / self.lambd
-        
-        # A_phi(rho)
-        self.a_phi = self.B * self.lambd * torch.tanh(arg) - (self.B * self.lambd**2 / r_safe) * torch.log(torch.cosh(arg))
-        
-        # B_field(rho)
-        b_field = self.B / (torch.cosh(arg)**2)
-        
-        # da_phi = B - A_phi/rho
-        self.da_phi = b_field - self.a_phi / r_safe
+        # da_phi = B - a_phi / rho
+        self.da_phi = self.B_vals - self.a_phi / r_safe
