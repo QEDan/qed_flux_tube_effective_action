@@ -1,77 +1,64 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from typing import Tuple, List
+from typing import Tuple
 
-class FluxConservingMLP(nn.Module):
+class BasisProfile(nn.Module):
     """
-    An MLP architecture that enforces total flux conservation identically
-    via the asymptotic boundary conditions of the gauge field A_phi.
-    
-    u(rho) = rho * A_phi(rho)
-    B(rho) = (1/rho) * du/drho
-    
-    We map rho to x in [0, 1] via x = rho / (rho + L).
-    We define u(rho) = (Phi/2pi) * g(x) where g(x) = x^2 * [1 + (1-x) * MLP(x)].
-    This ensures u(0) = 0, u(inf) = Phi/2pi.
+    Field profile defined as a sum of Gaussian basis functions:
+    B(rho) = sum_i w_i * exp(-(rho - c_i)^2 / (2 * sigma^2))
+    The total flux is conserved by re-normalizing the sum at each step.
     """
-    def __init__(self, hidden_dim: int = 32, num_layers: int = 3, total_flux: float = 2.0*np.pi*0.4, L: float = 1.0) -> None:
+    def __init__(self, num_basis: int = 8, total_flux: float = 2.0*np.pi*0.4, rho_max: float = 10.0) -> None:
         super().__init__()
         self.Phi_over_2pi = total_flux / (2.0 * np.pi)
-        self.L = L
+        self.num_basis = num_basis
         
-        layers = []
-        layers.append(nn.Linear(1, hidden_dim))
-        layers.append(nn.SiLU())
+        # Basis parameters
+        self.centers = torch.linspace(0.0, rho_max, num_basis)
+        self.sigma = rho_max / (num_basis * 2.0)
         
-        for _ in range(num_layers - 1):
-            layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.SiLU())
-            
-        layers.append(nn.Linear(hidden_dim, 1))
-        self.net = nn.Sequential(*layers)
+        # Initialize weights to approximate Sech2(rho) profile for jump-starting
+        # B(rho) = sech^2(rho/lambd). We use a lambda of ~1.0
+        lambd = 1.0
+        target_B = 1.0 / (torch.cosh(self.centers / lambd)**2)
         
-        self._init_weights()
-
-    def _init_weights(self) -> None:
-        for m in self.net.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
-
+        # Solve least-squares to initialize weights: w = (Basis^T * Basis)^-1 * Basis^T * target_B
+        rho_expanded = self.centers.view(-1, 1)
+        basis = torch.exp(-(rho_expanded - self.centers)**2 / (2 * self.sigma**2))
+        weights_init = torch.linalg.lstsq(basis, target_B).solution
+        
+        # Weights to optimize
+        self.weights = nn.Parameter(torch.abs(weights_init))
+        
     def forward(self, rho: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Computes B(rho) and A_phi(rho) such that flux is conserved.
-        """
-        rho.requires_grad_(True)
+        # B_raw(rho) = sum_i w_i * exp(-(rho - c_i)^2 / (2 * sigma^2))
+        rho_expanded = rho.view(-1, 1)
+        basis = torch.exp(-(rho_expanded - self.centers)**2 / (2 * self.sigma**2))
         
-        # 1. Coordinate mapping: rho -> x in [0, 1]
-        x = rho / (rho + self.L)
+        B_raw = torch.matmul(basis, torch.abs(self.weights)) # Weights must be positive for B > 0
         
-        # 2. Enclosed flux shape function g(x)
-        # We need g(0)=0, g(1)=1, g'(0)=0.
-        # Let's use g(x) = x^2 * (3 - 2x) + x^2 * (1 - x)^2 * MLP(x)
-        # The first part is the standard cubic Hermite that goes smoothly from 0 to 1.
-        # The second part is a flexible deviation that vanishes at both 0 and 1.
+        # Renormalize to conserve flux: Phi = 2*pi * integral(rho * B) = total_flux
+        # rho_weights calculated for integration
+        dr = rho[1] - rho[0] if len(rho) > 1 else torch.tensor(0.1)
+        rho_vals = rho.view(-1)
+        raw_flux = 2.0 * np.pi * torch.sum(B_raw.squeeze() * rho_vals * dr)
         
-        mlp_out = self.net(x)
-        # Smoothed cubic base
-        g_base = (x**2) * (3.0 - 2.0 * x)
-        # Flexible part
-        g_flex = (x**2) * ((1.0 - x)**2) * mlp_out
+        norm_factor = (self.Phi_over_2pi * 2.0 * np.pi) / (raw_flux + 1e-15)
+        B_vals = B_raw * norm_factor
         
-        g_x = g_base + g_flex
-        u_rho = self.Phi_over_2pi * g_x
+        # Clamp B_vals to prevent numerical divergence
+        B_vals = torch.clamp(B_vals, min=-1e5, max=1e5)
         
-        # 3. Derive B(rho) = (1/rho) * du/drho
-        du_drho = torch.autograd.grad(u_rho, rho, 
-                                      grad_outputs=torch.ones_like(u_rho),
-                                      create_graph=True, retain_graph=True)[0]
+        # Derive A_phi analytically using cumulative integration
+        # Flux(rho) = 2*pi * integral_0^rho B * r * dr
+        # a_phi = Flux(rho) / (2*pi*rho)
+        rho_integrand = B_vals.squeeze() * rho_vals
+        dy = 0.5 * (rho_integrand[1:] + rho_integrand[:-1]) * (rho_vals[1:] - rho_vals[:-1])
+        flux_integral = torch.zeros_like(rho_vals)
+        flux_integral[1:] = torch.cumsum(dy, dim=0)
         
-        r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
-        B_vals = du_drho / r_safe
+        r_safe = torch.where(rho_vals == 0, torch.tensor(1e-15, device=rho.device), rho_vals)
+        a_phi = flux_integral / r_safe
         
-        # 4. Derive A_phi = u / rho
-        a_phi = u_rho / r_safe
-        
-        return B_vals, a_phi
+        return B_vals, a_phi.view(-1, 1)

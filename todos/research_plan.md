@@ -25,15 +25,23 @@ Based on `fluxtubes.tex` and `greensfunc.tex`, the primary research objective is
 - [ ] Run calculations for integer flux ($\mathcal{F}=1, 2$) vs. non-integer flux ($\mathcal{F}=0.5, 1.5$).
 - [ ] Analyze the spatial distribution of the energy density in the exterior region.
 
+### Q4: Non-Existence of a Global Minimum
+**Question:** Does the effective action $S_{\text{eff}}$ possess a global minimum, or is it unbounded from below as the field profile approaches extreme configurations?
+- [ ] Define the stress test procedure: Run the optimization without regularization or weight decay, and sweep the basis weight bounds $[0, w_{max}]$.
+- [ ] Monitor the action magnitude: If $|S_{\text{eff}}|$ increases as $w_{max} \to \infty$ without reaching a stable stationary point, it suggests no global minimum.
+- [ ] Quantify the "energy of dispersion": Calculate the effective action for a set of field profiles with varying degrees of "spikiness" to see if the action is minimized by singular field configurations.
+- [ ] Document the divergence rate: Analyze the trend of the loss function vs. the field energy $\int B^2$.
+
 ---
 
-## 2. Calculation & Analysis Matrix
+## 2. Calculation & Analysis Matrix (Updated)
 
 | Research Question | Profile to Use | Parameters to Sweep | Analysis Method |
 | :--- | :--- | :--- | :--- |
 | **Q1 (Stability)** | Gaussian, Solitonic | $\lambda \in [0.1/m, 10/m]$, $\Phi \in [1, 10]$ | Plot $E(\lambda)$. Check for $\frac{dE}{d\lambda} = 0$ and $\frac{d^2E}{d\lambda^2} > 0$. |
 | **Q2 (Stationary)** | Differentiable Spline | Initial $\lambda$, fixed $\Phi$ | Gradient descent on $B(\rho)$. Compare resulting $B(\rho)$ to classical profiles. |
 | **Q3 (Diffusion)** | Step-Function | $\mathcal{F} \in [0, 2.5]$ in $0.1$ steps | Plot $\Delta\mathcal{L}(\rho)$ vs $\rho$. Measure tail decay rate for $\rho > \lambda$. |
+| **Q4 (Non-Existence)**| Basis Expansion | $w_{max} \in [10, 10^6]$ | Evaluate $S_{\text{eff}}$ at $w_{max}$. Check for convergence of $S_{\text{eff}}(w_{max})$. |
 
 ---
 
