@@ -15,7 +15,7 @@ class BasisProfile(nn.Module):
         self.num_basis = num_basis
         
         # Basis parameters
-        self.centers = torch.linspace(0.0, rho_max, num_basis)
+        self.centers = torch.linspace(0.0, rho_max, num_basis).to(torch.float64)
         self.sigma = rho_max / (num_basis * 2.0)
         
         # Initialize weights to approximate Sech2(rho) profile for jump-starting
@@ -29,7 +29,7 @@ class BasisProfile(nn.Module):
         weights_init = torch.linalg.lstsq(basis, target_B).solution
         
         # Weights to optimize
-        self.weights = nn.Parameter(torch.abs(weights_init))
+        self.weights = nn.Parameter(torch.abs(weights_init).to(torch.float64))
         
     def forward(self, rho: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # B_raw(rho) = sum_i w_i * exp(-(rho - c_i)^2 / (2 * sigma^2))
@@ -80,12 +80,12 @@ class SplineProfile(nn.Module):
         self.positivity_constraint = positivity_constraint
         
         # Basis parameters: uniform spacing of spline centers
-        self.centers = torch.linspace(0.0, rho_max, num_basis)
+        self.centers = torch.linspace(0.0, rho_max, num_basis).to(torch.float64)
         self.h = rho_max / (num_basis - 1) if num_basis > 1 else 1.0
         
         # Initialize weights: Jump-start with a smooth decay
         # B(rho) ~ exp(-rho^2/2)
-        target_B = torch.exp(-self.centers**2 / 2.0)
+        target_B = torch.exp(-self.centers**2 / 2.0).to(torch.float64)
         
         # Solve least-squares to initialize weights: w = (Basis^T * Basis)^-1 * Basis^T * target_B
         basis_init = self._get_basis(self.centers)
@@ -93,24 +93,25 @@ class SplineProfile(nn.Module):
         weights_init = torch.linalg.lstsq(basis_init, target_B).solution
         
         # Weights to optimize
-        self.weights = nn.Parameter(torch.abs(weights_init) if positivity_constraint else weights_init)
+        self.weights = nn.Parameter(torch.abs(weights_init).to(torch.float64) if positivity_constraint else weights_init.to(torch.float64))
 
     def _get_basis(self, rho: torch.Tensor) -> torch.Tensor:
-        """Evaluates the Cubic B-Spline basis functions at given rho values."""
-        # rho: (N_points,) -> (N_points, 1)
-        # centers: (num_basis,) -> (1, num_basis)
+        """
+        Evaluates the Cubic B-Spline basis functions at given rho values.
+        Enforces B'(0) = 0 by mirroring basis functions: N_sym(rho) = N(rho) + N(-rho).
+        """
         r = rho.view(-1, 1)
         c = self.centers.view(1, -1)
-        z = torch.abs(r - c) / self.h
         
-        # Cubic B-spline basis function (piece-wise)
-        # B(z) = 2/3 - z^2 + z^3/2 for 0 <= z < 1
-        # B(z) = (2-z)^3 / 6 for 1 <= z < 2
-        # B(z) = 0 otherwise
-        b1 = (2.0/3.0) - z**2 + 0.5 * z**3
-        b2 = (1.0/6.0) * (2.0 - z)**3
-        
-        basis = torch.where(z < 1.0, b1, torch.where(z < 2.0, b2, torch.zeros_like(z)))
+        # Cubic B-spline function
+        def b_spline(z):
+            z_abs = torch.abs(z)
+            b1 = (2.0/3.0) - z_abs**2 + 0.5 * z_abs**3
+            b2 = (1.0/6.0) * (2.0 - z_abs)**3
+            return torch.where(z_abs < 1.0, b1, torch.where(z_abs < 2.0, b2, torch.zeros_like(z)))
+
+        # N_sym(rho) = N((rho - c)/h) + N((-rho - c)/h)
+        basis = b_spline((r - c) / self.h) + b_spline((-r - c) / self.h)
         return basis
 
     def forward(self, rho: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:

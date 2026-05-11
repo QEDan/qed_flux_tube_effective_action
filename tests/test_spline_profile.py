@@ -5,7 +5,8 @@ from src.python.field_profile_mlp import SplineProfile
 
 def test_spline_profile():
     print("--- Testing SplineProfile ---")
-    rho = torch.linspace(0.0, 10.0, 500)
+    # Use a high-resolution grid near zero to check the derivative
+    rho = torch.linspace(0.0, 10.0, 2000)
     target_flux = 2.0 * np.pi * 0.4
     
     # Initialize Spline Profile
@@ -24,8 +25,18 @@ def test_spline_profile():
     assert torch.isfinite(B).all(), "NaN/Inf in B field!"
     assert torch.isfinite(A).all(), "NaN/Inf in A field!"
     
-    # Check that B(rho) is smooth by looking at its gradient
+    # Check B'(0) = 0
+    # For an even function B(rho) = B(-rho), B'(0) must be 0.
+    # We can check B(dr) vs B(-dr)
+    rho_sym = torch.tensor([-dr.item(), 0.0, dr.item()])
+    B_sym, _ = model(rho_sym)
+    diff = (B_sym[2] - B_sym[0]).item()
+    print(f"B(dr) - B(-dr):  {diff:.6e}")
+    assert abs(diff) < 1e-12, f"B is not symmetric around 0: B(dr)={B_sym[2]}, B(-dr)={B_sym[0]}"
+
+    # Gradient check for visualization/health
     dB = torch.gradient(B.squeeze(), spacing=dr.item())[0]
+
     d2B = torch.gradient(dB, spacing=dr.item())[0]
     
     assert torch.isfinite(dB).all(), "NaN/Inf in B gradient!"
