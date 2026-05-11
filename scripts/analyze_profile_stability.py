@@ -34,15 +34,32 @@ def analyze_profile_stability(checkpoint_path):
     # Since we can't easily hook into autograd's inner loop, we'll use a 
     # progress bar to monitor the checkpoint loop and a simple print for Hessian.
     def action_fn(weights):
-        # Substitute weights temporarily
-        original_weights = model.weights.data.clone()
-        model.weights.data = weights
+        # We need to evaluate the model using the provided weights in a way that preserves the graph.
+        # SplineProfile.forward uses self.weights. Instead of modifying the model,
+        # we can pass weights explicitly if we refactor, or use a functional approach.
         
-        B_vals, a_phi = model(rho_vals)
+        # Temporary functional override for B-spline evaluation
+        basis = model._get_basis(rho_vals)
+        w = torch.abs(weights) if model.positivity_constraint else weights
+        B_raw = torch.matmul(basis, w).view(-1, 1)
+        
+        # Renormalize to conserve flux
+        dr = rho_vals[1] - rho_vals[0]
+        raw_flux = 2.0 * np.pi * torch.sum(B_raw.squeeze() * rho_vals * dr)
+        norm_factor = (model.Phi_over_2pi * 2.0 * np.pi) / (raw_flux + 1e-15)
+        B_vals = B_raw * norm_factor
+        
+        # A_phi integration
+        rho_integrand = B_vals.squeeze() * rho_vals
+        dy = 0.5 * (rho_integrand[1:] + rho_integrand[:-1]) * (rho_vals[1:] - rho_vals[:-1])
+        flux_integral = torch.zeros_like(rho_vals)
+        flux_integral[1:] = torch.cumsum(dy, dim=0)
+        r_safe = torch.where(rho_vals == 0, torch.tensor(1e-15, device=rho_vals.device), rho_vals)
+        a_phi = (flux_integral / r_safe).view(-1, 1)
+
         profile = MLPProfile(rho_vals, B_vals.squeeze(), a_phi.squeeze())
         action = orchestrator.compute_effective_action(profile, chi_vals, ml_vals, [1, -1])
         
-        model.weights.data = original_weights
         return action.real
 
     # Compute Hessian
