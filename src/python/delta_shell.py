@@ -32,4 +32,10 @@ class DeltaFunctionShellProfile(FieldProfile):
         r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
         self.da_phi = -self.a_phi / r_safe
         
-        # Note: The solver must be configured to handle the boundary jump at R.
+    def get_jump_params(self):
+        # Returns (location, magnitude)
+        # jump = du_ext - du_int = + e * sigma3 * B_dist * u
+        # B_dist = F / (2 * pi * R)
+        # So jump = + e * sigma3 * (F / (2 * pi * R)) * u
+        # The solver multiplies this by sigma3, so we return e * F / (2 * pi * R)
+        return self.R, self.e * (self.F / (2.0 * np.pi * self.R))

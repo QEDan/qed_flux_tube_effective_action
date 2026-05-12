@@ -9,61 +9,55 @@ from scipy.integrate import quad
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
 
 from orchestrator import Orchestrator
-from profiles import ZeroFluxProfile, StepFunctionProfile
+from profiles import SuperGaussianProfile
 from analytic import heisenberg_euler_lagrangian
 
 def validate_he_expansion():
     # Setup parameters
-    lambd_values = [1.0]
+    # Narrower sweep for speed, focusing on the trend
+    lambd_values = [2.0, 5.0, 10.0, 15.0]
     B_peak = 0.1
     m = 1.0
 
-    # Grid for numerical solver
-    chi_values = (np.linspace(1.1, 10.0, 5) + 0.1j).tolist()
-    ml_values = list(range(-20, 21))
+    # Denser chi grid for precision, but fewer ml for speed
+    chi_values = (np.linspace(1.1, 30.0, 15) + 0.1j).tolist()
+    ml_values = list(range(-30, 31))
     sigma3_values = [1, -1]
-
     
     num_actions = []
     he_actions = []
     
-    orc = Orchestrator(device="cpu", batch_size=1024)
+    orc = Orchestrator(device="cpu", batch_size=2048)
     
-    print(f"--- Heisenberg-Euler Validation (B_peak={B_peak}) ---")
+    print(f"--- Heisenberg-Euler Validation (Super-Gaussian, B_peak={B_peak}) ---")
     
     for lambd in lambd_values:
         print(f"\nProcessing lambda={lambd}...")
-        rho_max = 2.0 * lambd + 10.0
-        rho = torch.linspace(0.01, rho_max, 500, dtype=torch.float64)
+        rho_max = 2.0 * lambd + 4.0
+        rho = torch.linspace(0.01, rho_max, 400, dtype=torch.float64)
         
-        # Using ZeroFluxProfile to ensure O(B) cancellation
-        profile_full = ZeroFluxProfile(rho, B=B_peak, lambd=lambd)
-        profile_half = ZeroFluxProfile(rho, B=B_peak/2.0, lambd=lambd)
+        # Super-Gaussian
+        profile_full = SuperGaussianProfile(rho, B0=B_peak, lambd=lambd)
+        profile_half = SuperGaussianProfile(rho, B0=B_peak/2.0, lambd=lambd)
         
         action_full = orc.compute_effective_action(profile_full, chi_values, ml_values, sigma3_values, m=m)
         action_half = orc.compute_effective_action(profile_half, chi_values, ml_values, sigma3_values, m=m)
         
-        print(f"    Action(B): {action_full.real.item():.4e}")
-        print(f"    Action(B/2): {action_half.real.item():.4e}")
-        
+        # B^4 term extraction
         num_val = (action_full.real.item() - 4.0 * action_half.real.item()) / 0.75
         num_actions.append(num_val)
-        print(f"  Numerical B^4 Action: {num_val:.4e}")
         
-        # 2. Heisenberg-Euler Benchmark (local limit)
         def he_integrand(r):
-            # B(rho) = B * (1 - 2*rho^2/lambd^2) for rho < lambd, else 0
-            if r < lambd:
-                B = B_peak * (1.0 - 2.0 * r**2 / lambd**2)
-            else:
-                B = 0.0
+            B = B_peak * np.exp(-(r/lambd)**4)
             return r * heisenberg_euler_lagrangian(B, m=m)
         
-        from scipy.integrate import quad
         res_he, _ = quad(he_integrand, 0, rho_max)
         he_val = 2.0 * np.pi * res_he
         he_actions.append(he_val)
-        print(f"  HE Benchmark Action: {he_val:.4e}")
+        
+        print(f"  Numerical B^4: {num_val:.4e}")
+        print(f"  HE Benchmark:   {he_val:.4e}")
+        print(f"  Ratio:          {num_val/he_val:.4f}")
 
     num_actions = np.array(num_actions)
     he_actions = np.array(he_actions)

@@ -90,8 +90,21 @@ class PyTorchSolver:
 
         for i in range(n_points - 1):
             h = rho[i+1] - rho[i]
-            # Discontinuity jump condition (only for StepFunctionProfile)
-            if lambd is not None and F is not None and abs(F) > 1e-12 and lambd > 0 and rho[i] < lambd <= rho[i+1]:
+            # Discontinuity jump condition
+            if hasattr(field_profile, 'get_jump_params'):
+                R, mag = field_profile.get_jump_params()
+                if rho[i] < R <= rho[i+1]:
+                    # jump = du_ext - du_int = mag * sigma3 * u
+                    # We need to account for sigma3 which is in params.
+                    # The mag in get_jump_params is already pre-multiplied by sigma3 in the profile update (Wait, checking DeltaFunctionShellProfile)
+                    # Actually, the jump depends on sigma3. Let's pass the jump directly or adjust it here.
+                    # The current jump condition in DeltaFunctionShellProfile is -e * (F / 2*pi*R).
+                    # I need to multiply by sigma3 (which is params['sigma3']).
+                    # Let's adjust get_jump_params to just return -e * F / (2*pi*R) and multiply by s3 here.
+                    state_u0[:, 1] += (mag * params['sigma3'].to(torch.float64)) * state_u0[:, 0]
+            
+            # StepFunctionProfile jump case
+            elif lambd is not None and F is not None and abs(F) > 1e-12 and lambd > 0 and rho[i] < lambd <= rho[i+1]:
                 state_u0[:, 1] += (-params['e'] * F / (np.pi * lambd**2)) * state_u0[:, 0]
 
             state_u0 = self.rk4_step(rho[i], h, state_u0, params, 
@@ -148,8 +161,14 @@ class PyTorchSolver:
 
         for i in range(n_points - 1, 0, -1):
             h = rho[i-1] - rho[i]
-            # Discontinuity jump condition (only for StepFunctionProfile)
-            if lambd is not None and F is not None and abs(F) > 1e-12 and lambd > 0 and rho[i] > lambd >= rho[i-1]:
+            # Discontinuity jump condition
+            if hasattr(field_profile, 'get_jump_params'):
+                R, mag = field_profile.get_jump_params()
+                if rho[i] > R >= rho[i-1]:
+                    state_uinf[:, 1] += (-mag * params['sigma3'].to(torch.float64)) * state_uinf[:, 0]
+            
+            # StepFunctionProfile jump case
+            elif lambd is not None and F is not None and abs(F) > 1e-12 and lambd > 0 and rho[i] > lambd >= rho[i-1]:
                 state_uinf[:, 1] += (params['e'] * F / (np.pi * lambd**2)) * state_uinf[:, 0]
 
             state_uinf = self.rk4_step(rho[i], h, state_uinf, params, 
@@ -168,6 +187,17 @@ class PyTorchSolver:
             log_scale_uinf[:, i-1] = log_acc_uinf
 
         W0 = rho[-1] * (state_u0[:, 1] * u_inf_init - state_u0[:, 0] * du_inf_init)
+        
+        # Logarithmic renormalization for W0 to prevent over/underflow
+        # If W0 is extremely small, log_scale_u0 + log_scale_uinf might be wrong.
+        # Let's ensure W0 is not used in a way that leads to loss of precision.
+        # res = (rho.unsqueeze(0) * u0 * uinf * torch.exp(log_diff)) / (W0.unsqueeze(1) + 1e-300)
+        
+        # The W0 is defined as rho * (u0' * uinf - u0 * uinf')
+        # Maybe the sign is wrong? Let's check Eq 2.69
+        # LaTeX: W0 = rho * (u0' u_inf - u0 u_inf')
+        # Yes, it matches.
+        
         log_diff = (log_scale_u0 + log_scale_uinf) - (log_acc_u0 + log_acc_uinf_init).unsqueeze(1)
-        res = (rho.unsqueeze(0) * u0 * uinf * torch.exp(log_diff)) / (W0.unsqueeze(1) + 1e-300)
+        res = (rho.unsqueeze(0) * u0 * uinf) / (W0.unsqueeze(1) + 1e-300) * torch.exp(log_diff)
         return res, W0

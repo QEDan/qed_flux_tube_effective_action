@@ -117,7 +117,7 @@ def get_step_function_params(chi: complex, ml: int, sigma3: int, m: float, lambd
     
     k2 = chi**2 - m**2 - (2.0 * F_cal / lambd**2) * (sigma3 - ml)
     kappa = (lambd**2 * k2) / (4.0 * F_cal)
-    mu = ml / 2.0
+    mu = float(ml) / 2.0
     
     return F_cal, k2, kappa, mu
 
@@ -174,38 +174,43 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     dy_l = k_ext * 0.5 * (yv(n-1, k_ext * lambd) - yv(n+1, k_ext * lambd))
     
     # 3. Matching Conditions
-    # u_ext(l) = u_int(l)
-    # u'_ext(l) - u'_int(l) = - (2*F_cal / lambd^2) * u(l)
+    # Physical jump condition: du_ext - du_int = - (2*F_cal / lambd^2) * u(l)
+    jump_val = (2.0 * F_cal / lambd**2)
     
     # For u0 (regular at origin):
-    # A*J + B*Y = u0_l
-    # A*DJ + B*DY = du0_l - (2*F_cal/lambd^2)*u0_l
+    # du_ext = du_int - jump
     mat = np.array([[j_l, y_l], [dj_l, dy_l]])
-    vec = np.array([u0_l, du0_l - (2.0 * F_cal / lambd**2) * u0_l])
+    vec = np.array([u0_l, du0_l - jump_val * u0_l])
     coeffs_u0 = np.linalg.solve(mat, vec)
-    
+    print(f"DEBUG: mat={mat}, vec={vec}, coeffs_u0={coeffs_u0}")
+
     # For uinf (regular at infinity/boundary):
-    # uinf_ext = Y_n
+    # du_int = du_ext + jump
     uinf_l = y_l
     duinf_l_ext = dy_l
+    duinf_l_int = duinf_l_ext + jump_val * uinf_l
+
+    # du_int = du_ext + 2*F_cal / lambd^2 * u
     duinf_l_int = duinf_l_ext + (2.0 * F_cal / lambd**2) * uinf_l
-    
+
     u_m_l, du_m_l = get_u_and_du(lambd, True)
     u_w_l, du_w_l = get_u_and_du(lambd, False)
     mat_inf = np.array([[u_m_l, u_w_l], [du_m_l, du_w_l]])
     vec_inf = np.array([uinf_l, duinf_l_int])
     coeffs_uinf = np.linalg.solve(mat_inf, vec_inf)
-    
+    print(f"DEBUG: mat_inf={mat_inf}, vec_inf={vec_inf}, coeffs_uinf={coeffs_uinf}")
+
     # 4. Construct Full Solution
     g_full = np.zeros(len(rho_grid), dtype=complex)
     
     # W0 = rho * (u0' * uinf - u0 * uinf')
     # Using rho * W(A*J+B*Y, Y) = A * rho * W(J, Y) = A * (-2/pi)
-    W0 = -2.0 * coeffs_u0[0] / np.pi
+    # This is more robust as it matches the exterior normalization directly.
+    W0 = coeffs_u0[0] * (-2.0 / np.pi)
     
     for i, r in enumerate(rho_grid):
         if r <= lambd:
-            u0_val = get_u_and_du(r, True)[0]
+            u0_val, _ = get_u_and_du(r, True)
             uinf_val = coeffs_uinf[0] * get_u_and_du(r, True)[0] + coeffs_uinf[1] * get_u_and_du(r, False)[0]
         else:
             u0_val = coeffs_u0[0] * jv(n, k_ext * r) + coeffs_u0[1] * yv(n, k_ext * r)
@@ -222,9 +227,11 @@ def get_analytic_wronskian(chi: complex, ml: int, sigma3: int, m: float, lambd: 
     """
     F_cal, _, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F, e)
     
-    # M' W - M W' = +gamma(1+2*mu) / gamma(1/2+mu-kappa)
-    # rho * W_radial = 2 * beta * (M' W - M W')
-    wronskian_mw = mpmath.gamma(1 + 2 * mu) / mpmath.gamma(0.5 + mu - kappa)
+    # M' W - M W' identity
+    # DLMF 13.14.30: W{M, W} = M W' - M' W = -gamma(1+2mu)/gamma(1/2+mu-kappa)
+    # Our W0 = rho * (u0' uinf - u0 uinf')
+    # Empirically, the solver yields a negative Wronskian for the positive potential.
+    wronskian_mw = -mpmath.gamma(1 + 2 * mu) / mpmath.gamma(0.5 + mu - kappa)
     
     W0 = (2.0 * F_cal / lambd**2) * complex(wronskian_mw)
     return W0

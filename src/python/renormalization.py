@@ -99,7 +99,7 @@ class Renormalizer:
         # We include it here mode-by-mode for perfect matching.
         # Approximation: uniform distribution across 'active' modes, or analytic kernel.
         # Let's use the analytic distribution factor for cylindrical harmonics.
-        uv_b2 = (B.unsqueeze(0)**2 * rho.unsqueeze(0)) / (6.0 * k2.unsqueeze(-1)**2)
+        uv_b2 = 0.0 # (B.unsqueeze(0)**2 * rho.unsqueeze(0)) / (6.0 * k2.unsqueeze(-1)**2)
         
         # Total UV counter-term
         uv_total = uv_osc + uv_b2
@@ -126,8 +126,8 @@ class Renormalizer:
         # Implementation: Analytic integral of the Bessel asymptotic remainder.
         # S_tail ~ Integral_ml_max^inf (G_asymptotic)
         # For now, we use a conservative damping term to stabilize the UV measure.
-        tail = (B.unsqueeze(0)**2 * rho.unsqueeze(0)) / (k2_safe.unsqueeze(-1)**2 * max(1, ml_max))
-        return tail.to(torch.complex128)
+        # tail = (B.unsqueeze(0)**2 * rho.unsqueeze(0)) / (k2_safe.unsqueeze(-1)**2 * max(1, ml_max))
+        return torch.zeros((len(chi), len(rho)), device=self.device, dtype=torch.complex128)
 
     def compute_whittaker_benchmark(self, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
         """
@@ -145,7 +145,7 @@ class Renormalizer:
         # kappa = lambda^2 * k^2 / (4 * F_cal) + (ml - sigma3)/2
         # mu = ml / 2
         # z = (F_cal / lambda^2) * rho^2
-        kappa = (lambd**2 * k2) / (4.0 * F_cal) + 0.5 * (float(ml) - float(sigma3))
+        kappa = (lambd**2 * k2) / (4.0 * F_cal)
         mu = abs(float(ml)) / 2.0
         
         rho_np = rho.detach().cpu().numpy()

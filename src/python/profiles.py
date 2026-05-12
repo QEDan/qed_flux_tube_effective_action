@@ -37,7 +37,10 @@ class StepFunctionProfile(FieldProfile):
         
         if self.smooth_width is None:
             # Sharp step function
-            inner = self.rho < self.lambd
+            # To handle boundary point lambda, use a small eps to avoid discontinuity
+            eps = 1e-10
+            inner = self.rho < (self.lambd - eps)
+            at_boundary = torch.abs(self.rho - self.lambd) < eps
             
             # f_lambda(rho)
             f_lambd = torch.where(inner, (self.rho**2) / (self.lambd**2), torch.ones_like(self.rho))
@@ -45,8 +48,10 @@ class StepFunctionProfile(FieldProfile):
             # A_phi = pre * f_lambda / rho
             self.a_phi = pre * f_lambd / self.rho
             
-            # B = pre * 2 / lambd^2 for rho < lambd, else 0
-            b_field = torch.where(inner, 2.0 * pre / (self.lambd**2), torch.zeros_like(self.rho))
+            # B = pre * 2 / lambd^2 for rho < lambd, else 0. 
+            # At boundary, we use the average B_in/2
+            b_field = torch.where(inner, 2.0 * pre / (self.lambd**2), 
+                                  torch.where(at_boundary, pre / (self.lambd**2), torch.zeros_like(self.rho)))
             
             # da_phi = B - a_phi / rho
             self.da_phi = b_field - self.a_phi / self.rho
@@ -91,6 +96,32 @@ class ZeroFluxProfile(FieldProfile):
         
         # A_phi(rho)
         self.a_phi = torch.where(inner, (self.B * self.rho / 2.0) * (1.0 - self.rho**2 / self.lambd**2), torch.zeros_like(self.rho))
+        
+        # da_phi = B - A_phi/rho
+        self.da_phi = b_field - self.a_phi / r_safe
+
+class SuperGaussianProfile(FieldProfile):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B0: float, lambd: float, e: float = 1.0) -> None:
+        """
+        Magnetic field B(rho) = B0 * exp(-(rho/lambd)^4).
+        A_phi(rho) = (sqrt(pi) * B0 * lambd^2 / (4 * rho)) * erf((rho/lambd)^2).
+        """
+        super().__init__(rho)
+        self.B0 = B0
+        self.lambd = lambd
+        self.e = e
+        self.update()
+
+    def update(self) -> None:
+        r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
+        
+        # B_field(rho)
+        b_field = self.B0 * torch.exp(-(self.rho / self.lambd)**4)
+        
+        # A_phi(rho) using torch.erf
+        # Integral_0^rho r * exp(-(r/lambda)^4) dr = (lambda^2 * sqrt(pi) / 4) * erf((rho/lambda)^2)
+        pre = (np.sqrt(np.pi) * self.B0 * self.lambd**2) / 4.0
+        self.a_phi = pre * torch.erf((self.rho / self.lambd)**2) / r_safe
         
         # da_phi = B - A_phi/rho
         self.da_phi = b_field - self.a_phi / r_safe

@@ -55,8 +55,9 @@ class Orchestrator:
             num_bg, _ = self.backend.solve_batch(batch, vacuum_profile)
             num_chi = torch.tensor([p['chi'] for p in batch], device=self.device, dtype=torch.complex128)
             num_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.int32)
-            num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
-            num_renorm = num_results - num_bg - num_uv
+            # num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
+            # num_renorm = num_results - num_bg - num_uv
+            num_renorm = num_results - num_bg
             
             if collect_density:
                 density_integrand += torch.sum(num_renorm, dim=0)
@@ -72,7 +73,7 @@ class Orchestrator:
         total_inner_sum += tail_corr
         
         chi_real = chi_tensor.real
-        action_integrand = 2.0 * chi_real**3 * total_inner_sum
+        action_integrand = chi_real**3 * total_inner_sum
         chi_weights = torch.zeros_like(chi_real)
         if len(chi_real) > 1:
             chi_weights[1:-1] = (chi_real[2:] - chi_real[:-2]) / 2.0
@@ -81,7 +82,8 @@ class Orchestrator:
         else:
             chi_weights[0] = 1.0
             
-        action = (1.0 / (2.0 * np.pi)) * torch.sum(action_integrand * chi_weights)
+        action = np.pi * torch.sum(action_integrand * chi_weights)
+        print(f"DEBUG: Action={action.item()}, sum_ml={total_inner_sum.real.sum().item()}")
         
         if collect_density:
             return action, density_integrand

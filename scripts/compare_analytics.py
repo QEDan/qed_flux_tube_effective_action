@@ -20,8 +20,8 @@ def compare_analytic_vs_numerical():
     ml = 1
     sigma3 = 1
     
-    # Grid: Full domain
-    rho_full = np.linspace(0.1, 2.0, 1000)
+    # Grid: Focus on the interior and matching region
+    rho_full = np.linspace(0.01, 2.0, 500)
     
     # Use sharp profile to match analytic benchmark exactly
     profile = StepFunctionProfile(rho_full, lambd=lambd, F=F, smooth_width=None)
@@ -29,7 +29,7 @@ def compare_analytic_vs_numerical():
     # Numerical solver
     orc = Orchestrator(device="cpu")
     params = [{'chi': chi, 'ml': ml, 'sigma3': sigma3, 'm': m, 'e': 1.0}]
-    results_num, _ = orc.backend.solve_batch(params, profile)
+    results_num, W0_num = orc.backend.solve_batch(params, profile)
     res_num = results_num[0].detach().numpy()
     
     # Full Analytic result (Matched)
