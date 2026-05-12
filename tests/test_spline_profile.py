@@ -18,7 +18,7 @@ def test_spline_profile():
     calculated_flux = 2.0 * np.pi * torch.sum(B.squeeze() * rho * dr)
     print(f"Target Flux:     {target_flux:.6f}")
     print(f"Calculated Flux: {calculated_flux.item():.6f}")
-    assert torch.allclose(torch.tensor(target_flux, dtype=torch.float64), calculated_flux, rtol=1e-2), "Flux not conserved!"
+    assert torch.allclose(torch.tensor(target_flux, dtype=torch.float64), calculated_flux, rtol=1e-6), "Flux not conserved!"
 
     # 2. Verify Continuity (Visual/Numerical)
     # Check for NaNs or Inf

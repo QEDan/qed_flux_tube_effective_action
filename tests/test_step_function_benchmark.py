@@ -70,7 +70,7 @@ def test_step_function_exact_normalization():
     max_diff = np.max(np.abs(u0_num - u0_ana))
     print(f"\nMax absolute difference in u0: {max_diff:.2e}")
     
-    assert max_diff < 1e-4
+    assert max_diff < 1e-6
 
 if __name__ == "__main__":
     pytest.main([__file__, "-s"])

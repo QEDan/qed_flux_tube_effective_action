@@ -18,11 +18,11 @@ def test_bessel_consistency():
     W = u0 * duinf - du0 * uinf
     expected_W = 2.0 / (np.pi * rho)
     
-    assert np.isclose(W, expected_W)
+    assert np.isclose(W, expected_W, rtol=1e-12, atol=1e-12)
     
     # G = (rho * u0 * uinf) / (rho * W)
     # rho * W = 2/pi
     g_val = (rho * u0 * uinf) / (rho * W)
     expected_g = 0.5 * np.pi * rho * u0 * uinf
     
-    assert np.isclose(g_val, expected_g)
+    assert np.isclose(g_val, expected_g, rtol=1e-12, atol=1e-12)
