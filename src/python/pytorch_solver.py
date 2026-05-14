@@ -188,16 +188,8 @@ class PyTorchSolver:
 
         W0 = rho[-1] * (state_u0[:, 1] * u_inf_init - state_u0[:, 0] * du_inf_init)
         
-        # Logarithmic renormalization for W0 to prevent over/underflow
-        # If W0 is extremely small, log_scale_u0 + log_scale_uinf might be wrong.
-        # Let's ensure W0 is not used in a way that leads to loss of precision.
-        # res = (rho.unsqueeze(0) * u0 * uinf * torch.exp(log_diff)) / (W0.unsqueeze(1) + 1e-300)
-        
-        # The W0 is defined as rho * (u0' * uinf - u0 * uinf')
-        # Maybe the sign is wrong? Let's check Eq 2.69
-        # LaTeX: W0 = rho * (u0' u_inf - u0 u_inf')
-        # Yes, it matches.
-        
+        # Ensure W0 is stable, avoiding division by zero or near-zero
+        W0_stable = torch.where(torch.abs(W0) < 1e-12, torch.sgn(W0) * 1e-12, W0)
         log_diff = (log_scale_u0 + log_scale_uinf) - (log_acc_u0 + log_acc_uinf_init).unsqueeze(1)
-        res = (rho.unsqueeze(0) * u0 * uinf) / (W0.unsqueeze(1) + 1e-300) * torch.exp(log_diff)
+        res = (rho.unsqueeze(0) * u0 * uinf) / (W0_stable.unsqueeze(1)) * torch.exp(log_diff)
         return res, W0

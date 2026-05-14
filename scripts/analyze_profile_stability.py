@@ -34,13 +34,9 @@ def analyze_profile_stability(checkpoint_path):
     # Since we can't easily hook into autograd's inner loop, we'll use a 
     # progress bar to monitor the checkpoint loop and a simple print for Hessian.
     def action_fn(weights):
-        # We need to evaluate the model using the provided weights in a way that preserves the graph.
-        # SplineProfile.forward uses self.weights. Instead of modifying the model,
-        # we can pass weights explicitly if we refactor, or use a functional approach.
-        
-        # Temporary functional override for B-spline evaluation
+        # Match SplineProfile.forward exactly using softplus
         basis = model._get_basis(rho_vals)
-        w = torch.abs(weights) if model.positivity_constraint else weights
+        w = torch.nn.functional.softplus(weights) if model.positivity_constraint else weights
         B_raw = torch.matmul(basis, w).view(-1, 1)
         
         # Renormalize to conserve flux
@@ -66,8 +62,8 @@ def analyze_profile_stability(checkpoint_path):
     print("Computing Hessian (Autodiff)...")
     hessian = torch.autograd.functional.hessian(action_fn, model.weights)
     
-    # Eigenvalue Analysis
-    eigenvalues = torch.linalg.eigvals(hessian).real
+    # Eigenvalue Analysis - Use eigvalsh for sorted real eigenvalues of symmetric Hessian
+    eigenvalues = torch.linalg.eigvalsh(hessian)
     print(f"Eigenvalues: {eigenvalues}")
     
     stable_modes = torch.sum(eigenvalues > 0).item()

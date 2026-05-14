@@ -1,7 +1,8 @@
 
 VALIDATION_PY = scripts/test_zero_field.py scripts/compare_analytics.py \
                 scripts/visualize_benchmark.py scripts/validate_he_expansion.py \
-                scripts/test_delta_shell_validation.py scripts/test_sech2_shell_validation.py
+                scripts/test_delta_shell_validation.py scripts/test_sech2_shell_validation.py \
+                scripts/validate_wkb.py
 
 VALIDATION_SAGEMATH_PY = symbolic_validations/numerical_spectrum.py symbolic_validations/verify_analytic_spectrum.py \
                          symbolic_validations/verify_isomorphism.py symbolic_validations/verify_ode.py \
@@ -53,6 +54,7 @@ validate:
 	@echo "2. scripts/visualize_benchmark.py: Check results/test_benchmark_absolute_visualization.png. Confirm that the dashed numerical integration curve perfectly tracks the solid analytic benchmark for the absolute amplitude."
 	@echo "3. scripts/test_delta_shell_validation.py: Check results/delta_shell_greens_function_comparison.png. Verify agreement between numerical and analytic Green's functions for a delta shell."
 	@echo "4. scripts/test_sech2_shell_validation.py: Check results/sech2_shell_greens_function_validation.png. Verify agreement between numerical sech2 and analytic delta-shell equivalent."
+	@echo "5. scripts/validate_wkb.py: Check results/wkb_validation_visual.png. Verify oscillatory match between numerical solver and WKB benchmark, observing amplitude and offset residuals."
 
 
 .PHONY: all clean validate

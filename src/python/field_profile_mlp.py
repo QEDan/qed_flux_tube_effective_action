@@ -36,7 +36,7 @@ class BasisProfile(nn.Module):
         rho_expanded = rho.view(-1, 1)
         basis = torch.exp(-(rho_expanded - self.centers)**2 / (2 * self.sigma**2))
         
-        B_raw = torch.matmul(basis, torch.abs(self.weights)) # Weights must be positive for B > 0
+        B_raw = torch.matmul(basis, torch.nn.functional.softplus(self.weights)) # Smooth positivity constraint
         
         # Renormalize to conserve flux: Phi = 2*pi * integral(rho * B) = total_flux
         # rho_weights calculated for integration
@@ -117,7 +117,7 @@ class SplineProfile(nn.Module):
     def forward(self, rho: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         basis = self._get_basis(rho)
         
-        w = torch.abs(self.weights) if self.positivity_constraint else self.weights
+        w = torch.nn.functional.softplus(self.weights) if self.positivity_constraint else self.weights
         B_raw = torch.matmul(basis, w).view(-1, 1)
         
         # Renormalize to conserve flux: Phi = 2*pi * integral(rho * B) = total_flux
