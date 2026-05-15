@@ -1,0 +1,1063 @@
+\chapter{Magnetic Flux Tubes in a Dense Lattice}
+\label{ch:periodic}
+\acresetall
+
+\begin{summary}
+If the superconducting nuclear material of a neutron star contains magnetic flux tubes, 
+the magnetic field is likely to vary rapidly on the scales where \acs{QED} effects 
+are important.
+In this chapter, I construct a cylindrically symmetric toy model of a flux 
+tube lattice in which the influence of neighbouring flux tubes is taken into account.
+We compute the effective action densities using the \acs{WLN} technique.
+The numerics predict a greater effective energy density in the 
+region of the flux tube, but a smaller energy density in the regions 
+between the flux tubes compared to a locally-constant-field approximation. 
+We also compute the interaction energy between a flux tube and its neighbours 
+as the lattice spacing is reduced from infinity. Because our flux tubes 
+exhibit compact support, this energy is entirely non-local and
+predicted to be zero in local approximations
+such as the derivative expansion. This quantity can take 
+positive or negative values depending on the magnetic field profile and the 
+specific definition of the interaction energy. 
+\end{summary}
+
+\section{Introduction}
+
+
+Computing the quantum effective action for magnetic flux tube 
+configurations is a problem that has generated considerable interest
+and has been explored through a variety of approaches~\cite{Gornicki1990271, 
+1998MPLA...13..379S, 0264-9381-12-5-013, PhysRevD.51.810, 1999PhRvD..60j5019B,
+PhysRevD.62.085024, 2001PhRvD..64j5011P, 2003PhRvD..68f5026B, 
+2005NuPhB.707..233G, 2006JPhA...39.6799W, Weigel:2010pf, Langfeld:2002vy}
+(see section \ref{sec:EAisoflux}). 
+Partly, this 
+is because it is a relatively simple problem for analyzing non-homogeneous 
+generalizations of the Heisenberg-Euler action and for exploring 
+limitations of techniques such as the derivative expansion. But, this 
+is also a physically important problem because tubes of magnetic flux 
+are very important for the quantum mechanics of electrons due 
+to the Aharonov-Bohm effect, and they appear 
+in a variety of interesting physical scenarios such as stellar astrophysics, 
+cosmic strings, in superconductor vortices, and quark confinement
+\cite{2003PrPNP..51....1G}.
+
+In the present context, we are concerned with the role that magnetic 
+flux tubes play in the superconducting nuclear material of compact stars.
+In this scenario, the \ac{QED} effects are particularly interesting because 
+the magnetic flux tubes, if they exist, are confined to tubes which may be 
+only a few percent of the Compton wavelength, $\lambda_{\rm C}$, in radius. Specifically, 
+the flux must be confined to within the London penetration depth of the superconducting 
+material, which for neutron stars has been estimated to be 80 fm $=$
+0.032 $\lambda_e$~\cite{PhysRevLett.91.101101}. Moreover, the 
+flux tube density is expected to be proportional to the 
+average magnetic field. For a background field near the quantum critical 
+strength, $B_k$, such as in a neutron star, the distance between flux tubes 
+is comparable to a Compton wavelength. This Compton wavelength scale is 
+also the scale at which the non-locality of \ac{QED} becomes important and 
+at which powerful local techniques like the derivative expansion 
+are no longer appropriate for computing the effective action.
+
+The free energy associated with these flux tubes is a factor in determining 
+whether the nuclear material of a neutron star is a type-I or type-II 
+superconductor. The free energy of a flux tube is determined by 
+looking at the energies associated with the magnetic field, with the 
+creation of a non-superconducting region in the superconductor, and 
+with interactions between the flux tubes. Flux tubes can only form 
+if it is energetically favourable to do so compared to expelling the 
+field due to the Meissner effect. In this chapter, I would 
+like to explore the contribution from \ac{QED} to this free 
+energy. For an isolated flux tube, this is an additional source 
+of energy for creating the magnetic field. For a lattice of 
+flux tubes, there is also an energy contribution from the 
+presence of neighbouring flux tubes because of the non-local 
+nature of quantum field theory.
+
+The energy of two flux tubes has been previously
+computed using \ac{WLN} methods and for flux tubes with aligned fields, the 
+energy is larger than twice the energy of a single flux tube when the flux tubes 
+are closely spaced~\cite{Langfeld:2002vy}. This result implies that there is a 
+repulsive interaction between the flux tubes due to \ac{QED} effects,
+strengthening the likelihood of the type-II scenario in neutron stars. This interaction 
+energy increases as the flux tubes are placed closer together, and can have a similar 
+magnitude as the \ac{QED} correction to the energy when the flux tubes are closely spaced.
+
+
+In this chapter, I will further explore the nature of this 
+phenomenon in \ac{QED} using
+ a highly parallel implementation of the \ac{WLN} 
+technique implemented on a \ac{GPU} architecture. Specifically, I explore 
+cylindrically symmetric magnetic field profiles for isolated flux 
+tubes and periodic profiles designed to model properties of a 
+triangular lattice. This 
+algorithm cannot be applied to spinor \ac{QED} calculations 
+in our model lattice because 
+of the well-known fermion problem of \ac{WLN}. However, the problem 
+does not affect \ac{ScQED} calculations. Therefore, 
+we explore the quantum-corrected energies of 
+isolated flux tubes for both scalar and spinor 
+electrons and use this comparison to speculate 
+about the relationship of our cylindrical lattice model 
+and the spinor \ac{QED} energies of an Abrikosov lattice 
+of flux tubes that may be found in neutron stars.
+
+
+
+
+
+\subsection{Cylindrical Magnetic Fields} 
+
+We consider our flux tubes to have cylindrical symmetry so that 
+the field points along the \bhattext{z}-direction with a 
+profile that depends on the radial coordinate, $\rho$. 
+In this case, we have $\vec{B} = B(\rho)$\bhattext{z}. 
+We can find the magnetic field in terms of the vector potential 
+from $\vec{B} = \curl{\vec{A}}$ and the gauge choice that $A_0 =
+A_\rho = A_z = 0$. Then,
+
+\be 
+	\label{eqn:Bperiodic} B(\rho) = \frac{A_\phi(\rho)}{\rho} +
+	\frac{dA_\phi(\rho)}{d\rho}. 
+\ee 
+
+The vector potential, $\Aphi$, can be characterized by a profile function, 
+$f_\lambda$, and a dimensionless flux parameter, $\mathcal{F}=\frac{e}{2\pi}F$:
+
+\be 
+	\Aphi = \frac{\mathcal{F}}{e \rho}f_\lambda(\rho).
+\ee 
+If we choose $f_\lambda(\rho=0) = 0$, then the total flux within
+in a radius of $L_\rho$ is 
+\be 
+	\Phi=\frac{2\pi}{e}\mathcal{F} f_\lambda(L_\rho).  
+\ee 
+
+In terms of the profile function, the magnetic field is written
+\be
+	\label{eqn:Bzfromfl}
+	B_z(\rho)=\frac{\mathcal{F}}{e\rho}\frac{df_\lambda(\rho)}{d\rho} 
+		=\frac{2\mathcal{F}}{e}\frac{df_\lambda(\rho^2)}{d(\rho^2)}. 
+\ee 
+
+
+\section{Isolated Flux Tubes}
+
+To explore isolated magnetic flux tubes, we consider the following 
+profile function:
+
+\be
+	f_\lambda(\rho^2) = \frac{\rho^2}{\rho^2 + \lambda^2}.
+\ee
+From equation (\ref{eqn:Bzfromfl}), this give a magnetic field 
+with a profile
+\be
+	\label{eqn:isoB}
+	B_z(\rho^2) = \frac{2\mathcal{F}}{e}\frac{\lambda^2}{(\rho^2+\lambda^2)^2}.
+\ee
+This profile is a smooth flux tube representation that can be evaluated quickly.
+Moreover, flux tubes 
+with this profile were studied previously using \ac{WLN}
+\cite{Moyaerts:2003ts, MoyaertsLaurent:2004}.
+
+
+
+\section{Cylindrical Model of a Flux Tube Lattice}
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/latticesymmetry.eps}
+	\caption[Cylindrical model of a hexagonal lattice]
+	{In a type-II superconductor, there are neighbouring flux 
+	tubes arranged in a hexagonal Abrikosov lattice which have a nonlocal 
+	impact on the effective action of the central flux tube (left). In our model, 
+	we account for the contributions from these neighbouring flux tubes in 
+	cylindrical symmetry by including surrounding rings of flux (right).}
+	\label{fig:latticesymmetry}
+\end{figure}
+
+In a neutron star, we do not have isolated flux tubes. The tubes are likely arranged in a dense lattice with the 
+spacing between tubes on the order of the Compton wavelength, with the size of a flux tube a few percent of 
+the Compton wavelength. Specifically, the maximum size of a flux tube is on the order of the 
+coherence length of the superconductor, which for neutron stars has been estimated to be 
+$\xi \approx 30$ fm~\cite{PhysRevLett.91.101101}. 
+This situation can be directly computed in the \ac{WLN} technique. However, 
+this requires us to integrate over two spatial dimensions instead of one. Moreover, it requires the use of more 
+loops to more precisely probe the spatial configurations of the magnetic field. Despite these problems, 
+it is very interesting to consider a dense flux tube lattice. Unlike the isolated flux tube, the wide-tube limit 
+of the configuration doesn't have zero field, but an average, uniform background field. If this background field is 
+the size of the critical field, there are interesting quantum effects even in the wide-tube limit. 
+
+In this section, I build a cylindrically symmetric toy model of a hexagonal flux tube lattice. We focus 
+on one central flux tube and treat the surrounding six flux tubes as a continuous ring with six units 
+of flux at a distance $a$ from the central tube. The next ring will contain twelve units of flux at a 
+distance of $2a$, etc (see figure \ref{fig:latticesymmetry}). 
+Because of this condition, the average strength of the field is fixed, and the field becomes uniform in the 
+wide tube limit instead of going to zero. For small values of $\lambda$, we will have nonlocal 
+contributions from the surrounding rings in addition to the local contributions from the central 
+flux tube.
+
+It is difficult to construct a model of this scenario if the flux tubes bleed into one another 
+as they are placed close together. For example, with Gaussian flux tubes or flux tubes 
+with the profile used in the previous section, it is difficult to increase the width of the flux tubes 
+while accounting for the magnetic flux that bleeds out of their regions. Moreover, it is 
+difficult to integrate these schemes to find the profile function $f_\lambda(\rho)$ which is needed 
+to compute the scalar part of the Wilson loop.  In order to keep each tube as a distinct entity which 
+stays within its assigned region, we assign 
+a smooth function with compact support to represent each tube. 
+This is most easily done with the bump function, $\Psi(x)$, defined as
+\be
+	\Psi(x) = 
+	\begin{cases}
+	e^{-1/(1-x^2)} & \mbox{ for } |x| < 1\\
+	0 & \mbox{ otherwise} 
+	\end{cases}.
+\ee
+This function can be viewed as a rescaled Gaussian.
+%Unfortunately, by the identity theorem, smooth functions with compact support cannot be 
+%analytic unless they vanish everywhere.
+
+
+We start by defining the magnetic field outside of the central flux tube. Here, the magnetic field 
+is a constant background field, with the flux ring contributing a bump of width $\lambda$. The height 
+of the bump must go to zero as the width of the flux tube approaches the distance between flux tubes, 
+and should become infinite as the flux tube width goes to zero:
+
+\be
+	B_z(\rho>\frac{a}{2}) = B_{\rm bg} + A\left(\frac{a-\lambda}{\lambda}\right)\left[\Psi(2(\rho-n a)/\lambda)-B\right].
+\ee
+with $n\equiv \lfloor\frac{\rho+a/2}{a}\rfloor$.
+
+
+If we require 6 units of flux in the first outer ring, 12 in the second, 
+and so on (see figure \ref{fig:latticesymmetry}), the size of the background field 
+is fixed to $B_{\rm bg} = \frac{6 \mathcal{F}}{ea^2}$. The total flux contribution due to the $\lambda$-dependent 
+terms must be zero:
+
+\be
+	\int_{(n-1/2)a}^{(n+1/2)a} \rho A\left(\frac{a-\lambda}{\lambda}\right)
+		\left[\Psi(2(\rho-n a)/\lambda)-B\right] d\rho = 0
+\ee
+
+\be
+	\frac{\lambda}{2}\int_{-1}^1 \left(\frac{\lambda}{2}x+na\right)\Psi(x)dx-Ba^2n = 0.
+\ee
+This fixes the value of the constant $B$ to
+\be
+	B=\frac{q_1}{2}\frac{\lambda}{a}.
+\ee
+The numerical constant $q_1$ is defined by
+\be
+	q_1 = \int_{-1}^{1}\Psi(x)dx \approx 0.443991.
+\ee
+
+For a given bump amplitude, $A$, the magnetic field will become negative if $\lambda$ becomes small enough.
+Therefore, we replace $A$ with its maximum value for which the field is positive if $\lambda > \lambda_{\rm min}$
+for some choice of minimum flux tube size:
+
+\be
+	A=\frac{12 \mathcal{F}}{e a q_1 (a-\lambda_{\rm min})}.
+\ee
+The choice of $\lambda_{\rm min}$ sets the tube width at which the field between the flux tubes vanishes. If 
+$\lambda < \lambda_{\rm min}$, the magnetic field between the flux tubes will 
+point in the $-\hat{\vec{z}}$-direction.
+
+Because we are trying to fit a hexagonal peg into a round hole, we must treat the central flux tube differently. 
+For example, the average field inside the central region for a unit of flux, is different than the average 
+field in the exterior region. Therefore, even when $\lambda \rightarrow a$, the field cannot be quite uniform. 
+We consider the field in the central region to be a constant field with a bump centered at $\rho = 0$:
+
+\be
+	B_z(\rho < \frac{a}{2}) = A_0 \Psi(2\rho/\lambda) + B_0.
+\ee
+The constant term, $B_0$ is fixed by requiring continuity with the exterior field at $\rho = a/2$:
+
+\be
+	B_0 = \frac{6\mathcal{F}}{e a^2}\left(1-\frac{a-\lambda}{a-\lambda_{\rm min}}\right).
+\ee
+The bump amplitude, $A_0$, is fixed by fixing the flux in the central region,
+\be
+	\int_0^{a/2}\rho\left[A_0\Psi(2\rho/\lambda) + B_0\right]d\rho = \frac{\mathcal{F}}{e}:
+\ee
+
+\be
+	A_0 \left(\frac{\lambda}{2}\right)^2\int_0^1 x \Psi(x)dx + 
+		\frac{B_0}{2}\left(\frac{a}{2}\right)^2 = \frac{\mathcal{F}}{e}
+\ee
+
+\be
+	A_0 = \frac{4 \mathcal{F}}{\lambda^2 e q_2}\left(1-\frac{3}{4}
+		\left(1-\frac{a-\lambda}{a-\lambda_{\rm min}}\right)\right),
+\ee
+where the numerical constant, $q_2$, is defined by
+
+\be
+	\label{eqn:q2}
+	q_2 \equiv \int_0^1 x \Psi(x) dx \approx 0.0742478.
+\ee
+
+Finally, collecting together the important expressions, 
+the cylindrically symmetric flux tube lattice model is
+
+\ba
+\label{eqn:ffbless}
+B_z(\rho\le\frac{a}{2}) &=& \frac{4 \mathcal{F}}{\lambda^2 e q_2}
+	\left(1-\frac{3}{4}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)\right)\Psi(2\rho/\lambda) \nonumber \\
+	& & + \frac{6\mathcal{F}}{ea^2}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)
+\ea
+
+\be
+\label{eqn:Bzext}
+B_z(\rho>\frac{a}{2}) = \frac{6 \mathcal{F}}{e a^2}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)
+	+ \frac{12 \mathcal{F}}{q_1ea\lambda}\left(\frac{a-\lambda}{a-\lambda_{\min}}\right)
+	\Psi(2(\rho-na)/\lambda)  
+\ee
+with
+\be
+	\Psi(x) = 
+	\begin{cases}
+	e^{-1/(1-x^2)} & \mbox{ for } |x| < 1\\
+	0 & \mbox{ otherwise} 
+	\end{cases},
+\ee
+
+\be
+	n=\left \lfloor\frac{\rho+a/2}{a}\right\rfloor,
+\ee
+
+\be
+	\label{eqn:q1}
+	q_1 \equiv \int_{-1}^{1}\Psi(x)dx \approx 0.443991,
+\ee
+and
+\be
+	q_2 \equiv \int_0^1 x \Psi(x) dx \approx 0.0742478.
+\ee
+The magnetic field profile defined by these equations is shown in figures
+\ref{fig:periodicB} and \ref{fig:B3d}. The current density required to 
+created fields with this profile is shown in figure \ref{fig:current}.
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/periodicB.eps}
+	\caption[Magnetic field in a cylindrical lattice model]
+	{The cylindrical lattice flux tube model for several 
+	values of the width parameter $\lambda$. Here we have taken $a =\sqrt{8}\lambda_e$
+	and $\lambda_{\rm min} = 0.1a$. Note that in the limit $\lambda\rightarrow a$
+	the field is nearly uniform with a mound in the central region. This is a 
+	consequence of the flux conditions in cylindrical symmetry requiring different
+	fields in the internal and external regions. The height of the $\lambda=0.1a$
+	flux tube extends beyond the height of the graph to about $61.9B_k$. 
+	A 3D surface plot of the $\lambda=0.6a$ field profile is shown in figure 
+	\ref{fig:B3d}.}
+	\label{fig:periodicB}
+\end{figure}
+
+\begin{figure}
+	\centering
+		\includegraphics[width=12cm]{images/B3d.eps}
+	\caption[Surface plot of magnetic field model]
+	{A 3D surface plot of the $\lambda = 0.6a$ (red) magnetic field profile from 
+	figure \ref{fig:periodicB}.}
+	\label{fig:B3d}
+\end{figure}
+
+\begin{figure}
+	\centering
+		\includegraphics[width=12cm]{images/current.eps}
+	\caption[Classical current required to create magnetic field model]
+	{The current densities required to create the $\lambda=0.6a$ (red) magnetic field profile. 
+	The current is given by the curl of the magnetic field, $J_\psi(\rho) = -\frac{d B_z(\rho)}{d\rho}$.
+	The conversion to SI units is $1B_k/\lambda_e \approx 6\times 10^{38}{\rm A/m}^3$.}
+	\label{fig:current}
+\end{figure}
+
+\subsection{The Classical Action}
+
+The classical action, $\Gamma^0$, is infinite for this configuration. To obtain 
+a finite result, we must look at the action per unit length in the z-direction, 
+per unit time, and per flux tube region (\ie for $\rho < a/2$). 
+The action for such a region in 
+cylindrical coordinates is given by 
+
+\be
+	\frac{\Gamma^0}{T L_z} = -\pi \int_0^{a/2}\rho B_z(\rho)^2d\rho.
+\ee
+We substitute in equation (\ref{eqn:ffbless}), the magnetic field in the interior 
+region:
+\ba
+	\frac{\Gamma^0}{T L_z} &=& -\pi \int_0^{a/2}\rho \biggr[
+	\frac{4\mathcal{F}}{\lambda^2e^2q_2}\left(1-\frac{3}{4}
+	\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)\right)
+	\Psi(2\rho/\lambda)\nonumber \\
+	& & + \frac{6\mathcal{F}}{ea^2}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)
+	\biggr]^2 d\rho.
+\ea
+
+After some algebra, we are left with an expression for the classical action,
+
+\ba
+	\frac{\Gamma_0}{TL_z} &=& \pi \int_0^{a/2}\rho B_z(\rho)^2d\rho \\
+	& = & -\frac{\pi \mathcal{F}^2}{e^2a^2}\biggr\{4\frac{a^2q_3}{\lambda^2q_2^2}
+	+\left(\frac{\lambda-\lambda_{\rm min}}{a - \lambda_{\rm lmin}}\right)
+	\biggr[ \nonumber \\
+	& &\left(\frac{9}{4}\frac{a^2q_3}{\lambda^2q_2^2}-\frac{9}{2}\right)
+	\left(\frac{\lambda-\lambda_{\rm min}}{a - \lambda_{\rm lmin}}\right) 
+	-6\frac{a^2q_3}{\lambda^2q_2^2}+12 \biggr]\biggr\},
+\ea
+with $q_3$ being another numerical constant related to integrating the bump function:
+
+\be
+	\label{eqn:q3}
+	q_3 \equiv \int_0^1 x\left(\Psi(x)\right)^2 dx 
+	= \int_0^1 x e^{-\frac{2}{1-x^2}}dx \approx 0.0187671.
+\ee
+
+\subsection{Integrating to Find the Potential Function}
+
+To compute the Wilson loops, it is generally required to use the 
+vector potential which describes the magnetic field. For us, this means that 
+we must find $f_\lambda(\rho)$ for our magnetic field model. 
+This could always be done numerically, but can be computationally costly since 
+it is evaluated by every discrete point of every worldline in the ensemble.
+For computations on the \ac{CUDA} device, an increase in the complexity of the 
+kernel often means that less memory 
+resources are available per processing thread, limiting 
+the number of threads that can be computed concurrently.
+It is therefore preferable to find an analytic expression for this function.
+From equation (\ref{eqn:Bzfromfl}), this function is related to the integral 
+of the magnetic field with respect to $\rho^2$. For the inner region, we have
+
+\ba
+	f_\lambda(\rho < a/2) &=& \frac{e}{2\mathcal{F}}\biggr[\frac{4\mathcal{F}}{\lambda^2eq_2}
+		\left(1-\frac{3}{4}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)\right)
+		\int_0^{\rho^2}\Psi\left(\frac{2\rho'}{\lambda}\right)d \rho'^2 \nonumber \\
+		& &+\frac{6 \mathcal{F}}{ea^2}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)\rho^2\biggr].
+\ea
+The integral over the bump function can be computed in terms of the exponential integral 
+$E_i(x) = \int_{-\infty}^x \frac{e^t}{t} dt$:
+\ba
+	\int_0^{\rho^2}\Psi\left(\frac{2\rho'}{\lambda}\right)d\rho'^2 = 
+	\begin{cases}
+	\left(\frac{\lambda}{2}\right)^2\biggr[2q_2+\left(\frac{4\rho^2}{\lambda^2}-1\right) 
+		e^{-\frac{1}{1-\frac{4\rho^2}{\lambda^2}}} & {}\\
+		~~~~~~~~~~- E_i\left(-\frac{1}{1-\frac{4\rho^2}{\lambda^2}}\right)\biggr]& \mbox{ for } \rho < \lambda/2\\
+	\frac{q_2\lambda}{2} & \mbox{ for } \rho \ge \lambda/2 
+	\end{cases}.
+\ea
+So, our expression for the profile function in the inner region is
+\be
+	f_\lambda(\rho\le a/2) = \left(1-\frac{3}{4}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)\right)
+		\Phi(2\rho/\lambda) + \frac{3\rho^2}{a^2}\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right),
+\ee
+with
+\be
+	\Phi(x) \equiv
+	\begin{cases}
+	1 + \frac{1}{2q_2}\left(x^2-1\right)e^{-\frac{1}{1-x^2}}
+		-\frac{1}{2q_2}E_i\left(-\frac{1}{1-x^2}\right)& \mbox{ for } x < 1\\
+	1 & \mbox{ for } x \ge 1 
+	\end{cases}.
+\ee
+
+The exterior integral is a bit more challenging, but we can make significant progress 
+and obtain an approximate expression. The first term is a constant given by the value of the profile 
+function at $\rho = a/2$. This value is given by the flux in the central flux tube, which 
+we have already chosen to be 1,
+\be
+	f_\lambda(\rho>a/2) = 1 + \frac{e}{\mathcal{F}}\int_{a/2}^{\rho}\rho'B(\rho'>a/2)d\rho'.
+\ee
+We may plut the magnetic field, equation (\ref{eqn:Bzext}), into this expression to get
+\ba
+	f_\lambda(\rho>a/2) &=& 1 + \frac{3}{4}\left(\frac{4\rho^2}{a^2}-1\right)
+		\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right) \nonumber \\
+		& &+\frac{12}{q_1a\lambda}\left(\frac{a-\lambda}{a-\lambda_{\rm min}}\right)
+		\int_{a/2}^{\rho}\rho'\Psi\left(\frac{2(\rho-na)}{\lambda}\right)d\rho'.
+\ea
+The remaining integral is over every bump between $\rho'=a/2$ and $\rho'=\rho$. We express the result 
+as a term which accounts for each completely integrated bump, and an integral over the partial bump if $\rho$ is 
+within a bump:
+\ba
+	f_\lambda(\rho>a/2) &=& 1 + \frac{3}{4}\left(\frac{4\rho^2}{a^2}-1\right)
+		\left(\frac{\lambda-\lambda_{\rm min}}{a-\lambda_{\rm min}}\right)
+		+3n(n-1)\left(\frac{a-\lambda}{a-\lambda_{\rm min}}\right) \nonumber \\
+		& &+\frac{3\lambda}{q_1a}\left(\frac{a-\lambda}{a-\lambda_{\rm min}}\right)\chi(2(\rho-na)/\lambda),
+\ea
+where
+\be
+	\chi(x_0) = 
+	\begin{cases}
+	0 & \mbox{ for } x_0 \le -1  \\
+	\int_{-1}^{x_0}xe^{-\frac{1}{1-x^2}}dx 
+			+ \frac{2na}{\lambda}\int_{-1}^{x_0}e^{-\frac{1}{1-x^2}}dx& \mbox{ for } |x_0| < 1\\
+	 \frac{2naq_1}{\lambda} & \mbox{ for } x_0 \ge 1 	  
+	\end{cases}.
+\ee
+One of the integrals in $\chi(x_0)$ can be expressed in terms of the exponential integral:
+\be
+	\int_{-1}^{x_0}xe^{-\frac{1}{1-x^2}}dx =\frac{1}{2}\left[(x_0^2-1)e^{-\frac{1}{1-x_0^2}}
+		-E_i\left(-\frac{1}{1-x_0^2}\right)\right].
+\ee
+
+The remaining integral can't be simplified analytically. To use this integral in our numerical model, 
+it must be computed for each discrete point on each loop for each $\rho_{\rm cm}$ and $T$ value. 
+Therefore, it is worthwhile to consider an approximate expression which models the integral, and 
+can be computed faster than performing a numerical integral each time. To find this approximation, 
+I computed the numerical result at 300 values between $x_0=-1.2$ and $x_0=1.2$. The data was then 
+input into Eureqa Formulize, a symbolic regression program which uses genetic algorithms to find 
+analytic representations of arbitrary data~\cite{formulize}. 
+A similar technique has been used to produce 
+approximate analytic solutions of ODEs~\cite{geneticODEs}.
+The result is a model of the numerical data points with a maximum error of 0.0001 on the range $|x_0| < 1.0$:
+%\be
+%	\int_{-1}^{x_0} e^{-\frac{1}{1-x^2}}dx \approx 0.218 + \frac{0.393x_0\cosh{(0.806x_0^4-0.696x_0^2+0.0902)}}
+%		{\cosh{(0.825x_0^2-0.0234x_0+0.375)}}
+%\ee
+
+\be
+	\int_{-1}^{x_0} e^{-\frac{1}{1-x^2}}dx \approx 
+	\frac{0.444}{1+\exp{\left[ -3.31x_0 - 
+	\frac{5.25x_0^3 - 3.31x_0^2\sin{(x_0)}\cos{(-0.907x_0^2-1.29x_0^8)}}{\cos{(x_0)}}\right]}}.
+\ee
+
+This function evaluates a factor of ten faster than the numerical integral evaluated at the 
+same level of precision with the \ac{GSL} Gaussian quadrature library functions and 
+with fewer memory registers. 
+Using this approximation
+introduces a systematic uncertainty  which is small compared to that associated with the 
+discretization of the loop integrals, and considerably smaller than the statistical error bars.
+
+Using these expressions for the integrals, we can express $f_\lambda(\rho)$ in any region in terms of 
+exponential integrals, exponential, and trigonometric functions with suitable precision:
+
+\small
+\ba
+	\chi(x_0) \approx 
+	\begin{cases}
+	0 & \mbox{ for } x_0 \le -1 \\
+	\frac{1}{2}\left[(x_0^2-1)e^{-\frac{1}{1-x_0^2}}
+		-E_i\left(-\frac{1}{1-x_0^2}\right)\right] +
+		\frac{2na}{\lambda}\biggr[\\
+		~~~~~\frac{0.444}{1+\exp{\left( -3.31x_0 - 
+	\frac{5.25x_0^3 - 3.31x_0^2\sin{(x_0)}\cos{(-0.907x_0^2-1.29x_0^8)}}
+		{\cos{(x_0)}}\right)}}\biggr] & \mbox{ for } |x_0| < 1\\
+	 \frac{2naq_1}{\lambda} & \mbox{ for } x_0 \ge 1 	  
+	\end{cases}.
+\ea
+\normalsize
+For computation, we may express the exponential integral 
+as a continued fraction:
+
+\be
+E_i(-x) = -E_1(x) = -e^x\left[ \cfrac{1}{x+1-\cfrac{1}{x+3-\cfrac{4}{x+5-\cfrac{9}{x+7-...}}}}\right].
+\ee
+This expression converges very rapidly in the range of 
+interest (i.e. $x>1$) using Lentz's 
+algorithm~\cite{nr3rd}.
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/periodicfl.eps}
+	\caption[The profile function in a cylindrical lattice model]
+	{The function $f_\lambda(\rho)$ for the above described magnetic 
+	field model. The flux conditions require the function to pass through the 
+	black dots. A quadratic function corresponds to a uniform field while 
+	a staircase function corresponds to delta-function flux tubes. The parameter 
+	$\lambda$ smoothly transitions between these two extremes.
+	Each of these functions corresponds to a magnetic field profile in 
+	figure \ref{fig:periodicB}.}
+	\label{fig:periodicfl}
+\end{figure}
+
+The profile function, $f_\lambda(\rho)$, is plotted in figure \ref{fig:periodicfl}.
+
+
+\section{Results}
+\label{sec:periodic_results}
+
+\subsection{Comparing Scalar and Fermionic Effective Actions}
+
+Because of the fermion problem of \ac{WLN} 
+(see section \ref{sec:fermionproblem}), the 1-loop effective 
+action for the cylindrical flux tube lattice model could not be 
+computed for the case of spinor \ac{QED}. 
+The fermion problem does not 
+affect the scalar case. So, we are confined to analyzing this 
+model for \ac{ScQED}. 
+
+For isolated flux tubes, the decay of the magnetic field for large distances
+protects the calculations from the fermion problem (see section 
+\ref{sec:fermionproblem}). Therefore, the
+effective action can be computed for both scalar and spinor 
+\ac{QED}. In figure \ref{fig:scalfermiratio}, we plot the 
+ratio of the spinor to scalar 1-loop correction term for 
+identical magnetic fields, along with the prediction of the 
+\ac{LCF} approximation for large values of $\lambda$. The 
+\ac{LCF} approximation in \ac{ScQED} is given by
+\ba
+	\label{eqn:LCFscal}
+	\Gamma^{(1)}_{\rm scal} &=& -\frac{1}{2\pi}\int_0^\infty dT 
+	\int_0^\infty \rho_{\rm cm} d\rho_{\rm cm}\frac{e^{-m^2T}}{T^3} \nonumber \\
+	& &\left\{\frac{eB(\rho_{\rm cm})T}{\sinh{(eB(\rho_{\rm cm})T)} }
+	- 1 +\frac{1}{6}(eB(\rho_{\rm cm})T)^2\right\}.
+\ea
+This can be compared to the spinor \ac{QED} approximation, 
+equation (\ref{eqn:LCFferm}).
+
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/scalfermiratio.eps}
+	\caption[Comparison of 1-loop term in \acs{QED} and \acs{ScQED}]
+	{The ratio of the 1-loop term in \ac{QED} to the 1-loop term 
+	in \ac{ScQED}. The solid line is the \ac{LCF} approximation, 
+	while the points are the result of \ac{WLN} calculations. Note that the 
+	\ac{LCF} approximation breaks down near $\lambda = \lambda_e$ and 
+	that the statistics from point to point are strongly correlated. This plot shows that 
+	the 1-loop correction in \ac{ScQED} differs from the \ac{QED} correction by a factor 
+	close to unity for a wide range of flux tube widths.}
+	\label{fig:scalfermiratio}
+\end{figure}
+
+There are two important notes to make about figure \ref{fig:scalfermiratio}. 
+Firstly, the \ac{LCF} approximation is only a good approximation 
+for $\lambda \gg \lambda_e$, and isn't accurate when pushed near its formal 
+validity limits~\cite{MoyaertsLaurent:2004}. The second note is that the 
+statistics of the \ac{WLN} points are strongly correlated. So, we conclude 
+that the \ac{ScQED} 1-loop correction is larger than the \ac{QED} correction 
+for large $\lambda$, and this appears to be reversed for small $\lambda$. 
+However, the large \ac{WLN} error bars and the invalidity of the 
+\ac{LCF} approximation near $\lambda = \lambda_e$ prevent us from 
+seeing how this transition happens. Nevertheless, the main 
+conclusion from this figure is that the scalar 1-loop correction 
+reflects the behaviour of the full \ac{QED} 1-loop correction 
+to within a factor of about 2 over a wide range of flux tube widths 
+for isolated flux tubes.
+
+Besides using a finite field profile, the fermion problem can also be circumvented by increasing
+the electron mass. 
+From equation (\ref{eqn:cylEA}), we can see that the square of the electron mass 
+sets the scale for the exponential suppression of the large proper time Wilson loops that 
+contribute to the fermion problem. However, if we increase the fermion mass, we are 
+reducing the Compton wavelength of our theory so that the flux tube lattice is no longer 
+dense in terms of the (new) Compton wavelength. It is the Compton wavelength of the theory that 
+determines what is meant by `dense'. We therefore cannot avoid the fermion 
+problem for dense lattice models by changing the electron mass.
+
+Based on the results presented in figure \ref{fig:scalfermiratio}, we conclude that the coupling between the electron's spin 
+and the magnetic field do not have a dramatic effect on the vacuum 
+energy for isolated flux tubes. Therefore, we expect that \ac{ScQED} provides a good model of the 
+underlying vacuum physics near these flux tubes, at least at the level our toy model 
+flux tube lattice. 
+
+
+\subsection{Flux Tube Lattice}
+
+The \ac{WLN} technique computes an effective action density which is then integrated to 
+obtain the effective action. This quantity differs from the Lagrangian in that it is 
+not determined by local operators, but encodes information about the field everywhere
+through the worldline loops.
+Like the classical action, the 1-loop term of the effective action per unit length 
+is infinite for a flux tube lattice because the field extends infinitely far. 
+For this reason, we define the effective action to be the action density integrated 
+over the region of a central flux tube $(0<\rho<a/2)$:
+
+\small
+\ba
+	\frac{\Gamma}{\mathcal{T}L_z} &=& -\pi \int_0^{a/2}\rho B_z(\rho)^2d\rho \nonumber \\
+	& &-\frac{1}{2\pi}\int_0^{a/2}\rho_{\rm cm} d\rho_{\rm cm}\int_0^\infty \frac{dT}{T^3}e^{-m^2T}
+	\nonumber \\
+	& &\times \left\{ \mean{W}_{\rho_{\rm cm}} - 1 +\frac{1}{6}(eB(\rho_{\rm cm})T)^2\right\}.
+\ea
+\normalsize
+
+The 1-loop 
+term of the effective action density is plotted in figure \ref{fig:EAscffpeek} for the 
+cylindrical flux tube lattice model. The most pronounced feature of this density is 
+that there is a negative contribution from the regions where the field is strong. 
+This contribution has the same sign as the classical term. Therefore, quantum correction 
+tends to reinforce the classical action. A less pronounced feature is that there is a 
+positive contribution arising from the $\rho > \lambda/2$ region, in between 
+the lumps of magnetic field which represent the flux tubes. 
+In this region, the local magnetic field is positive, but small. 
+
+
+
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/EAscffpeek.eps}
+	\caption[The 1-loop action density for a cylindrical lattice in \acs{ScQED}.]
+	{The \ac{ScQED} effective action density for the central 
+	flux tube in our cylindrical lattice model for several tube widths, 
+	$\lambda$. The average field strength is the critical field, $B_K$. 
+	The effective action is positive in between flux tubes due to nonlocal 
+	effects.}
+	\label{fig:EAscffpeek}
+\end{figure}
+
+To interpret this feature, we consider the relative contributions between the 
+Wilson loops and the counter term. These terms are shown in figure 
+\ref{fig:CounterTermDomination} for the constant field case. 
+For all values of proper time, $T$, the counter terms dominate, giving 
+an overall negative sign. In order for the action density to be positive, there 
+must be a greater contribution from the Wilson loop average than from the 
+counter term, since this term tends to give a positive contribution to the 
+action. In our flux tube model, this seems to occur in the regions between the 
+flux tubes. In these regions, the local contribution from the counter term is 
+relatively small because the field is small. However, the contribution from the 
+Wilson loop average is large because the loop cloud is exploring the nearby 
+regions where the field is much larger. The effect is largest where the field 
+is small, but becomes large in a nearby region. We therefore interpret the positive 
+contributions to the 1-loop correction from these regions as a non-local 
+effect. A similar example of such an effect from fields which vary on 
+scales of the Compton wavelength has been observed previously using the 
+\ac{WLN} technique~\cite{PhysRevD.84.065035}. 
+
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/CounterTermDominationScalar.eps}
+	\caption[Wilson loop and counter term contributions for a constant field]
+	{The Wilson loop and counter term contributions to the integrand 
+	of the effective action for a constant field in \ac{ScQED}. For constant fields, the 
+	effective action is always negative due to the domination of the counter 
+	term over the Wilson loop. For non-homogeneous fields, 
+	A positive effective action density signifies 
+	that non-local (\ie $T > 0$) effects dominate the counter term.}
+	\label{fig:CounterTermDomination}
+\end{figure}
+
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/EAscffvsl.eps}
+	\caption[The 1-loop \acs{ScQED} term versus flux tube width]
+	{The 1-loop \ac{ScQED} term of the effective action as a function 
+	of flux tube width, $\lambda/a$, for several values of the flux tube spacing, $a$.
+	The dotted lines are computed from the \ac{LCF} approximation.}
+	\label{fig:EAscffvsl}
+\end{figure}
+
+In figure \ref{fig:EAscffvsl}, we plot the magnitude of the 1-loop 
+\ac{ScQED} term of the effective 
+action as a function of the flux tube width. As the flux tubes become smaller, there 
+is an amplification of the 1-loop term, just as there is for the classical action. 
+Similarly, for more closely spaced flux tubes, $a$ is smaller, and the 1-loop term 
+increases in magnitude. The ratio of the 1-loop term to the classical term is plotted 
+in figure \ref{fig:ActRatscff}. The quantum contribution is greatest for closely spaced, 
+narrow flux tubes, but does not appear to become a significant fraction of the total action.
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/EAscffresid.eps}
+	\caption[The deviation of the cylindrical flux tube lattice from the \ac{LCF}
+	approximation]
+	{The residuals between the \ac{WLN} results and the \ac{LCF} approximation 
+	for the cylindrical flux tube lattice. The level of agreement is not expected because 
+	the field varies rapidly on the Compton wavelength scale. This agreement is believed to 
+	be due to an averaging effect of integrating over the electron degrees of freedom making a
+	mean-field approximation appropriate.}
+	\label{fig:EAscffresid}
+\end{figure}
+
+We observe that the \ac{LCF} approximation is surprisingly good despite the 
+fact that the magnetic field is varying rapidly on the Compton wavelength scale of the electron.
+We plot the residuals showing the deviations between the \ac{WLN} results and the \ac{LCF}
+approximation in figure \ref{fig:EAscffresid}. To understand this, recall the discussion 
+surrounding figure \ref{fig:CounterTermDomination}. The Wilson loop term is sensitive to the 
+average magnetic field through the loop ensemble, $\mean{B}_{\rm e}$. In contrast, the counter 
+term is sensitive to the magnetic field at the center of mass of the loop, $B_{\rm cm}$. 
+Since these terms carry opposite signs, we can understand the difference from the 
+constant field approximation in terms of a competition between these terms. When 
+$B_{\rm cm} < \mean{B}_{\rm e}$, such as when the center of mass is in a local minimum of the 
+field, there is a reduction of the energy relative to the locally constant field case, with 
+a possibility of the quantum term of the energy density becoming negative. 
+However, when $B_{\rm cm} > \mean{B}_{\rm e}$, such as in a local maximum of the field, 
+there is an amplification of the energy relative to the constant field case. We can put a 
+bound on the difference between the mean field through a loop and the field at the 
+center of mass for small loops (\ie small $T$),
+\be
+	|\mean{B} - B_{\rm cm}| \lesssim |B''(\rho_0)| T
+\ee
+where $|B''(\rho_0)| \ge B''(\rho)$ for all $\rho$ in the loop. This expression is proved the 
+same way as determining the error in numerical integration using the midpoint rectangle 
+rule.
+
+
+If the field varies rapidly about some mean value 
+on the Compton wavelength scale, the various contributions 
+from local minima and local maxima are averaged out and the mean field approximation 
+provided by the \ac{LCF} method becomes appropriate. A similar argument applies in the 
+fermion case, where the important quantity is the mean magnetic field along the circumference 
+of the loop. This quantity is also well served by a mean-field approximation when integrating 
+over rapidly varying fields.
+
+Another interesting feature of figure \ref{fig:EAscffresid} is that the \ac{LCF} 
+approximation appears to describe narrower flux tubes better than wider ones, even when the 
+spacing between the flux tubes is held constant. This effect is likely a result of the compact 
+support given to the flux tube profiles. For narrow tubes, we are guaranteed to have many more 
+center of mass points outside the flux tube than inside, giving a smaller energy contribution than 
+for isolated flux tubes without compact support where the distinction between inside and outside is 
+not as abrupt. This also explains why narrow, closely spaced tubes produce a lower energy than 
+is predicted by the \ac{LCF} approximation.
+
+This argument does not apply to the smooth isolated flux tubes given 
+by equation (\ref{eqn:isoB}). 
+For these flux tubes, the only region where there is a large discrepancy between $\mean{B}_{\rm e}$ and
+$B_{\rm cm}$ is near the center of the flux tube. This 
+is a global maximum of the field, and the only maximum of $|B''(\rho)|$. 
+There are no regions where the average field in the loop ensemble is 
+much stronger than the center of mass magnetic field. So, we expect an amplification of the 
+energy near the flux tube relative to the constant field case. 
+In the flux tubes with compact support, however, 
+there is such a region just outside the flux tube. We can understand the surprisingly close agreement 
+of these results to the \ac{LCF} approximation in our model 
+in terms of competition between these 
+regions of local minima and maxima of the field (see figure \ref{fig:EAscffvsconst}). 
+
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/EAscffvsconst.eps}
+	\caption[A comparison between the action density in the \ac{LCF} approximation and \ac{WLN}]
+	{The action density in \ac{WLN} and the \ac{LCF} approximation, scaled by $\rho$ so 
+	an area on the figure is proportional to a volume. The approximation 
+	is poor everywhere, however, when there are regions of local minima and local maxima of the field about 
+	a mean value, the effective action approximately agrees between these methods. This is due to 
+	a partial cancellation between regions where the estimate provided by the approximation is too 
+	large (green) and other regions where the estimate is too small (red).}
+	\label{fig:EAscffvsconst}
+\end{figure}
+
+
+
+
+
+Finally, I find that the quantum term remains small compared to the 
+classical action for the range of parameters investigated. This is shown 
+in figure \ref{fig:ActRatscff} where we plot the ratio of the \acs{ScQED}
+term of the action to the classical action. The relative smallness of this correction 
+is consistent with the predictions from homogeneous fields and the derivative 
+expansion, as well as with previous studies on flux tube 
+configurations~\cite{1999PhRvD..60j5019B}.
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/ActRatscff.eps}
+	\caption[The 1-loop \acs{ScQED} quantum to classical ratio versus flux tube width]
+	{The 1-loop \ac{ScQED} term divided by the classical term of the effective action as a function 
+	of flux tube width, $\lambda/a$ for several values of the flux tube spacing, $a$.}
+	\label{fig:ActRatscff}
+\end{figure}
+
+\subsection{Interaction Energies}
+
+Using this model, we may also investigate the energy associated with interactions 
+between the flux tubes. Since the flux tubes in our model exhibit compact support, 
+the interaction energy is entirely due to a nonlocal interaction between nearby 
+flux tubes. Thus, it contrasts with previous research which has investigated the 
+interaction energies between flux tubes which have 
+overlapping fields~\cite{Langfeld:2002vy}. In this 
+case, there is a classical interaction energy ($\propto B_1 B_2$) as well as 
+a quantum correction ($\propto (B_1 + B_2)^4 - B_1^4 - B_2^4$ in the weak-field limit). 
+Even when these field overlap interactions are not present, 
+there are also nonlocal energies in the 
+vicinity of a flux tube due to the presence of other flux tubes. For example, 
+the energy from nearby flux tubes can interact with a flux tube through the 
+quantum diffusion of the magnetic field. Because of this 
+phenomenon, we expect an interaction energy in the region of the central flux tubes 
+due to the proximity of neighbouring flux tubes, even though no changes are made 
+to the field profile or its derivatives in the region of interest. 
+Since this interaction represents a force due to 
+quantum fluctuations under the influence 
+of external conditions, it is an example of a Casimir force. The Casimir force between 
+two infinitely thin flux tubes in \ac{ScQED} has previously been found to be attractive~\cite{duru1993}. Our model 
+can shed light specifically on this interaction, which is not predicted by 
+local approximations such as the derivative expansion.
+
+Consider a central flux tube with a width $\lambda = 0.5\lambda_e$. 
+When $\lambda_{\rm min} = \lambda$, 
+the magnetic field outside of the flux tube, $B_{\rm bg}$, is zero. Then, if the distance 
+between flux tubes, $a$, is set very large, the energy density will be 
+localized to the central flux tube and there will be no nonlocal interaction 
+energy due to neighbouring flux tubes.
+We define the interaction energy, $E_{\rm int}$, as the 
+difference in energy within a distance $a/2$ of the central flux tube
+between a configuration with a given value of $a$ 
+and a configuration with $a = \infty$. In practice, we use $a = 10,000\lambda_e$ as 
+a suitable stand-in for $a = \infty$:
+
+\be
+	\frac{E_{\rm int}}{L_z} = -\frac{\Gamma_{\rm scal}(a)}{L_z \mathcal{T}} 
+	+\frac{\Gamma_{\rm scal}(a=1\times 10^4 \lambda_e)}{L_z \mathcal{T}}.
+\ee
+With this definition, the interaction energy is the energy associated with 
+lowering the distance between flux rings from infinity. This the the analogue 
+in our model of reducing the lattice spacing of the flux tubes.
+
+One complication of this definition is that there is no clear distinction between 
+energy density which `belongs' to the central flux tube and energy density which 
+`belongs' to the neighbouring flux tubes. We continue to use our convention that the total energy 
+for the central flux tube is determined by the integral over the non-local action density
+in a region within a radius 
+of $a/2$ of the flux tube. As $a$ is taken smaller and smaller, some energy from nearby 
+flux tubes is included within this region, but also, some energy associated with the central 
+flux tube is diffused out of the region. This ambiguity is unavoidable within this 
+model. We can't numerically compute the energy over all of space and subtract off 
+different contributions, because these energies are infinite.
+
+\begin{figure}
+	\centering
+		\includegraphics[width=10cm]{images/interactionb.eps}
+	\caption[The interaction energy versus the flux tube spacing]
+	{The interaction energy per unit length of flux tube as a function 
+	of the flux tube spacing, $a$. The energy density of a critical 
+	strength magnetic field is 17 GeV/$\lambda_e^3$, so this 
+	energy density is small in comparison to the classical magnetic field energies, 
+	or the 1-loop corrections. However, the local interactions are constant in $a$.
+	At $a<\lambda_e/2$, 
+	the bump functions from neighbouring tubes overlap. This approximately corresponds
+	to the critical magnetic field which destroys superconductivity.}
+	\label{fig:interaction}
+\end{figure}
+
+The interaction energy is plotted in figure \ref{fig:interaction}. In this plot, the 
+error bars are 1-sigma error bars that account for the correlations in the means 
+computed for each group of worldlines,
+
+\be
+	\sigma_{E_{\rm int}} = \sqrt{\sigma_{E_a}^2 + \sigma_{E_{a=10000}}^2 
+		- 2\operatorname{Cov}(E_a, E_{a=10000})},
+\ee
+where $\operatorname{Cov}(a,b)$ is the covariance between random variables $a$ and $b$.
+Recall from figure \ref{fig:EAscffpeek} that there is a positive contribution 
+to the effective action, and therefore a negative contribution to the energy 
+from the region between flux tubes. As we reduce $a$, bringing the flux tubes 
+closer together, two considerations become important. Firstly, we are increasing 
+the average field strength meaning there tends to be more flux through the 
+worldline loops which tends to give a negative contribution to the interaction 
+energy. Secondly, we are reducing the spatial volume over which we integrate the 
+energy since we only integrate $\rho$ from $0$ to $a/2$. This effect makes a positive 
+contribution to the interaction energy since we include less and less of the 
+region of negative energy density in our integral. 
+
+In figure \ref{fig:interaction}, there appears to be a landscape with both 
+positive and negative interaction energies at different values of $a$. 
+These appear to be consistent with the interplay between positive and 
+negative contributions described in the previous paragraph. This is consistent with 
+the usual expectation of attractive Casimir forces~\cite{duru1993}. The dominant contribution 
+for the positive energy values is caused by less of the negative energy region contributing 
+as the domain assigned to the flux tube is reduced. However, the point at $a/\lambda_e = 2$ is 
+negative ($-0.3\pm0.1$MeV/$\lambda_e$) indicating that an attractive interaction from 
+nearby flux tubes is dominant. 
+We are continuing to compute points at larger values of $a$. 
+
+At $a/\lambda_e = 0.5$, 
+the flux tubes are positioned right next to one another, and the negative 
+contribution from the increase in the mean field appears to be 
+slightly larger than the positive contribution from the loss of the 
+region of negative energy density from the integral. Beyond
+this, the flux tubes would overlap each other, which approximately corresponds 
+to the critical background field which destroys superconductivity.
+
+Based on the above explanation, it appears that the non-local 
+interaction energy between magnetic fields has a strong dependence on 
+the specific profile of the classical magnetic field that was used. 
+This makes it difficult to predict if it will result in attractive 
+or repulsive forces
+in a more realistic model of a flux tube lattice. 
+
+The energy density of a 
+critical strength magnetic field is about $17{\rm GeV}/\lambda_e^3$, 
+so the energy associated with this interaction is relatively small. 
+However, there are no other interactions which affect the 
+energy of moving the flux tubes closer together when they are 
+separated by many coherence lengths. Here, the characteristic 
+distance associated with the interaction, $\lambda_e$, is considerably 
+larger than coherence length or London penetration depth, so the 
+interactions between flux tubes through the order field are heavily 
+suppressed. 
+
+
+\section{Discussion and Conclusions}
+
+In this chapter, I have developed a cylindrically symmetric magnetic field 
+model which reproduces some of the 
+features of a flux tube lattice: for a given central flux tube, there are 
+nearby regions of large magnetic field which interact nonlocally, and 
+the large flux tube size limit goes to a large uniform magnetic field
+instead of to zero field. I have investigated the 1-loop effects from 
+\ac{ScQED} in this model using the \ac{WLN} technique for various 
+combinations of flux tube size, $\lambda$, and flux tube spacing, $a$.
+
+In contrast to isolated flux tubes, I find that there are some regions where the 
+\ac{WLN} results are greater than the \ac{LCF} approximation and other 
+regions where they are less than the \ac{LCF} approximation. This can be understood 
+by thinking of the difference from the \ac{LCF} approximation as a competition 
+between the local counter term and the Wilson loop averages. 
+For magnetic fields which vary on the Compton wavelength scale 
+about some mean field strength, the \ac{LCF} approximation 
+provides a poor approximation of the energy density, but may provide a 
+good approximation to the total energy density of the field due to it 
+being a good mean field theory approximation to the energy density. 
+The appropriateness of the \ac{LCF} approximation in this case
+can be understood as an approximate balance between regions where the 
+field is a local maximum and the magnitude of the quantum correction to the 
+action density is larger than in the constant field case, and regions where 
+the field is a local minimum and the quantum corrections predict a smaller 
+action density than the constant field case. This 
+washing out of the field structure due to non-local effects has also 
+been observed in \ac{WLN} studies of the vacuum polarization 
+tensor~\cite{PhysRevD.84.065035}. 
+
+There is a force between nearby magnetic flux tubes due 
+to the quantum diffusion of the energy density. This interaction is 
+non-local and is not predicted by the local derivative expansion.
+It is an example of a Casimir force (\ie a force resulting from 
+quantum vacuum fluctuations) and it is computed in a very similar 
+way as the Casimir force between conducting bodies in the \ac{WLN} 
+technique~\cite{Gies:2003cv}.
+The size of the energy densities involved in this force are small even 
+compared to the 1-loop corrections to the energy densities, which are
+in turn small compared to the classical magnetic energy density. 
+
+Although this interaction energy is small, 
+the interactions between flux tubes in a neutron star due to the 
+order field of the superconductor are suppressed because the distance between the 
+tubes is considerably larger than the coherence length and 
+London penetration depth. Therefore, this force is possibly important 
+for the behaviour of flux tubes in neutron star crusts and interiors.
+For example, in our lattice model, this force could contribute 
+to a bunching of the worldlines, producing regions where flux tubes 
+are separated by $\sim2\lambda_e$ and other regions which have 
+no flux tubes. Consequently, this force may have important implications 
+for neutron star physics. However, investigating these implications is 
+outside the scope of this thesis.
+
+The nature of this 
+interaction energy is expected to depend on the model of the 
+magnetic field profile for the reasons discussed in section 
+\ref{sec:periodic_results}. It is therefore reasonable that 
+forces of either sign, attractive or repulsive, may be possible 
+depending on the particular landscape formed by the 
+magnetic field and the particular definition used of the interaction 
+energy. In a superconductor, the profiles of the magnetic 
+flux tubes are determined by the minimization of the free 
+energy for the interacting system formed by the magnetic 
+and order parameter fields. Therefore, investigating this 
+phenomenon using more realistic models is an interesting 
+direction for future research. In particular, it would be interesting 
+to determine if certain conditions allowed for a non-local interaction 
+between magnetic flux tubes to be experimentally observable.
+
+The conclusions from this chapter are applicable to \ac{ScQED}. 
+However, we have also investigated the relationship between spinor 
+and scalar \ac{QED} for isolated flux tubes where the \ac{WLN} technique 
+can be applied to both cases. We find that both theories have the same 
+qualitative behaviour, and agree within a factor of order unity quantitatively. The arguments 
+and explanations given for the \ac{ScQED} results have strong parallels in the spinor 
+\ac{QED} case. The spinor case can also be understood in terms of a competition between 
+the Wilson loop averages and the local counter term. We therefore speculate that 
+the results from this chapter will hold in the spinor case, at least qualitatively. However, 
+addressing the fermion problem so that the spinor case can be studied explicitly for 
+flux tube lattices would be valuable progress in this area of research.
+
