@@ -73,22 +73,37 @@ class LatticeBumpProfile(FieldProfile):
             b_field[outer_mask] = B0 + term_outer_bump * self._psi(2.0 * (self.rho[outer_mask] - n * self.a) / self.lambd)
 
         # Vector potential A_phi = 1/rho * Integral_0^rho r' B(r') dr'
-        # We integrate numerically for now to be safe and flexible, 
-        # though analytic expressions exist in the paper.
+        # The integral must capture the total flux up to rho.
         if len(self.rho) > 1:
             dr = self.rho[1] - self.rho[0]
             integrand = b_field * self.rho
-            # Trapezoidal rule for cumulative integral
-            flux_integral = torch.zeros_like(self.rho)
-            flux_integral[1:] = torch.cumsum(0.5 * (integrand[:-1] + integrand[1:]) * dr, dim=0)
+            # For a periodic lattice, the field B(r) is not purely localized.
+            # We integrate cumulatively.
+            flux_integral = torch.cumsum(0.5 * (integrand[:-1] + integrand[1:]) * dr, dim=0)
+            flux_integral = torch.cat([torch.zeros(1, device=self.rho.device), flux_integral])
         else:
-            # Single point approximation (average with 0)
             flux_integral = 0.5 * (b_field * self.rho) * self.rho
 
-        
         self.a_phi = flux_integral / r_safe
-        self.da_phi = b_field - self.a_phi / r_safe
-        self.B_vals = b_field
+
+        # In a lattice, the background field B0 is non-zero. 
+        # A_phi should really be A_phi = 1/rho * Integral (B - B_background)
+        # to ensure the gauge A_phi -> 0 at infinity or is consistent with the vacuum solver.
+        # Let's subtract the contribution of B0.
+        # Contribution of B0 is B0 * rho^2 / 2.
+        # A_phi_sub = A_phi - B0 * rho / 2
+        self.a_phi -= B0 * self.rho / 2.0
+
+        # Subtract B0 from B_vals to represent the field fluctuation B - B0.
+        # This makes it consistent with the vacuum solver which assumes B=0 background.
+        self.B_vals = b_field - B0
+        
+        # A_phi is already updated with B0 subtraction:
+        # A_phi_sub = A_phi - B0 * rho / 2
+        # Which is consistent with B_fluctuation.
+        
+        self.da_phi = self.B_vals - self.a_phi / r_safe
+
 
 if __name__ == "__main__":
     # Quick sanity check plot

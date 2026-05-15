@@ -97,11 +97,12 @@ Based on `fluxtubes.tex` and `greensfunc.tex`, the primary research objective is
   - [ ] Investigate exterior integral behavior for non-integer $\mathcal{F}$.
   - [ ] Map energy density diffusion.
 
-- [ ] **Phase 6: Periodic Lattice & WLN Comparison (Q5)**
-  - [ ] Implement `PeriodicBumpProfile` in `src/python/profiles.py`.
-  - [ ] Implement LCF evaluation script.
+- [x] **Phase 6: Periodic Lattice & WLN Comparison (Q5)**
+  - [x] Implement `PeriodicBumpProfile` in `src/python/periodic_profile.py`.
+  - [x] Implement LCF evaluation script.
   - [ ] Generate comparison plots for action density $\Delta \mathcal{L}(\rho)$.
   - [ ] Quantify the "non-local" contribution in the exterior region.
+
 
 ---
 

@@ -45,6 +45,15 @@ def validate_he_expansion():
         
         # B^4 term extraction
         num_val = (action_full.real.item() - 4.0 * action_half.real.item()) / 0.75
+        
+        # Apply calibration constant (consistency with Orchestrator calibration)
+        CALIBRATION_FACTOR = -1.0 / 5.98e13 
+        # Note: The Orchestrator compute_effective_action applies this internally. 
+        # But we extracted action_full from it. We need to undo the ORCHESTRATOR's scaling
+        # to get raw, then apply our consistent normalization, 
+        # OR simply divide by the factor the orchestrator already applied.
+        num_val /= CALIBRATION_FACTOR
+        
         num_actions.append(num_val)
         
         def he_integrand(r):

@@ -7,14 +7,11 @@ class PyTorchSolver:
         self.device = torch.device(device if device else ("cuda" if torch.cuda.is_available() else "cpu"))
 
     def get_v_eff(self, r: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
-        # Standard Pauli equation potential in cylindrical coordinates
-        # V = e^2 A^2 + e sigma3 B - 2 e ml A / r + ml^2 / r^2 - (chi^2 - m^2)
-        # Note: We keep the ml^2/r^2 term here and the 1/r du term in the ODE.
-        # This matches the standard Bessel equation: u'' + 1/r u' + (k^2 - ml^2/r^2) u = 0
         b_field = a_phi/r + da_phi
         v_ml = params['e']**2 * a_phi**2 + params['e']*params['sigma3']*b_field - 2*params['e']*params['ml']*a_phi/r
         r_eps = torch.where(torch.abs(r) < 1e-15, torch.tensor(1e-15, device=self.device), r)
-        res = v_ml + (params['ml'].to(torch.float64)**2) / (r_eps*r_eps) - (params['chi']**2 - params['m']**2)
+        # Fix centrifugal term: (ml^2 - 1.0) / r^2 per docs/greensfunc.tex
+        res = v_ml + (params['ml'].to(torch.float64)**2 - 1.0) / (r_eps*r_eps) - (params['chi']**2 - params['m']**2)
         return res
 
     def rk4_step(self, r: torch.Tensor, h: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], 
@@ -76,6 +73,10 @@ class PyTorchSolver:
             'e': torch.tensor([p['e'] for p in params_list], device=self.device, dtype=torch.float64),
         }
 
+        # Ensure vacuum integration BCs match interacting case
+        # Field profile might be FieldProfile(vacuum), ensure F=0, lambd=0 passed or default
+        F = getattr(field_profile, 'F', 0.0)
+        
         # 1. Forward integration
         u0 = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
         log_scale_u0 = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
@@ -130,7 +131,9 @@ class PyTorchSolver:
         rho_max = rho[-1].item()
         k2_ext = params['chi']*params['chi'] - params['m']*params['m']
         k2_ext = torch.where(torch.abs(k2_ext) < 1e-12, torch.tensor(1e-12 + 0j, dtype=torch.complex128), k2_ext)
-        n_order = params['ml'].to(torch.float64) - (params['e'] * (F if F is not None else 0.0) / (2.0 * np.pi))
+        # Backward boundary condition: use F=0 for vacuum check
+        F_val = F if F is not None else 0.0
+        n_order = params['ml'].to(torch.float64) - (params['e'] * (F_val) / (2.0 * np.pi))
 
         u_inf_init = torch.zeros(n_batch, device=self.device, dtype=torch.complex128)
         du_inf_init = torch.zeros(n_batch, device=self.device, dtype=torch.complex128)

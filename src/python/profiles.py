@@ -65,14 +65,17 @@ class StepFunctionProfile(FieldProfile):
             
             # A_phi = pre * f_lambda / rho
             self.a_phi = pre * f_lambd / self.rho
-            
-            # B = pre * 2 / lambd^2 for rho < lambd, else 0. 
-            # At boundary, we use the average B_in/2
-            b_field = torch.where(inner, 2.0 * pre / (self.lambd**2), 
-                                  torch.where(at_boundary, pre / (self.lambd**2), torch.zeros_like(self.rho)))
-            
-            # da_phi = B - a_phi / rho
-            self.da_phi = b_field - self.a_phi / self.rho
+
+            # da_phi = d(A_phi)/dr. 
+            # For rho < lambd: A = pre * rho / lambd^2 => dA/dr = pre / lambd^2
+            # For rho > lambd: A = pre / rho => dA/dr = -pre / rho^2
+            self.da_phi = torch.where(inner, pre / (self.lambd**2), -pre / (self.rho**2))
+
+            # B = da_phi + A/rho
+            # For rho < lambd: B = pre/l^2 + pre*rho/l^2/rho = 2*pre/l^2
+            # For rho > lambd: B = -pre/r^2 + pre/r^2 = 0
+            b_field = self.da_phi + self.a_phi / self.rho
+
         else:
             # Smoothed step function using sigmoid for theta(lambd - rho)
             arg = (self.lambd - self.rho) / self.smooth_width
