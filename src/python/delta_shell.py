@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-from typing import Union
-from src.python.profiles import FieldProfile
+from typing import Union, List
+from src.python.profiles import FieldProfile, Discontinuity
 
 class DeltaFunctionShellProfile(FieldProfile):
     def __init__(self, rho: Union[np.ndarray, torch.Tensor], R: float, F: float, e: float = 1.0) -> None:
@@ -32,10 +32,9 @@ class DeltaFunctionShellProfile(FieldProfile):
         r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
         self.da_phi = -self.a_phi / r_safe
         
-    def get_jump_params(self):
-        # Returns (location, magnitude)
-        # jump = du_ext - du_int = + e * sigma3 * B_dist * u
-        # B_dist = F / (2 * pi * R)
-        # So jump = + e * sigma3 * (F / (2 * pi * R)) * u
-        # The solver multiplies this by sigma3, so we return e * F / (2 * pi * R)
-        return self.R, self.e * (self.F / (2.0 * np.pi * self.R))
+    def get_discontinuities(self) -> List[Discontinuity]:
+        """
+        Jump in u' across a delta-function shell.
+        jump = du_ext - du_int = + e * sigma3 * B_dist * u
+        """
+        return [Discontinuity(location=self.R, magnitude=self.e * (self.F / (2.0 * np.pi * self.R)), is_sigma3_dependent=True)]

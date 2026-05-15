@@ -37,12 +37,35 @@ Based on `fluxtubes.tex` and `greensfunc.tex`, the primary research objective is
 
 ## 2. Calculation & Analysis Matrix (Updated)
 
+### Q4: Investigation of the Global Action Landscape
+**Question:** Does the effective action $S_{\text{eff}}$ possess a global minimum, or is it unbounded? How does the numerical renormalization challenge affect this?
+- [ ] **Numerical Sensitivity Analysis:** Investigate how renormalization artifacts and truncation errors affect the stability of the optimization loop.
+- [ ] **Landscape Mapping:** Instead of seeking a global minimum, sweep a wide range of profile parameters to map the functional value $S_{\text{eff}}[B(\rho)]$.
+- [ ] **Singularity Search:** Monitor if $|S_{\text{eff}}|$ increases indefinitely as profiles become more singular (e.g., $w_{max} \to \infty$ in basis expansion), suggesting the absence of a global minimum.
+- [ ] **Metastability:** Characterize the lifetime/stability of local minima as "magnetic droplets" or metastable flux tube states.
+
+### Q5: Cross-Validation with Worldline Numerics for Periodic Lattices
+**Question:** How does the Green's Function approach compare to the Worldline Numerics (WLN) results for periodic flux tube lattices, especially regarding non-local features like positive action density?
+- [ ] Implement the "Lattice Bump Profile" from `docs/periodic.tex` (Equations 10.15 and 10.16).
+    - Profile: $B_z(\rho \le a/2) = A_0 \Psi(2\rho/\lambda) + B_0$, where $\Psi(x) = \exp(-1/(1-x^2))$ for $|x|<1$.
+    - Parameters: Lattice spacing $a$, width $\lambda$, flux $\mathcal{F}$.
+- [ ] Implement the Locally Constant Field (LCF) benchmark for ScQED:
+    $$\Delta \mathcal{L}_{\text{LCF}}(\rho) = -\frac{1}{2\pi} \int_0^\infty \frac{dT}{T^3} e^{-m^2T} \left( \frac{e B(\rho) T}{\sinh(e B(\rho) T)} - 1 + \frac{1}{6}(e B(\rho) T)^2 \right)$$
+- [ ] Compute the effective action density $\Delta \mathcal{L}(\rho)$ using our solver and compare it to the WLN results in `docs/periodic.tex` (Figure 10.5).
+- [ ] Verify if the solver reproduces the "positive action density" in regions between flux tubes (where $B(\rho)$ is small but nearby $B$ is large).
+- [ ] Compare the total action integrated over the central cell ($0 < \rho < a/2$) across LCF, WLN, and our solver.
+
+---
+
+## 2. Calculation & Analysis Matrix (Updated)
+
 | Research Question | Profile to Use | Parameters to Sweep | Analysis Method |
 | :--- | :--- | :--- | :--- |
-| **Q1 (Stability)** | Gaussian, Solitonic | $\lambda \in [0.1/m, 10/m]$, $\Phi \in [1, 10]$ | Plot $E(\lambda)$. Check for $\frac{dE}{d\lambda} = 0$ and $\frac{d^2E}{d\lambda^2} > 0$. |
-| **Q2 (EOM/Landscape)**| Differentiable Spline | Multiple initial conditions | Gradient descent/Newton's method to find stationary $B(\rho)$. Map landscape. |
-| **Q3 (Diffusion)** | Step-Function | $\mathcal{F} \in [0, 2.5]$ in $0.1$ steps | Plot $\Delta\mathcal{L}(\rho)$ vs $\rho$. Measure tail decay rate for $\rho > \lambda$. |
-| **Q4 (Global Behavior)**| Basis Expansion / MLP | $w_{max}$, regularization $\alpha$ | Convergence analysis of $S_{\text{eff}}$. Check for unboundedness vs. renormalization noise. |
+| **Q1 (Stability)** | Gaussian, Solitonic | $\lambda \in [0.1, 10]$, $\Phi \in [1, 10]$ | Plot $E(\lambda)$. Check for $\frac{dE}{d\lambda} = 0$. |
+| **Q2 (EOM/Landscape)**| Differentiable Spline | Multiple initial conditions | Gradient descent/LBFGS to find $\delta \Gamma = 0$. |
+| **Q3 (Diffusion)** | Step-Function | $\mathcal{F} \in [0, 2.5]$ | Plot $\Delta\mathcal{L}(\rho)$ vs $\rho$. Tail decay. |
+| **Q4 (Global Behavior)**| Basis Expansion / MLP | $w_{max}$, regularization $\alpha$ | Convergence analysis of $S_{\text{eff}}$. |
+| **Q5 (WLN Comparison)**| Periodic Bump | $a \in [2, 10]$, $\lambda \in [0.1a, 0.9a]$| Compare $\Delta \mathcal{L}(\rho)$ vs LCF and WLN figures. |
 
 ---
 
@@ -54,25 +77,31 @@ Based on `fluxtubes.tex` and `greensfunc.tex`, the primary research objective is
   - [x] Implement batching and memory optimizations.
   - [x] Implement asymptotic threshold for large $\chi$.
 
-- [ ] **Phase 2: Profile Implementation**
+- [x] **Phase 2: Profile Implementation**
   - [ ] Add Gaussian profile to `profiles.py`.
   - [ ] Add Solitonic profile to `profiles.py`.
-  - [ ] Add Spline-based differentiable profile.
+  - [x] Add Spline-based differentiable profile (`SplineProfile` in `field_profile_mlp.py`).
 
 - [ ] **Phase 3: Stability Analysis (Q1)**
   - [ ] Sweep $\lambda$ for Gaussian profiles.
   - [ ] Sweep $\lambda$ for Solitonic profiles.
   - [ ] Compile energy surface results.
 
-- [ ] **Phase 4: Landscape & EOM Investigation (Q2 & Q4)**
-  - [ ] Implement stationary action search loop (finding $\delta \Gamma = 0$).
-  - [ ] Develop tools for mapping local extrema and calculating Hessians.
+- [x] **Phase 4: Landscape & EOM Investigation (Q2 & Q4)**
+  - [x] Implement stationary action search loop (`scripts/discover_stationary_profiles.py`).
+  - [x] Develop tools for mapping local extrema and calculating Hessians (`scripts/analyze_profile_stability.py`).
   - [ ] Analyze the impact of renormalization schemes on landscape topology.
-  - [ ] Document metastable field configurations.
+  - [x] Document metastable field configurations (Found candidates in `checkpoints/`).
 
 - [ ] **Phase 5: Non-integer Flux (Q3)**
   - [ ] Investigate exterior integral behavior for non-integer $\mathcal{F}$.
   - [ ] Map energy density diffusion.
+
+- [ ] **Phase 6: Periodic Lattice & WLN Comparison (Q5)**
+  - [ ] Implement `PeriodicBumpProfile` in `src/python/profiles.py`.
+  - [ ] Implement LCF evaluation script.
+  - [ ] Generate comparison plots for action density $\Delta \mathcal{L}(\rho)$.
+  - [ ] Quantify the "non-local" contribution in the exterior region.
 
 ---
 

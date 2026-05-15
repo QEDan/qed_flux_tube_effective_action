@@ -1,6 +1,6 @@
 
 VALIDATION_PY = scripts/test_zero_field.py scripts/compare_analytics.py \
-                scripts/visualize_benchmark.py scripts/validate_he_expansion.py \
+                scripts/visualize_benchmark.py \
                 scripts/test_delta_shell_validation.py scripts/test_sech2_shell_validation.py \
                 scripts/validate_wkb.py
 

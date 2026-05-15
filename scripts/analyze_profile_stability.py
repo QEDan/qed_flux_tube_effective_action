@@ -58,25 +58,45 @@ def analyze_profile_stability(checkpoint_path):
         
         return action.real
 
+    # Compute Gradient to check stationarity
+    print("Checking Stationarity (Gradient Norm)...")
+    weights = model.weights.detach().clone().requires_grad_(True)
+    loss = action_fn(weights)
+    loss.backward()
+    grad_norm = torch.norm(weights.grad).item()
+    print(f"Gradient Norm: {grad_norm:.6e}")
+    
     # Compute Hessian
     print("Computing Hessian (Autodiff)...")
     hessian = torch.autograd.functional.hessian(action_fn, model.weights)
     
     # Eigenvalue Analysis - Use eigvalsh for sorted real eigenvalues of symmetric Hessian
     eigenvalues = torch.linalg.eigvalsh(hessian)
-    print(f"Eigenvalues: {eigenvalues}")
+    print(f"Eigenvalues: {eigenvalues.detach().numpy()}")
     
-    stable_modes = torch.sum(eigenvalues > 0).item()
-    unstable_modes = torch.sum(eigenvalues < 0).item()
+    stable_modes = torch.sum(eigenvalues > 1e-6).item()
+    unstable_modes = torch.sum(eigenvalues < -1e-6).item()
+    flat_modes = torch.sum(torch.abs(eigenvalues) <= 1e-6).item()
+    
     print(f"Stable Modes (>0): {stable_modes}")
     print(f"Unstable Modes (<0): {unstable_modes}")
+    print(f"Flat/Zero Modes: {flat_modes}")
     
-    if unstable_modes == 0:
-        print("Profile is a LOCAL MINIMUM (Stable Metastable State).")
-    elif stable_modes == 0:
-        print("Profile is a LOCAL MAXIMUM.")
+    stationary_threshold = 1e-3
+    is_stationary = grad_norm < stationary_threshold
+
+    if not is_stationary:
+        print(f"WARNING: Profile is NOT a stationary point (Grad Norm {grad_norm:.4e} > {stationary_threshold:.4e}).")
+        print("Stability classification below may be invalid.")
+
+    if unstable_modes == 0 and is_stationary:
+        print("RESULT: Profile is a confirmed LOCAL MINIMUM.")
+    elif stable_modes == 0 and is_stationary:
+        print("RESULT: Profile is a confirmed LOCAL MAXIMUM.")
+    elif is_stationary:
+        print(f"RESULT: Profile is a confirmed SADDLE POINT with {unstable_modes} unstable directions.")
     else:
-        print(f"Profile is a SADDLE POINT with {unstable_modes} unstable directions.")
+        print("RESULT: Optimization did not converge to a stationary point.")
 
     # Plot Eigenvalues
     plt.figure()

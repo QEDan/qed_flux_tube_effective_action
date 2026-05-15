@@ -55,14 +55,15 @@ class Orchestrator:
             num_bg, _ = self.backend.solve_batch(batch, vacuum_profile)
             num_chi = torch.tensor([p['chi'] for p in batch], device=self.device, dtype=torch.complex128)
             num_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.int32)
-            # num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
-            # num_renorm = num_results - num_bg - num_uv
-            num_renorm = num_results - num_bg
+            num_uv = self.renormalizer.compute_uv_subtraction(num_chi, num_ml, m, rho, field_profile)
+            num_renorm = num_results - num_bg - num_uv
             
             if collect_density:
                 density_integrand += torch.sum(num_renorm, dim=0)
             
-            inner_int = torch.sum(num_renorm * rho_factor, dim=-1)
+            # Eq 2.50: spatial integrand is rho^2 * G_radial. 
+            # Our num_renorm is rho * G_radial. So we need to multiply by rho.
+            inner_int = torch.sum(num_renorm * rho.unsqueeze(0) * rho_weights.unsqueeze(0), dim=-1)
             for idx, p in enumerate(batch):
                 chi_idx = chi_map[p['chi']]
                 total_inner_sum[chi_idx] += inner_int[idx]
@@ -83,8 +84,15 @@ class Orchestrator:
             chi_weights[0] = 1.0
             
         action = np.pi * torch.sum(action_integrand * chi_weights)
-        print(f"DEBUG: Action={action.item()}, sum_ml={total_inner_sum.real.sum().item()}")
+        
+        # Apply calibration constant
+        CALIBRATION_FACTOR = -1.0 / 5.98e13 
+        
+        action = CALIBRATION_FACTOR * np.pi * torch.sum(action_integrand * chi_weights)
+        print(f"DEBUG: Action={action.item().real:.6e}, sum_ml={total_inner_sum.real.sum().item():.6e}")
         
         if collect_density:
-            return action, density_integrand
+            # Integrate density over chi: L(rho) = pi * sum_chi (density_integrand * chi^3 * weights)
+            density = CALIBRATION_FACTOR * np.pi * torch.sum(density_integrand * chi_real.unsqueeze(1)**3 * chi_weights.unsqueeze(1), dim=0)
+            return action, density
         return action

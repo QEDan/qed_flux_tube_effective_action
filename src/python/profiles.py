@@ -1,6 +1,16 @@
 import numpy as np
 import torch
-from typing import Union, Tuple, Optional, Any
+from typing import Union, Tuple, Optional, Any, List
+
+class Discontinuity:
+    """
+    Represents a singular point in the effective potential (e.g., a delta function).
+    The solver uses this to apply jump conditions to the wave function derivative.
+    """
+    def __init__(self, location: float, magnitude: float, is_sigma3_dependent: bool = False):
+        self.location = location
+        self.magnitude = magnitude
+        self.is_sigma3_dependent = is_sigma3_dependent
 
 class FieldProfile:
     def __init__(self, rho: Union[np.ndarray, torch.Tensor]) -> None:
@@ -17,6 +27,14 @@ class FieldProfile:
                    self.a_phi.detach().cpu().numpy(), \
                    self.da_phi.detach().cpu().numpy()
         return self.rho, self.a_phi, self.da_phi
+
+    def get_discontinuities(self) -> List[Discontinuity]:
+        """
+        Returns a list of points where the potential contains singular contributions 
+        (e.g., delta functions) requiring jump conditions in the ODE solver.
+        The solver defaults to assuming the distribution is continuous if this returns an empty list.
+        """
+        return []
 
 class StepFunctionProfile(FieldProfile):
     def __init__(self, rho: Union[np.ndarray, torch.Tensor], lambd: float, F: float, e: float = 1.0, smooth_width: Optional[float] = None) -> None:
@@ -73,6 +91,16 @@ class StepFunctionProfile(FieldProfile):
             
             # da_phi = pre * (df_lambd / rho - f_lambd / rho^2)
             self.da_phi = pre * (df_lambd / self.rho - f_lambd / (self.rho**2))
+
+    def get_discontinuities(self) -> List[Discontinuity]:
+        """
+        For a sharp step function, there is a delta-function spike in the potential 
+        at rho = lambda, leading to a jump in u'.
+        """
+        if self.smooth_width is not None or self.lambd <= 0 or abs(self.F) < 1e-12:
+            return []
+        # Jump = -e * F / (pi * lambda^2)
+        return [Discontinuity(location=self.lambd, magnitude=-self.e * self.F / (np.pi * self.lambd**2))]
 
 class ZeroFluxProfile(FieldProfile):
     def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = 1.0) -> None:

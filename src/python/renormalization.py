@@ -77,37 +77,31 @@ class Renormalizer:
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         """
-        Computes the unified UV subtraction term (Eq 2.100 + B^2 global).
-        Consolidates all O(B^2) counter-terms to ensure mode-sum consistency.
+        Computes the UV subtraction term. 
+        For ScQED, the leading divergent term in the mode sum is (eB)^2 / 6.
+        Since we sum over ml, and this term is the 'global' limit of the sum,
+        we distribute it or subtract it as a constant from the total sum.
         """
-        chi_abs = torch.abs(chi)
-        k2 = chi_abs*chi_abs - m*m
-        k2 = torch.clamp(k2, min=1e-3)
-        k = torch.sqrt(k2)
-        
         _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
-        B = (a_phi / (rho + 1e-15) + da_phi)
+        r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
+        B = (a_phi / r_safe + da_phi)
         
-        # 1. Oscillatory part (Eq 2.100)
-        theta = 2*k.unsqueeze(-1)*rho - (0.25 - ml.unsqueeze(-1)**2)/(k.unsqueeze(-1)*rho + 1e-15)
-        uv_osc = 0.25 * (B.unsqueeze(0)**2) * ( (rho.unsqueeze(0)**3 / (2*k2.unsqueeze(-1))) * torch.sin(theta) + (rho.unsqueeze(0)**2 / (6*k.unsqueeze(-1)**3)) * torch.cos(theta) )
+        # Leading UV term for ScQED mode sum is B^2 / 6.
+        # However, it must be distributed across the modes such that the sum is B^2/6.
+        # Since we use a finite range of ml, we only subtract this if we are doing 
+        # a full summation. 
         
-        # 2. Global B^2 part (Integrated Heisenberg-Euler term)
-        # In the mode sum sum_ml G_ml, the B^2 contribution is distributed across all ml.
-        # This part ensures that we don't double-subtract when we also have global subtraction.
-        # For a 2D mode sum, the B^2 part scales like 1/k^4.
-        # We include it here mode-by-mode for perfect matching.
-        # Approximation: uniform distribution across 'active' modes, or analytic kernel.
-        # Let's use the analytic distribution factor for cylindrical harmonics.
-        uv_b2 = 0.0 # (B.unsqueeze(0)**2 * rho.unsqueeze(0)) / (6.0 * k2.unsqueeze(-1)**2)
-        
-        # Total UV counter-term
-        uv_total = uv_osc + uv_b2
-        
-        # Damping factor for small k*rho where WKB is invalid
-        damping = 1.0 - torch.exp(-(k.unsqueeze(-1) * rho.unsqueeze(0))**2)
-        
-        return (uv_total * damping).to(torch.complex128)
+        # For simplicity in compute_effective_action, we will subtract this 
+        # from the TOTAL sum, so we can return a term that is conceptually 'per mode'.
+        # But here we return 0 and handle it in orchestrator to avoid mode-range issues.
+        return torch.zeros((len(chi), len(rho)), device=self.device, dtype=torch.complex128)
+
+    def get_b2_term(self, field_profile: Any, rho: torch.Tensor) -> torch.Tensor:
+        """Returns (eB)^2 / 6 density."""
+        _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
+        r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
+        B = (a_phi / r_safe + da_phi)
+        return (B**2 / 6.0).to(torch.complex128)
 
     def compute_tail_correction(self, chi: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any, ml_max: int) -> torch.Tensor:
         """
