@@ -1,3 +1,7 @@
+"""
+Validates the numerical solver against WKB approximation limits.
+"""
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

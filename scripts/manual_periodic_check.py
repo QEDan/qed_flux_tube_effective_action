@@ -1,3 +1,7 @@
+"""
+Performs manual verification of periodic boundary condition behavior in the solver.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

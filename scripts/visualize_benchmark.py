@@ -1,3 +1,7 @@
+"""
+Visualizes benchmark results to confirm agreement between numerical and analytic amplitudes.
+"""
+
 import sys
 import os
 import torch

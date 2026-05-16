@@ -1,3 +1,7 @@
+"""
+Generates Green's function comparison plots specifically for Sech2-shell configurations.
+"""
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

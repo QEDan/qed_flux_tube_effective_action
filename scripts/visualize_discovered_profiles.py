@@ -1,3 +1,7 @@
+"""
+Provides visualization tools for discovered stationary field profiles.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,3 +1,7 @@
+"""
+Optimizes the field profile parameters to minimize the effective action.
+"""
+
 import os
 import torch
 import numpy as np

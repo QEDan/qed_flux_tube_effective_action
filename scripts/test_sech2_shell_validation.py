@@ -1,3 +1,7 @@
+"""
+Validates the Green's function computation for the Sech2-shell profile.
+"""
+
 import sys, os; sys.path.append(os.path.abspath("."))
 sys.path.append(os.path.abspath("src/python"))
 sys.path.append(os.path.abspath("scripts"))

@@ -1,3 +1,7 @@
+"""
+Attempts to discover new stationary profiles using the numerical optimizer.
+"""
+
 import os
 import torch
 import numpy as np

@@ -1,3 +1,7 @@
+"""
+Analyzes the stability of a given field profile by computing its Hessian and evaluating its eigenvalues.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,3 +1,7 @@
+"""
+Plots the effective action as a function of the magnetic field strength.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

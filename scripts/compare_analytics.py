@@ -1,3 +1,7 @@
+"""
+Compares numerical Green's function results against analytic Whittaker/Bessel benchmarks.
+"""
+
 import sys
 import os
 import torch

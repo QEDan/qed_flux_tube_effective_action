@@ -1,3 +1,7 @@
+"""
+Compares numerical results with Local Constant Field (LCF) benchmarks for periodic profiles.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

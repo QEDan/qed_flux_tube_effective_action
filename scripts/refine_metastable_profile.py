@@ -1,3 +1,7 @@
+"""
+Refines the identified metastable profiles to improve numerical precision.
+"""
+
 import os
 import torch
 import numpy as np

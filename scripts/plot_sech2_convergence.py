@@ -1,3 +1,7 @@
+"""
+Investigates and plots the convergence properties of the Sech2 shell profile.
+"""
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

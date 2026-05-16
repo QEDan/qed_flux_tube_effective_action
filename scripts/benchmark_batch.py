@@ -1,3 +1,7 @@
+"""
+Benchmarks the numerical solver by running a batch of parameter configurations.
+"""
+
 import torch
 import numpy as np
 import time
