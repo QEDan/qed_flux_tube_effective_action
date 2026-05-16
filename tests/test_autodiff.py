@@ -38,7 +38,7 @@ def test_autodiff_action():
     sigma3_values = [1, -1]
     
     # Compute action
-    action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values)
+    action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values)
     print(f"Action value: {action.item()}")
     
     # Compute gradient with respect to A0

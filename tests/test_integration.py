@@ -20,8 +20,8 @@ def test_full_orchestrator_pytorch():
     profile = StepFunctionProfile(rho, lambd=1.0, F=1.0)
 
     orch = Orchestrator(batch_size=4)
-    # Run with telemetry
-    action = orch.compute_effective_action(profile, chi_values, ml_values, sigma3_values, collect_density=False)
+    # Run integration
+    action, _ = orch.compute_effective_action(profile, chi_values, ml_values, sigma3_values)
 
     assert isinstance(action, torch.Tensor)
     assert torch.isfinite(action)

@@ -7,28 +7,25 @@ class PyTorchSolver:
         self.device = torch.device(device if device else ("cuda" if torch.cuda.is_available() else "cpu"))
 
     def get_v_eff(self, r: torch.Tensor, params: Dict[str, torch.Tensor], a_phi: torch.Tensor, da_phi: torch.Tensor) -> torch.Tensor:
+        """
+        Computes the effective potential V_eff(r) for the radial Schrodinger-like equation.
+        The ODE is: [d^2/dr^2 + (1/r) d/dr - V_eff(r)] u(r) = 0.
+        
+        V_eff includes:
+        1. Magnetic coupling: e^2 A_phi^2 + e*sigma3*B - 2*e*ml*A_phi/r
+        2. Centrifugal barrier: ml^2 / r^2
+        3. Energy/Mass term: chi^2 - m^2
+        
+        This potential is used to solve for the radial Green's function G_ml(r, r').
+        """
         b_field = a_phi/r + da_phi
+        # Interaction terms from -Pi^2 + e*sigma3*B
         v_ml = params['e']**2 * a_phi**2 + params['e']*params['sigma3']*b_field - 2*params['e']*params['ml']*a_phi/r
+        
         r_eps = torch.where(torch.abs(r) < 1e-15, torch.tensor(1e-15, device=self.device), r)
-        # Fix centrifugal term: (ml^2 - 1.0) / r^2 per docs/greensfunc.tex
-        res = v_ml + (params['ml'].to(torch.float64)**2 - 1.0) / (r_eps*r_eps) - (params['chi']**2 - params['m']**2)
-        return res
-
-    def rk4_step(self, r: torch.Tensor, h: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], 
-                 a_p_start: torch.Tensor, da_p_start: torch.Tensor, 
-                 a_p_mid: torch.Tensor, da_p_mid: torch.Tensor, 
-                 a_p_end: torch.Tensor, da_p_end: torch.Tensor) -> torch.Tensor:
-        def f(r_val, state_val, a_p, da_p):
-            u, du = state_val[:, 0], state_val[:, 1]
-            v_eff = self.get_v_eff(r_val, params, a_p, da_p)
-            d2u = v_eff * u - (1.0/r_val) * du
-            return torch.stack([du, d2u], dim=1)
-
-        k1 = f(r, state, a_p_start, da_p_start)
-        k2 = f(r + 0.5*h, state + 0.5*h*k1, a_p_mid, da_p_mid)
-        k3 = f(r + 0.5*h, state + 0.5*h*k2, a_p_mid, da_p_mid)
-        k4 = f(r + h, state + h*k3, a_p_end, da_p_end)
-        res = state + (h/6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
+        # Centrifugal term and spectral shift
+        # Note: ml^2/r^2 is the standard radial term for cylindrical symmetry.
+        res = v_ml + (params['ml'].to(torch.float64)**2) / (r_eps*r_eps) - (params['chi']**2 - params['m']**2)
         return res
 
     def rk4_step(self, r: torch.Tensor, h: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], 

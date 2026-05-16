@@ -33,7 +33,7 @@ def test_zero_field_cancellation():
     m = 1.0
     
     # Compute effective action
-    action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
+    action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
     
     print(f"Renormalized action for zero field: {action.item()}")
     

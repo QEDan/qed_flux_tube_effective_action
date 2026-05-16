@@ -27,7 +27,7 @@ def plot_ea_vs_field():
     print("Computing Effective Action vs Field Strength...")
     for B in B_range:
         profile = Sech2Profile(rho, B=B, lambd=lambd)
-        action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
+        action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
         actions.append(action.real.item())
         print(f"B={B:.2f}, S_renorm={actions[-1]:.4e}")
     

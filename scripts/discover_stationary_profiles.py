@@ -54,7 +54,7 @@ def discover_stationary_profiles(num_starts=10, steps=50, lr=0.1, log_dir="runs/
                 optimizer_adam.zero_grad()
                 B_vals, a_phi = model(rho_vals)
                 profile = MLPProfile(rho_vals, B_vals.squeeze(), a_phi.squeeze())
-                action = orchestrator.compute_effective_action(profile, chi_fast, ml_fast, [1, -1])
+                action, _ = orchestrator.compute_effective_action(profile, chi_fast, ml_fast, [1, -1])
                 grad_B = torch.gradient(B_vals.squeeze(), spacing=dr.item())[0]
                 reg_smooth = 1e-2 * torch.sum(grad_B**2) * dr
                 loss = action.real + reg_smooth
@@ -65,7 +65,7 @@ def discover_stationary_profiles(num_starts=10, steps=50, lr=0.1, log_dir="runs/
             with torch.no_grad():
                 B_vals, a_phi = model(rho_vals)
                 profile = MLPProfile(rho_vals, B_vals.squeeze(), a_phi.squeeze())
-                action = orchestrator.compute_effective_action(profile, chi_fast, ml_fast, [1, -1])
+                action, _ = orchestrator.compute_effective_action(profile, chi_fast, ml_fast, [1, -1])
                 grad_B = torch.gradient(B_vals.squeeze(), spacing=dr.item())[0]
                 reg_smooth = 1e-2 * torch.sum(grad_B**2) * dr
                 new_loss = (action.real + reg_smooth).item()
@@ -94,7 +94,7 @@ def discover_stationary_profiles(num_starts=10, steps=50, lr=0.1, log_dir="runs/
             optimizer_lbfgs.zero_grad()
             B_vals, a_phi = model(rho_vals)
             profile = MLPProfile(rho_vals, B_vals.squeeze(), a_phi.squeeze())
-            action = orchestrator.compute_effective_action(profile, chi_fast, ml_fast, [1, -1])
+            action, _ = orchestrator.compute_effective_action(profile, chi_fast, ml_fast, [1, -1])
             grad_B = torch.gradient(B_vals.squeeze(), spacing=dr.item())[0]
             reg_smooth = 1e-2 * torch.sum(grad_B**2) * dr
             loss = action.real + reg_smooth

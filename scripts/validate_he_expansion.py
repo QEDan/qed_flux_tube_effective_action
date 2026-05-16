@@ -40,8 +40,8 @@ def validate_he_expansion():
         profile_full = SuperGaussianProfile(rho, B0=B_peak, lambd=lambd)
         profile_half = SuperGaussianProfile(rho, B0=B_peak/2.0, lambd=lambd)
         
-        action_full = orc.compute_effective_action(profile_full, chi_values, ml_values, sigma3_values, m=m)
-        action_half = orc.compute_effective_action(profile_half, chi_values, ml_values, sigma3_values, m=m)
+        action_full, _ = orc.compute_effective_action(profile_full, chi_values, ml_values, sigma3_values, m=m)
+        action_half, _ = orc.compute_effective_action(profile_half, chi_values, ml_values, sigma3_values, m=m)
         
         # B^4 term extraction
         num_val = (action_full.real.item() - 4.0 * action_half.real.item()) / 0.75

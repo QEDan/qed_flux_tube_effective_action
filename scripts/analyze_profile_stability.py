@@ -54,7 +54,7 @@ def analyze_profile_stability(checkpoint_path):
         a_phi = (flux_integral / r_safe).view(-1, 1)
 
         profile = MLPProfile(rho_vals, B_vals.squeeze(), a_phi.squeeze())
-        action = orchestrator.compute_effective_action(profile, chi_vals, ml_vals, [1, -1])
+        action, _ = orchestrator.compute_effective_action(profile, chi_vals, ml_vals, [1, -1])
         
         return action.real
 

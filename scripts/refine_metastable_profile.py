@@ -62,7 +62,7 @@ def refine_metastable_profile(checkpoint_path="checkpoints/fast_profile_1.pt", n
             profile = MLPProfile(rho_vals, B_vals.squeeze(), a_phi.squeeze())
             
             # High-res action calculation
-            action = orchestrator.compute_effective_action(profile, chi_high, ml_high, [1, -1])
+            action, _ = orchestrator.compute_effective_action(profile, chi_high, ml_high, [1, -1])
             
             # Reduced smoothness reg for refinement (let the action drive the shape)
             grad_B = torch.gradient(B_vals.squeeze(), spacing=dr.item())[0]

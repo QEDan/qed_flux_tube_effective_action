@@ -45,7 +45,7 @@ def optimize_field_profile(num_restarts=1, steps=200, lr=0.1, checkpoint_dir="ch
                 chi_vals = [chi_full[idx] for idx in chi_indices]
                 
                 profile = MLPProfile(rho_vals, B_vals.squeeze(), a_phi.squeeze())
-                action_sampled = orchestrator.compute_effective_action(profile, chi_vals, ml_full, [1, -1])
+                action_sampled, _ = orchestrator.compute_effective_action(profile, chi_vals, ml_full, [1, -1])
                 action_est = action_sampled * (len(chi_full) / chi_batch_size)
                 
                 # Smoothness Regularization

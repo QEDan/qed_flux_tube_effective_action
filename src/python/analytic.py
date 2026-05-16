@@ -125,17 +125,16 @@ def get_interior_solutions(rho: np.ndarray, chi: complex, ml: int, sigma3: int, 
     """
     Compute analytic solutions u0 (regular at 0) and uinf (regular at infinity)
     for the interior region (rho < lambd).
-
-    The radial wavefunction in our ODE is phi(r) = u(r) / sqrt(r).
-    Whittaker M/W solutions correspond to phi_analytic(r).
-    Thus, u(r) = sqrt(r) * phi_analytic(r).
+    The radial wavefunction u(rho) satisfies the radial ODE.
+    Whittaker M/W functions for the potential V ~ r^2 are related to u via:
+    u(rho) = M_{kappa, mu}(z) / rho, where z ~ rho^2 and mu = ml/2.
     """
     F_cal, _, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F, e)
 
     z = (F_cal / lambd**2) * rho**2
 
-    u0 = np.sqrt(rho) * M_whittaker(z, kappa, mu) / rho
-    uinf = np.sqrt(rho) * W_whittaker(z, kappa, mu) / rho
+    u0 = M_whittaker(z, kappa, mu) / rho
+    uinf = W_whittaker(z, kappa, mu) / rho
 
     return u0, uinf
 def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = 1.0) -> np.ndarray:

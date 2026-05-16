@@ -4,16 +4,20 @@ from scipy.special import jv, yv
 from typing import Union, Dict, Tuple, Any, Optional, List
 
 class Renormalizer:
+    """
+    Handles vacuum subtraction and UV renormalization terms for the effective action.
+    This class provides the background Green's function (G0) and the counter-terms
+    needed to ensure the convergence of the spectral integral over chi.
+    """
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
         self._g0_cache: Dict[Tuple[complex, int], torch.Tensor] = {}
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor) -> torch.Tensor:
         """
-        Computes the background Green's function G0 = -pi/2 * rho * J_ml(k*rho) * Y_ml(k*rho)
-        where k = sqrt(chi^2 - m^2).
-        Dimension: [L]
-        Uses asymptotic approximation for large ml to avoid overflow.
+        Computes the analytic vacuum Green's function G0_ml(rho, rho) for the ODE.
+        The result is G0 = -pi/2 * rho * J_ml(k*rho) * Y_ml(k*rho).
+        Units: [Length]
         """
         k2 = chi*chi - m*m
         k2 = torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2)
