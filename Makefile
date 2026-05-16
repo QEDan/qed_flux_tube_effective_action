@@ -2,7 +2,8 @@
 VALIDATION_PY = scripts/test_zero_field.py scripts/compare_analytics.py \
                 scripts/visualize_benchmark.py \
                 scripts/test_delta_shell_validation.py scripts/test_sech2_shell_validation.py \
-                scripts/validate_wkb.py
+                scripts/validate_wkb.py scripts/plot_greens_function_comparison.py \
+		scripts/plot_sech2_greens_function.py 
 
 VALIDATION_SAGEMATH_PY = symbolic_validations/numerical_spectrum.py symbolic_validations/verify_analytic_spectrum.py \
                          symbolic_validations/verify_isomorphism.py symbolic_validations/verify_ode.py \
@@ -50,11 +51,13 @@ validate:
 	fi
 	@echo ""
 	@echo "--- Visual Inspection Required ---"
-	@echo "1. scripts/compare_analytics.py: Check results/analytic_vs_numerical.png. Verify high-degree overlap in the top two panels (Real/Imag) and near-zero residuals in the bottom panel."
-	@echo "2. scripts/visualize_benchmark.py: Check results/test_benchmark_absolute_visualization.png. Confirm that the dashed numerical integration curve perfectly tracks the solid analytic benchmark for the absolute amplitude."
-	@echo "3. scripts/test_delta_shell_validation.py: Check results/delta_shell_greens_function_comparison.png. Verify agreement between numerical and analytic Green's functions for a delta shell."
-	@echo "4. scripts/test_sech2_shell_validation.py: Check results/sech2_shell_greens_function_validation.png. Verify agreement between numerical sech2 and analytic delta-shell equivalent."
-	@echo "5. scripts/validate_wkb.py: Check results/wkb_validation_visual.png. Verify oscillatory match between numerical solver and WKB benchmark, observing amplitude and offset residuals."
+	@echo "1. scripts/compare_analytics.py: Check results/analytic_vs_numerical.png. Verify high-degree overlap between numerical and analytic solutions in the top panels, and that residuals in the bottom panel are noise-level."
+	@echo "2. scripts/visualize_benchmark.py: Check results/test_benchmark_absolute_visualization.png. Confirm that the numerical integration tracks the analytic benchmark for absolute amplitude."
+	@echo "3. scripts/test_delta_shell_validation.py: Check results/delta_shell_greens_function_comparison.png. Verify agreement between numerical and analytic Green's functions. Small boundary-induced peaks are acceptable (see TECHNICAL_VALIDATION.md)."
+	@echo "4. scripts/test_sech2_shell_validation.py: Check results/sech2_shell_greens_function_validation.png. Verify agreement between numerical Sech2 and analytic delta-shell equivalent."
+	@echo "5. scripts/plot_greens_function_comparison.py: Check results/greens_function_comparison.png. Verify the 2-panel comparison and residual behavior according to TECHNICAL_VALIDATION.md criteria."
+	@echo "6. scripts/plot_sech2_greens_function.py: Check results/sech2_shell_greens_function_comparison.png. Verify comparison plot; divergences should be localized to shell boundaries."
+	@echo "7. scripts/validate_wkb.py: Check results/wkb_validation_visual.png. Verify oscillatory match between numerical solver and WKB benchmark, observing amplitude and offset residuals."
 
 
 .PHONY: all clean validate

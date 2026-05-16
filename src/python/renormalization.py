@@ -101,11 +101,14 @@ class Renormalizer:
         return torch.zeros((len(chi), len(rho)), device=self.device, dtype=torch.complex128)
 
     def get_b2_term(self, field_profile: Any, rho: torch.Tensor) -> torch.Tensor:
-        """Returns (eB)^2 / 6 density."""
+        """
+        Returns (eB)^2 / 12 density.
+        Matches Scalar QED field strength renormalization term.
+        """
         _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
         B = (a_phi / r_safe + da_phi)
-        return (B**2 / 6.0).to(torch.complex128)
+        return (B**2 / 12.0).to(torch.complex128)
 
     def compute_tail_correction(self, chi: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any, ml_max: int) -> torch.Tensor:
         """

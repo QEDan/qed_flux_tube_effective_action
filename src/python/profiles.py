@@ -157,6 +157,34 @@ class SuperGaussianProfile(FieldProfile):
         # da_phi = B - A_phi/rho
         self.da_phi = b_field - self.a_phi / r_safe
 
+class WLNFluxTubeProfile(FieldProfile):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], lambd: float, F: float, e: float = 1.0) -> None:
+        """
+        Profile from docs/WLNumerics.tex:
+        f_lambda(rho^2) = rho^2 / (lambda^2 + rho^2)
+        B_z(rho) = F * lambda^2 / (pi * (lambda^2 + rho^2)^2)
+        A_phi(rho) = F * rho / (2 * pi * (lambda^2 + rho^2))
+        """
+        super().__init__(rho)
+        self.lambd = lambd
+        self.F = F
+        self.e = e
+        self.update()
+
+    def update(self) -> None:
+        r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
+        pre_A = self.F / (2.0 * np.pi)
+        
+        # A_phi = pre_A * rho / (lambd^2 + rho^2)
+        denom = self.lambd**2 + self.rho**2
+        self.a_phi = pre_A * self.rho / denom
+        
+        # B_z = pre_A * (2 * lambd^2) / denom^2
+        b_field = pre_A * (2.0 * self.lambd**2) / (denom**2)
+        
+        # da_phi = B - A_phi / rho
+        self.da_phi = b_field - self.a_phi / r_safe
+
 class MLPProfile(FieldProfile):
     def __init__(self, rho: torch.Tensor, B_vals: torch.Tensor, a_phi: torch.Tensor, e: float = 1.0) -> None:
         super().__init__(rho)

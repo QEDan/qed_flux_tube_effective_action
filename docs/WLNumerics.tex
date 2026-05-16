@@ -1,0 +1,769 @@
+\chapter{Parallel Worldline Numerics in \texorpdfstring{\acs{CUDA}}{CUDA}} 
+
+\label{ch:WLNumerics}
+
+\acresetall
+
+\begin{summary}
+	In this chapter, I give an overview of the \ac{WLN} 
+	technique, and discuss the parallel 
+	\ac{CUDA} implementation of the algorithm created for this 
+	thesis. In the \ac{WLN} technique, we wish to 
+	generate an ensemble of representative closed-loop particle 
+	trajectories, and use these to compute an approximate 
+	average value for Wilson loops. We show how this can be done with 
+	a specific emphasis on cylindrically symmetric magnetic fields.
+	The fine-grained, massive parallelism provided by 
+	the \ac{GPU} architecture results in considerable speedup in 
+	computing Wilson loop averages.
+\end{summary}
+
+In this chapter, I will give an overview of a numerical technique 
+which can be used to compute the effective actions of external 
+field configurations.
+The technique, called either \acl{WLN} or the Loop Cloud Method,
+was first used by Gies and Langfeld~\cite{Gies:2001zp} and has since been
+applied to computation of effective actions 
+\cite{Gies:2001tj,Langfeld:2002vy,Gies:2005sb,Gies:2005ym,Dunne:2009zz}
+and Casimir energies
+\cite{Moyaerts:2003ts,Gies:2003cv,PhysRevLett.96.220401}. More recently, 
+the technique has also been applied to pair production~\cite{2005PhRvD..72f5001G}
+and the vacuum polarization tensor~\cite{PhysRevD.84.065035}.
+\ac{WLN} is able to compute quantum effective actions in
+the one-loop approximation to all orders in both the coupling and in the
+external field, so it is well suited to studying non-perturbative aspects
+of \acp{QFT} in strong background fields. Moreover, the technique maintains
+gauge invariance and Lorentz invariance.  The key idea of the technique is
+that a path integral is approximated as the average of a finite set of $N_l$
+representative closed paths (loops) through spacetime. We use a standard
+Monte-Carlo procedure to generate loops which have large contributions to
+the loop average.
+
+
+\section{\texorpdfstring{\acs{QED}}{QED} Effective Action on the Worldline}
+
+Worldline numerics is built on the worldline formalism which was initially 
+invented by Feynman~\cite{PhysRev.80.440, PhysRev.84.108}. 
+Much of the recent interest in this formalism is based on the 
+work of Bern and Kosower, who derived it from the infinite string-tension limit of 
+string theory and demonstrated that it provided an efficient means for computing 
+amplitudes in \ac{QCD}~\cite{PhysRevLett.66.1669}. 
+For this reason, the worldline formalism is often referred to as 
+`string inspired'. However, the formalism can also be obtained straight-forwardly 
+from first-quantized field theory~\cite{1992NuPhB.385..145S}, which is the approach 
+we will adopt here.  In this formalism
+the degrees of freedom of the field are represented in terms of one-dimensional 
+path integrals over an ensemble of closed trajectories.  
+
+
+We begin with the \ac{QED} effective action expressed in the proper-time 
+formalism, (\ref{eqn:proptimelag}),
+
+\ba
+	\label{eqn:trln}
+	{\rm Tr~ln}\left[\frac{\slashed{p}+e\slashed{A}_\mu^0
+	-m}{\slashed{p}-m}\right] &=& -\frac{1}{2}\int d^4x \int_0^\infty
+	\frac{dT}{T}e^{-iTm^2} \nonumber \\
+	& &\times {\rm tr}\biggr( \bra{x}e^{iT(\slashed{p}
+	+e\slashed{A}^0_\mu)^2}\ket{x} 
+	- \bra{x}e^{iTp^2}\ket{x}\biggr).
+\ea
+
+
+
+To evaluate $\bra{x}e^{iT(\slashed{p}_\mu + e\slashed{A}_\mu)^2}\ket{x}$, we recognize that it is simply 
+the propagation amplitude $\braket{x,T}{x,0}$ from ordinary quantum mechanics 
+with $(\slashed{p}_\mu + e\slashed{A}_\mu)^2$ playing the role of the Hamiltonian.  
+We therefore express this factor in its path integral form:
+
+\ba
+	\bra{x}e^{iT(\slashed{p}_\mu + e\slashed{A}_mu)^2}\ket{x} &=&  \mathcal{N}
+	\int \mathcal{D}x_\rho(\tau) e^{-\int_0^T d\tau \left[\frac{\dot{x}^2(\tau)}{4} 
+	+ i A_\rho x^\rho(\tau)\right]} \nonumber \\
+	& & \times \Paulispin.
+\ea
+
+$\mathcal{N}$ is a normalization constant which we can fix by using our renormalization 
+condition that the fermion determinant should vanish at zero external field:
+
+\ba
+	\bra{x}e^{iTp^2}\ket{x} & = & \mathcal{N}\int \mathcal{D} 
+		x_p(\tau)e^{-\int_0^T d\tau\frac{\dot{x}^2(\tau)}{4}} \\
+	&=& \int \frac{d^4p}{(2\pi T)^4}\bra{x}e^{iTp^2}\ket{p}\braket{p}{x} \\
+	& = & \frac{1}{(4\pi T)^2},	
+\ea
+
+\be
+	\mathcal{N}\int \mathcal{D}x_\rho(\tau) e^{-\int_0^T d\tau \frac{\dot{x}^2(\tau)}{4}} 
+	= \frac{1}{(4\pi T)^2}.
+\ee
+
+We may now write
+\ba
+	\mathcal{N}\int \mathcal{D}x_\rho(\tau) e^{-\int_0^T d\tau[\frac{\dot{x}^2(\tau)}{4}+iA_\rho x^\rho(\tau)]}
+	\Paulispin \nonumber \\
+	= \frac{1}{(4\pi T)^2} \left\langle e^{-i\int_0^T d\tau A_\rho x^\rho(\tau)}\Paulispin\right\rangle_x ,
+\ea
+where
+\be
+	\label{eqn:meandef}
+	\mean{\hat{\mathcal{O}}}_x = \frac{\int \mathcal{D}x_\rho(\tau) \hat{\mathcal{O}} 
+	e^{-\int_0^T d\tau\frac{\dot{x}^2(\tau)}{4}}}{\int \mathcal{D}x_\rho(\tau)  
+	e^{-\int_0^T d\tau\frac{\dot{x}^2(\tau)}{4}}}
+\ee
+is the weighted average of the operator $\hat{\mathcal{O}}$ over an ensemble of closed particle 
+loops with a Gaussian velocity distribution.
+
+Finally, combining all of the equations from this section results in the 
+one-loop effective action for \ac{QED} on the worldline:
+
+\ba
+	\label{eqn:QEDWL}
+	\Gamma^{(1)}[A_\mu] &=& \frac{2}{(4\pi)^2}\int_0^\infty
+	\frac{dT}{T^3}e^{-m^2T}\int d^4x_{\rm CM} \nonumber \\
+	& & \times \left[\left\langle e^{i\int_0^Td\tau A_\rho(x_{\rm CM}+x(\tau))\dot{x}^\rho(\tau)}
+	\Paulispin\right\rangle _x -1\right]. \nonumber \\
+	& &
+\ea
+
+\section{Worldline Numerics}
+
+The averages, $\mean{\hat{\mathcal{O}}}$, defined by equation (\ref{eqn:meandef})
+involve 
+functional integration over every possible closed path through spacetime
+which has a Gaussian velocity distribution.  
+The prescription of the \ac{WLN} technique is to compute 
+these averages approximately using a finite set of $N_l$ representative loops 
+on a computer.  The worldline average is then approximated as the mean of 
+an operator evaluated along each of the worldlines in the ensemble:
+
+\be
+	\mean{\hat{\mathcal{O}}[x(\tau)]} \approx 
+	\frac{1}{N_l} \sum_{i=1}^{N_l} \hat{\mathcal{O}}[x_i(\tau)].
+\ee
+
+
+\subsection{Loop Generation} 
+\label{sec:loopgen}
+The velocity distribution for the loops depends on
+the proper time, $T$.  However, generating a separate ensemble of loops for 
+each value of $T$ would be very computationally expensive.  This problem is alleviated by generating
+a single ensemble of loops, $\vec{y}(\tau)$, representing unit proper time,
+and scaling those loops accordingly for different values of $T$:
+
+\be 
+\vec{x}(\tau) = \sqrt{T}\vec{y}(\tau/T) ,
+\ee
+
+\be \int_0^T d\tau \vec{\dot{x}}^2(\tau) \rightarrow \int_0^1 dt
+\vec{\dot{y}}^2(t).
+\ee
+
+There is no way to treat the integrals as continuous as we generate our loop
+ensembles.  Instead, we treat the integrals as sums over discrete points
+along the proper-time interval $[0,T]$.  This is fundamentally different
+from space-time discretization, however.  Any point on the worldline loop
+may exist at any position in space, and $T$ may take on any value.  It is
+important to note this distinction because the Worldline method retains
+Lorentz invariance while lattice techniques, in general, do not.
+
+The challenge of loop cloud generation is in generating a discrete set
+of points on a unit loop which obeys the prescribed velocity distribution.
+There are a number of different algorithms for achieving this goal which have
+been discussed in the literature.  Four possible algorithms are compared
+and contrasted in \cite{Gies:2003cv}.  In this work, we choose a more
+recently developed algorithm, dubbed ``d-loops", which was first described
+in \cite{Gies:2005sb}. To generate a ``d-loop", the number of points is iteratively 
+doubled, placing the new points in a Gaussian distribution between the existing neighbour points.
+We quote the algorithm directly:
+
+\begin{quote} 
+  \begin{singlespace}
+    \begin{itemize} 
+	  \item[(1)] Begin with one arbitrary point
+		$N_0=1$, $y_{N}$.
+
+	  \item[(2)] Create an $N_1=2$ loop, i.e., add a point $y_{N/2}$ that is
+	    distributed in the heat bath of $y_N$ with
+	   \begin{equation} 
+		 e^{-\frac{N_1}{4} 2 (y_{N/2} -y_{N})^2}. \label{yn2}
+	   \end{equation}
+
+      \item[(3)] Iterate this procedure, creating an $N_k=2^k$ppl loop by
+        adding $2^{k-1}$ points $y_{{qN}/{N_k}}$, $q=1,3,\dots, N_k-1$ with
+        distribution
+      \begin{equation} 
+	    e^{-\frac{N_k}{4} 2 [y_{qN/N_k} -\frac{1}{2}(y_{(q+1)N/N_k}+
+		y_{(q-1)N/N_k})]^2}. \label{ynk}
+	  \end{equation}
+
+      \item[(4)] Terminate the procedure if $N_k$ has reached $N_k=N$ for
+        unit loops with $N$ ppl.
+
+      \item[(5)] For an ensemble with common center of mass, shift each
+        whole loop accordingly.
+
+    \end{itemize}
+  \end{singlespace}	
+\end{quote}
+
+The above d-loop algorithm was selected since it is simple and about 10\%
+faster than previous algorithms, according to its developers, because it
+requires fewer algebraic operations.
+
+The generation of the loops is largely independent from the main program.
+Because of this, it was simpler to generate the loops using a Matlab 
+script. The Matlab function used for generating d-loops using the 
+above algorithm can be found in appendix \ref{sec:srcWLgen}.
+
+
+This function was used to produce text files containing the worldline data for 
+ensembles of loops. Then, these text files were read into memory at the 
+launch of each calculation. The results of this generation routine can 
+be seen in figure \ref{fig:worldlineplot}.
+
+When the \ac{CUDA} kernel is called\footnote{Please see appendix \ref{ch:cudafication} for an overview of \ac{CUDA}.}, 
+every thread in every block executes 
+the kernel function with its own unique identifier. So, it is best to 
+generate worldlines in integer multiples of the number of threads per 
+block. The Tesla C1060 device allows up to 512 threads per block.
+
+
+\begin{figure}
+	\centering
+		\includegraphics[width=14cm]{images/worldlineplot.eps}
+	\caption[Discretization of the worldline loop]
+	{A single discrete worldline loop shown at several levels 
+	of discretization. The loops form fractal patterns and have a strong 
+	parallel with Brownian motion. The colour
+	represents the phase of a particle travelling along the loop, and 
+	begins at dark blue, progresses in a random walk through yellow, 
+	and ends at dark 
+	red. The total flux through this particular worldline at $T=1$ and 
+	$B=B_k$ is about $0.08 \pi/e$.}
+	\label{fig:worldlineplot}
+\end{figure}
+
+\section{Cylindrical Worldline Numerics} 
+We now consider cylindrically symmetric external magnetic fields.
+In this case, we may simplify (\ref{eqn:QEDWL}),
+
+\be \frac{\Gamma^{(1)}_{\rm ferm}}{T
+L_z} = \frac{1}{4\pi} \int_0^\infty \rho_{\rm cm}
+  \left[ \int_0^\infty \frac{dT}{T^3}e^{-m^2T}\left\{\langle
+  W\rangle_{\vec{r}_{\rm cm}} - 1 -\frac{1}{3}(eB_{\rm
+  cm}T)^2\right\}\right]d\rho.
+  \label{eqn:cylEA}
+\ee 
+
+\subsection{Cylindrical Magnetic Fields} 
+
+We have $\vec{B} =
+B(\rho)$\bhattext{z} with
+
+\be \label{eqn:BWLN} B(\rho) = \frac{A_\phi(\rho)}{\rho} +
+\frac{dA_\phi(\rho)}{d\rho} \ee if we make the gauge choice that $A_0 =
+A_\rho = A_z = 0$.
+
+We begin by considering $\Aphi$ in the form
+
+\be \Aphi = \frac{F}{2\pi \rho}f_\lambda(\rho) \ee so that \be
+B_z(\rho)=\frac{F}{2\pi\rho}\frac{df_\lambda(\rho)}{d\rho} \ee and the total
+flux is \be \Phi=F(f_\lambda(L_\rho)-f_\lambda(0)).  \ee It is convenient
+to express the flux in units of $\frac{2 \pi}{e}$ and define a dimensionless
+quantity
+
+\be 
+	\mathcal{F}=\frac{e}{2 \pi} F.
+\ee
+
+%If we require that $B_z(\rho)$ remains finite at $\rho \to 0$ and that
+% $\frac{dB_z(\rho)}{d\rho}\biggr|_{\rho=0}=0$, then we can choose without
+%loss of generality that $f_\lambda(\rho) = C_1\rho^2 + C_2\rho^4 +...$
+%for small $\rho$ and $f_\lambda(L_\rho) = 1$.
+
+%\be C_1=\frac{eB_z(0)}{2 \mathcal{F}}\equiv\frac{e B_0}{2\mathcal{F}} \ee
+
+%\subsection{The Classical Action}
+
+%\ba \Gamma_{\rm Cl}& =& -\int d^4x\frac{B^2}{2} \\ \frac{\Gamma_{\rm Cl}}{T
+%L_z}  & =& \frac{F^2}{2\pi}
+%  \int_0^\infty \left( f'_\lambda(\rho^2)\right)^2 d\rho^2
+%\ea
+
+%If we take \be f_\lambda(\rho^2) = \frac{\rho^2}{(\lambda^2+\rho^2)} \ee then,
+
+%\be \frac{\Gamma_{\rm cl}}{TL_z} = \frac{-2\pi (\mathcal{F}/e)^2}{3 \lambda^2}
+%=\frac{-F^2}{6\pi \lambda^2} \ee
+
+\subsection{Wilson Loop}
+
+The quantity inside the angled brackets in equation (\ref{eqn:QEDWL}) is a 
+gauge invariant observable called a Wilson loop. We note that the proper time
+integral provides a natural path ordering for this operator.
+The Wilson loop expectation value is
+
+\be
+\label{eqn:wilsonloop}
+\langle W\rangle_{\vec{r}_{\rm cm}}= \left \langle e^{ie\int_0^T d\tau
+\vec{A}(\vec{r}_{{\rm cm}} + \vec{r}(\tau)) \cdot \dot{\vec{r}}}
+ \frac{1}{4} {\rm tr}  e^{\frac{e}{2}\int_0^T d\tau
+  \sigma_{\mu \nu}F_{\mu \nu}(\vec{r}_{{\rm cm}} + \vec{r}(\tau))}\right
+  \rangle_{\vec{r}_{\rm cm}},
+\ee
+which we look at as a product between a scalar part ($e^{ie\int_0^T d\tau
+\vec{A}(\vec{r}_{{\rm cm}} + \vec{r}(\tau)) \cdot \dot{\vec{r}}}$)
+and a fermionic part ($\frac{1}{4} {\rm tr}  e^{\frac{e}{2}\int_0^T d\tau
+  \sigma_{\mu \nu}F_{\mu \nu}(\vec{r}_{{\rm cm}} + \vec{r}(\tau))}$).
+  
+
+  
+\subsubsection{Scalar Part}
+
+In a magnetic field, the scalar part is related to the flux through 
+the loop, $\Phi_B$, by Stokes theorem:
+
+\ba
+ e^{ie\int_0^T d\tau
+ \vec{A} \cdot \dot{\vec{r}}} &=&
+ e^{ie\oint \vec{A}\cdot d\vec{r}} = e^{ie\int_{\vec{\Sigma}} \vec{\nabla}\times\vec{A} \cdot d\vec{\Sigma}}\\
+ & = & e^{ie\int_{\vec{\Sigma}} \vec{B} d\vec{\Sigma}} = e^{ie\Phi_B}.
+\ea
+So, this factor accounts for the Aharonov-Bohm phase aquired by 
+particles in the loop.
+
+The loop discretization results in the following approximation of the
+scalar integral:
+
+\be
+  \oint \vec{A}(\vec{r})\cdot d\vec{r} =  \sum_{i=1}^{N_{ppl}}
+  \int_{\vec{r}^i}^{\vec{r}^{i+1}}\vec{A}(\vec{r})\cdot d\vec{r}.
+\ee 
+Using a linear parameterization of the positions, the line integrals are
+
+\be 
+  \int_{\vec{r}^i}^{\vec{r}^{i+1}}\vec{A}(\vec{r})\cdot d\vec{r} =
+  \int_0^1dt \vec{A}(\vec{r}(t))\cdot(\vec{r}^{i+1} - \vec{r}^i).
+\ee
+Using the same gauge choice outlined above ($\vec{A}=A_\phi \hat{\phi}$),
+we may write
+
+\be 
+	\vec{A}(\vec{r}(t)) = \frac{\mathcal{F}}{e\rho^2} 
+	f_\lambda(\rho^2)(-y,x,0),
+\ee 
+where we have chosen $f_\lambda(\rho^2)$ to depend on $\rho^2$ instead
+of $\rho$ to simplify some expressions and to 
+avoid taking many costly square roots in the worldline numerics.
+We then have
+
+\be \int_{\vec{r}^i}^{\vec{r}^{i+1}}\vec{A}(\vec{r})\cdot
+d\vec{r} = \mathcal{F} (x^iy^{i+1}-y^i x^{i+1})\int_0^1
+dt\frac{f_\lambda(\rho_i^2(t))}{\rho_i^2(t)}.  \ee The linear interpolation
+in Cartesian coordinates gives
+
+\be 
+	\label{eqn:rhoi} \rho_i^2(t) = A_i + 2B_it + C_i t^2,
+\ee
+where
+\ba 
+	A_i &=& (x^i)^2 + (y^i)^2 \\ 
+	B_i&=&x^i(x^{i+1} - x^i) + y^i(y^{i+1}-y^i)\\ 
+	C_i &= &(x^{i+1}-x^i)^2 + (y^{i+1}-y^i)^2. 
+	\label{eqn:Ci} 
+\ea
+
+In performing the integrals along the straight lines connecting
+each discretized loop point, we are in danger of violating gauge invariance.
+If these integrals can be performed analytically, than gauge invariance
+is preserved exactly.  However, in general, we wish to compute these integrals
+numerically.  In this case, gauge invariance is no longer guaranteed, but
+can be preserved to any numerical precision that's desired.
+
+\subsubsection{Fermion Part} 
+
+For fermions, the Wilson loop
+is modified by a factor,
+
+\ba 
+W^{\rm ferm.} &=& \frac{1}{4}{\rm tr}\left(e^{\frac{1}{2}
+	e\int_0^T d\tau \sigma_{\mu \nu}F^{\mu \nu}}\right)\\ 
+	&=& \frac{1}{4}{\rm tr}\left(e^{\sigma_{x y} 
+	e\int_0^T d\tau B\left(x(\tau)\right)}\right) \\	
+	&=& \cosh{\left(e \int_0^T d\tau B\left(x(\tau)\right)\right)}\\
+	&=& \cosh{\left(2\mathcal{F}\int_0^T
+	d\tau f'_\lambda(\rho^2(\tau))\right)},
+	\label{eqn:Wfermfpl}
+\ea 
+where I have used the
+relation 
+\be 
+	eB = 2\mathcal{F}\frac{d f_\lambda(\rho^2)}{d \rho^2} =
+	2\mathcal{F}f'_\lambda(\rho^2).  
+\ee 
+
+This factor represents an additional contribution to the 
+action because of the spin interaction with the magnetic field. 
+Classically, for a particle with a magnetic moment $\vec{\mu}$ 
+travelling through a magnetic field in a time $T$, the 
+action is modified by a term given by
+\be
+	\Gamma^0_{\rm spin} = \int_0^T \vec{\mu} \cdot \vec{B}(\vec{x}(\tau)) d\tau.
+\ee
+The magnetic moment is related to the electron spin 
+$\vec{\mu} = g\left(\frac{e}{2m}\right)\vec{\sigma}$, 
+so we see that the integral in the above quantum fermion factor is 
+very closely related to the classical action 
+associated with transporting a magnetic moment through a magnetic field:
+\be
+	\Gamma^0_{\rm spin} = g\left(\frac{e}{2m}\right) \sigma_{x y} \int_0^T B_z(x(\tau))d\tau.
+\ee
+Qualitatively, we could write
+\be 
+	W^{\rm ferm} \sim \cosh{\left(\Gamma^0_{\rm spin}\right)}.
+\ee
+
+
+As a possibly useful aside, we may want to express 
+the integral in terms of $f_\lambda(\rho^2)$ instead of its derivative.
+We can do this by integrating by parts:
+\ba 
+	\int_0^T d\tau f'_\lambda(\rho^2(\tau)) &=& 
+	\frac{T}{N_{\rm ppl}}\sum_{i=1}^{N_{\rm ppl}}\int_0^1 dt f'_\lambda(\rho^2_i(\tau))
+	\\ & = & 
+	\frac{T}{N_{\rm ppl}}\sum_{i=1}^{N_{\rm ppl}}\biggr[
+	\frac{f_\lambda(\rho^2_i(t))}{2(B_i+C_it)}\biggr|^{t=1}_{t=0} \nonumber \\
+  & & +\frac{C_i}{2}\int_0^1 \frac{f_\lambda(\rho^2_i(t))}{(B_i+C_i
+  t)^2} dt\biggr] \\ & = &  \frac{T}{N_{\rm ppl}}\sum_{i=1}^{N_{\rm
+  ppl}}\frac{C_i}{2}\int_0^1 \frac{f_\lambda(\rho^2_i(t))}{(B_i+C_i t)^2} dt,
+\ea 
+with $\rho_i^2(t)$ given by equations (\ref{eqn:rhoi}) to (\ref{eqn:Ci}).
+The second equality is obtained from integration-by-parts.  In the third
+equality, we use the loop sum to cancel the boundary terms in pairs:
+
+\be 
+\label{eqn:Wfermfl}
+W^{{\rm ferm.}} = \cosh{\left(\frac{\mathcal{F}T}{N_{\rm
+ppl}}\sum_{i=1}^{N_{{\rm ppl}}}
+  C_i \int_0^1 dt \frac{f_\lambda(\rho^2_i(t))}{(B_i+C_i t)^2}\right)}.
+\ee
+In most cases, one would use equation (\ref{eqn:Wfermfpl}) to compute the fermion factor 
+of the Wilson loop. However, 
+equation (\ref{eqn:Wfermfl}) may be useful in cases where $f'_\lambda(\rho^2(\tau))$
+is not known or is difficult to compute. 
+
+%\subsubsection{Step-Function Flux Tube} Consider the specific example
+%of a step-function flux tube \be B_z(\rho) = \frac{F}{\pi \lambda^2}
+%\theta(\lambda-\rho) \ee so that
+
+%\be f_\lambda(\rho^2)=\frac{\rho^2}{\lambda^2}\theta(\lambda^2-\rho^2) +
+%\theta(\rho^2-\lambda^2).  \ee
+
+\subsection{Renormalization}
+
+The field strength renormalization counter-terms result from the small $T$
+behaviour of the worldline integrand.  In the limit where $T$ is very small,
+the worldline loops are very localized around their center of mass.  So,
+we may approximate their contribution as being that of a constant field
+with value $\vec{A}(\vec{r}_{{\rm cm}})$.  Specifically, we require that the field
+change slowly on the length scale defined by $\sqrt{T}$. This condition on 
+$T$ can be written
+
+\be 
+T \ll \left|\frac{m^2}{e B'(\rho^2)}\right| 
+= \left| \frac{m^2}{2\mathcal{F}f''_\lambda(\rho^2_{\rm cm})}\right|.
+\ee 
+
+When this limit is satisfied, we may use the exact expressions for the
+constant field Wilson loops to determine the small $T$ behaviour of the
+integrands and the corresponding counter terms.
+
+The Wilson loop averages for constant magnetic fields in scalar and 
+fermionic \ac{QED} are
+
+\be
+	\mean{W}_{\rm ferm} = eBT\coth{(eBT)}
+\ee
+and
+\be
+	\mean{W}_{\rm scal} = \frac{eBT}{\sinh{(eBT)}}.
+\ee
+So, the integrand for fermionic \ac{QED} in the limit of small $T$ is
+
+\ba \label{eqn:fermI} I_{\rm ferm}(T) &=&
+\frac{e^{-m^2T}}{T^3}\left[eB(\vec{r}_{cm})T\coth{(eB(\vec{r}_{cm})T)}
+- 1 -\frac{e^2}{3} B^2(\vec{r}_{cm})T^2\right] \nonumber \\ &\approx&-\frac{(eB)^4
+T}{45}+\frac{1}{45} (eB)^4 m^2 T^2+\left( \frac{2 (eB)^6}{945}-\frac{(eB)^4
+m^4}{90}\right)T^3 \nonumber \\
+  & & +\frac{(7 (eB)^4 m^6-4 (eB)^6 m^2)T^4 }{1890}+O(T^5).
+\ea
+For \ac{ScQED}, we have
+\ba 
+\label{eqn:scalI} I_{\rm scal}(T) &=&
+\frac{e^{-m^2T}}{T^3}\left[eB(\vec{r}_{cm})T/\sinh{(eB(\vec{r}_{cm})T)}
+- 1 +\frac{1}{6} (eB)^2(\vec{r}_{cm})T^2\right] \nonumber \\ &\approx&\frac{7
+(eB)^4 T}{360}-\frac{7  (eB)^4 m^2 T^2}{360}+\frac{(147 (eB)^4 m^4-31
+(eB)^6)T^3 }{15120} \nonumber \\ & &+\frac{ (31 (eB)^6 m^2-49 (eB)^4
+m^6)T^4}{15120}+O(T^5). 
+\ea
+
+Beyond providing the renormalization conditions, these expansions can be used
+in the small $T$ regime to avoid a problem with the Wilson loop uncertainties
+in this region.  Consider the uncertainty in the integrand arising from the
+uncertainty in the Wilson loop:
+
+\ba 
+\delta I(T) &=& \frac{\partial I}{\partial W} \delta W \\
+  &=& \frac{e^{-m^2 T}}{T^3} \delta W.
+\ea In this case, even though we can compute the Wilson loops for small $T$
+precisely, even a small uncertainty is magnified by a divergent factor when
+computing the integrand for small values of $T$.  So, in order to perform
+the integral, we must replace the small $T$ behaviour of the integrand with
+the above expansions (\ref{eqn:fermI}) and (\ref{eqn:scalI}).  Our worldline
+integral then proceeds by analytically computing the integral for the small
+$T$ expansion up to some small value, $a$, and adding this to the remaining
+part of the integral~\cite{MoyaertsLaurent:2004}:
+
+\be 
+	\int_0^{\infty} I(T) dT = \underbrace{\int_0^a I(T) dT}_{\rm small ~T} 
+	+ \underbrace{\int_a^\infty I(T)dT}_{\rm worldline ~numerics}.
+\ee
+Because this normalization proceedure uses the constant field expressions for small values of 
+$T$, this scheme introduces a small systematic uncertainty. To improve on the 
+method outlined here, the derivatives of the background field can 
+be accounted for by using the analytic forms of the heat kernel expansion to perform the 
+renormalization~\cite{Gies:2001tj}. 
+
+\begin{figure}[ht] 
+  \begin{center}
+    \includegraphics[width=5in]{images/Integrand.eps} 
+	    \caption[small $T$ behaviour of worldline numerics]
+		{The small $T$
+		behaviour of \ac{WLN}.  The data points represent the numerical
+		results, where the error bars are determined from the jackknife analysis described 
+		in chapter \ref{ch:WLError}.
+		The solid line represents the exact solution while the dotted line represents
+		the small $T$ expansion of the exact solution.  Note the amplification of
+		the uncertainties.} 
+  \end{center} 
+\end{figure}
+
+\section{Computing an Effective Action}
+
+The ensemble average in the effective action is simply the sum over the
+contributions from each worldline loop, divided by the number of loops in
+the ensemble.  Since the computation of each loop is independent of the
+other loops, the ensemble average may be straightforwardly parallelized by
+generating separate processes to compute the contribution from each loop.
+For this parallelization, four Nvidia Tesla C1060 \acp{GPU} were used through
+the \ac{CUDA} parallel programing framework.  Because \acp{GPU} can spawn
+thousands of parallel processing threads\footnote{Each Tesla C1060 device has 30 multiprocessors
+which can each support 1,024 active threads.  So, the number of threads available at a time 
+is 30,720 on each of the Tesla devices.  Billions of threads may be scheduled on each 
+device~\cite{cudazone}.} 
+with much less computational overhead
+than an \ac{MPI} cluster, they excel at handling a very large number of parallel 
+threads, although the clock speed is slower and fewer memory resources are typically available.
+In contrast, parallel computing on a cluster using \acs{CPU} 
+tends to have a much higher speed per thread, but there are typically fewer 
+threads available.  The worldline technique is exceedingly parallelizable, 
+and it is a straightforward matter to divide the task into thousands or tens of thousands of 
+parallel threads.  In this case,  one should expect excellent performance 
+from a \ac{GPU} over a parallel \ac{CPU} implementation, unless thousands 
+of \acp{CPU} are available for the program. The \ac{GPU} architecture has 
+recently been used by another group for computing Casimir forces using 
+worldline numerics~\cite{2011arXiv1110.5936A}.
+Figure \ref{fig:coprocessing} 
+illustrates the coprocessing and parallelization scheme used here for the 
+worldline numerics.
+
+\begin{figure}
+	\centering
+		\includegraphics[width=12cm]{images/CoprocessingDiagram.eps}
+                \caption[Heterogeneous processing scheme for worldline numerics]
+				{The \ac{CPU} manages the loops which compute the 
+					integrals over center of mass and proper time. 
+					For each proper time integral, we require the results 
+					from a large number of individual worldlines. The \ac{GPU}
+					is used to compute the integral 
+					over each worldline in parallel, and the 
+					results are returned to the \ac{CPU} for use in the effective action
+					calculation.}.
+	\label{fig:coprocessing}
+\end{figure}
+
+In an
+informal test, a Wilson loop average was computed using an ensemble of 5000
+loops in 4.7553 seconds using a serial implementation 
+while the \ac{GPU} performed the same calculation
+in 0.001315 seconds using a \ac{CUDA} implementation.  
+A parallel \ac{CPU} code would require a cluster with thousands of 
+cores to achieve a similar speed, even if we assume linear (ideal) 
+speed-up.  So, for \ac{WLN} computations,
+a relatively inexpensive \ac{GPU} can be expected to outperform a small
+or mid-sized cluster.  This increase in computation speed has enabled the
+detailed parameter searches discussed in this dissertation.
+
+Of course, there are also tradeoffs from using the 
+\ac{GPU} architecture with the \ac{WLN} technique. The most significant 
+of these is the limited availability of memory on the device. A \ac{GPU} device 
+provides only a few GB of global memory (4GB on the Tesla C1060). This limit 
+forces compromises between the number of points-per-loop and the number of 
+loops to keep the total size of the loop cloud data small. The limited availability of memory 
+resources also limits the number of threads which can be executed concurrently on the device.
+Because of the overhead associated with transfering data to and from the device, 
+the advantages of a \ac{GPU} over a \ac{CPU} cluster are most pronounced 
+on problems which can be divided into several hundred or thousands of processes. 
+Therefore, the \ac{GPU} may not offer great performance advantages 
+for a small number of loops. Finally, there is some additional complexity involved 
+in programming for the \ac{GPU} in terms of learning specialized libraries and 
+memory management on the device. This means that the code may take longer to develop
+and there may be a learning curve for researchers. However, this problem 
+is not much more pronounced with \ac{GPU} programming than with other 
+parallelization strategies.
+
+Once the ensemble average of the Wilson loop has been computed, computing
+the effective action is a straightforward matter of performing numerical
+integrals.  The effective action density is computed by performing the
+integration over proper time, $T$.  Then, the effective action is computed
+by performing a spacetime integral over the loop ensemble center of mass.
+In all cases where a numerical integral was performed, Simpson's method was
+used~\cite{burden2001numerical}. Integrals from 0 to $\infty$ were mapped to the 
+interval $[0,1]$ using substitutions of the form $x = \frac{1}{1+T/T_{\rm max}}$, 
+where $T_{\rm max}$ sets the scale for the peak of the integrand. In the constant field 
+case, for the integral over proper time,
+ we expect $T_{\rm max} \sim 3/(eB)$ for large fields and $T_{\rm max} \sim 1$ for 
+fields of a few times critical or smaller. In chapter \ref{ch:WLError}, we present 
+a detailed discussion of how the statistical and discretization uncertainties 
+can be computed in this technique.
+
+In this implementation, the numerical integrals are done using a serial CPU
+computation. 
+This serial portion of the algorithm tends to limit the speedup that can be achieved with 
+the large number of parallel threads on the \ac{GPU} device\footnote{By Amdahl's law, 
+for a program with a ratio, $P$, of parallel to serial computations on $N$ processors, 
+the speedup is given by $S < \frac{1}{(1-P)+\frac{P}{N}}$. This law predicts 
+rapidly deminishing returns from increasing the number of processors when $P>0$ 
+for a fixed problem size.}. 
+However, an important 
+benefit of the large number of threads available on the \ac{GPU} is that the 
+number of worldlines in the ensemble can be increased without limit, as long 
+as more threads are available, without significantly increasing the computation time. 
+If perfect occupancy could be achieved on a Tesla C1060 device, an ensemble 
+of up to 30,720 worldlines could be computed concurrently.
+Thus, the \ac{GPU} provides an excellent architecture for improving the 
+statistical uncertainties. Additionally, there is room for further optimization of 
+the algorithm by parallelizing the serial portions of the 
+algorithm to achieve a greater speedup.
+
+More details about implementing this algorithm on the \ac{CUDA} architecture 
+can be found in appendix \ref{ch:cudafication}. A listing of the 
+\ac{CUDA} \ac{WLN} code appears in appendix \ref{ch:sourcecode}. 
+
+
+
+\section{Verification and Validation}
+
+The \ac{WLN} software can be validated and verified by making sure that it 
+produces the correct results where the derivative expansion is a good approximation, 
+and that the results are consistent with previous numerical calculations of flux tube 
+effective actions. For this reason, the validation was done primarily with flux tubes with 
+a profile defined by the function
+\be
+	f_\lambda(\rho^2) = \frac{\rho^2}{(\lambda^2 + \rho^2)}.
+\ee
+For large values of $\lambda$, this function varies slowly on the Compton wavelength 
+scale, and so the derivative expansion is a good approximation. Also, flux tubes 
+with this profile were studied previously using \ac{WLN}
+\cite{Moyaerts:2003ts, MoyaertsLaurent:2004}.
+
+Among the results presented in~\cite{MoyaertsLaurent:2004} is a comparison of 
+the derivative expansion and \ac{WLN} for this magnetic field 
+configuration. The result is that the next-to-leading-order term 
+in the derivative expansion is only a small correction to the the 
+leading-order term for $\lambda \gg \lambda_e$, where the derivative 
+expansion is a good approximation. The derivative expansion breaks
+down before it reaches its formal validity limits 
+at $\lambda \sim \lambda_e$. For this reason,
+we will simply focus on the leading order derivative expansion (which we call the
+\ac{LCF} approximation).
+The effective action of \ac{QED} in the \ac{LCF} approximation is given 
+in cylindrical symmetry by
+\ba
+	\label{eqn:LCFferm}
+	\Gamma^{(1)}_{\rm ferm} &=& \frac{1}{4\pi}\int_0^\infty dT 
+	\int_0^\infty \rho_{\rm cm} d\rho_{\rm cm}\frac{e^{-m^2T}}{T^3} \nonumber \\
+	& &\left\{eB(\rho_{\rm cm})T\coth{(eB(\rho_{\rm cm})T)} 
+	- 1 -\frac{1}{3}(eB(\rho_{\rm cm})T)^2\right\}.
+\ea
+
+\begin{figure}
+	\centering
+		\includegraphics[width=12cm]{images/igrandvsT4.F10l21.eps}
+	\caption[Comparison with derivative expansion for $T$ integrand]
+	{The integrand of the proper time, $T$, integral for three different values 
+	of the radial coordinate, $\rho$ for a $\lambda = 1$ flux tube. The solid lines 
+	represent the zeroth-order derivative expansion, which, as expected, is a good approximation 
+	until $\rho$ becomes too small.}
+	\label{fig:igrandvsT}
+\end{figure}
+
+Figure \ref{fig:igrandvsT} shows a comparison between the proper time integrand,
+\be
+	\frac{e^{-m^2T}}{T^3}\left[\langle W\rangle_{\vec{r}_{\rm cm}} 
+		- 1 -\frac{1}{3}(eB_{\rm cm}T)^2\right],
+\ee
+and the \ac{LCF} approximation result for a flux tube with $\lambda = \lambda_e$ and
+$\mathcal{F} = 10$. In this case, the \ac{LCF} approximation is only appropriate far from the 
+center of the flux tube, where the field is not changing very rapidly. In the figure, we can 
+begin to see the deviation from this approximation, which gets more pronounced closer to the 
+center of the flux tube (smaller values of $\rho$).
+
+
+
+\begin{figure}
+	\centering
+		\includegraphics[width=12cm]{images/vsxcm.ferm.smooth.eps}
+	\caption[Comparison with \acs{LCF} approximation for action density]
+	{The fermion term of the effective action density as a function 
+	of the radial coordinate for a flux tube with width $\lambda = 10 \lambda_e$. }
+	\label{fig:vsrhocm}
+\end{figure}
+
+The effective action density for a slowly varying flux tube is plotted in figure
+\ref{fig:vsrhocm} along with the \ac{LCF} approximation. In this case, 
+the \ac{LCF} approximation agrees within the statistics of the \ac{WLN}.
+
+%\begin{figure}
+%	\centering
+%		\includegraphics[width=12cm]{images/EAaf2vsl.eps}
+%	\caption[One-loop correction versus flux tube radius]
+%	{The fermion term of the effective action for flux tubes 
+%	with a wide range of widths and for several values of flux. }
+%	\label{fig:EAaf2vsl}
+%\end{figure}
+
+%In figure \ref{fig:EAaf2vsl}, we plot the fermionic term of the effective 
+%action over several orders of magnitude of $\lambda$ for several values of 
+%the dimensionless flux parameter, $\mathcal{F}$. These results are consistent with 
+%previous \ac{WLN} calculations~\cite{Moyaerts:2003ts, MoyaertsLaurent:2004}.
+
+\section{Conclusions}
+
+In this chapter, I have reviewed the \ac{WLN} numerical technique with a focus 
+on computing the effective action of \ac{QED} in nonhomogeneous, cylindrically symmetric 
+magnetic fields. The method uses a Monte Carlo generated ensemble of worldline loops 
+to approximate a path integral in the worldline formalism. These worldline loops are 
+generated using a simple algorithm and encode the information about the magnetic 
+field by computing the flux through the loop and the action aquired from transporting a 
+magnetic moment around the loop.
+This technique preserves Lorentz symmetry exactly and can preserve 
+gauge symmetry up to any required precision. 
+
+I have discussed implementing this technique on \ac{GPU} architecture using 
+\ac{CUDA}. The main advantage of this architecture is that it allows for a 
+very large number of concurrent threads which can be utilized with 
+very little overhead. In practice, this means that a large ensemble 
+of worldlines can be computed concurrently, thus allowing for a considerable 
+speedup over serial implementations, and allowing for the precision of the 
+numerics to increase according to the number of threads available. 
