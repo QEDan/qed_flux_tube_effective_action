@@ -25,9 +25,8 @@ def test_telemetry_density_integrand():
     
     # Run integration
     action, density = orch.compute_effective_action(
-        profile, chi_values, ml_values, sigma3_values
-    )
-    
+        profile, chi_values, ml_values, sigma3_values, collect_density=True
+    )    
     assert isinstance(action, torch.Tensor)
     assert isinstance(density, torch.Tensor)
     assert density.shape == rho.shape

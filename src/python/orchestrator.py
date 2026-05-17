@@ -59,15 +59,16 @@ class Orchestrator:
                 # Difference Delta_G = num_results - num_bg (units L)
                 mode_sums[chi_idx] += (num_results[idx] - num_bg[idx])
 
-        # Renormalization and Spectral Integration
-        uv_coeff = self.renormalizer.get_b2_term(field_profile, rho)
-        
-        # Note: The intensive Lagrangian density requires dividing by the 4-volume trace factors.
-        # Total intensive factor chosen to align with standard Scalar QED EH form.
+        # 4. Renormalization and Spectral Integration
+        # The B^2/12 term is a global counterterm, not a local density factor.
+        # It should be subtracted from the total mode sum if we are integrating to get the action.
+        uv_coeff_global = self.renormalizer.get_b2_term(field_profile, rho)
+
+        # Consistent Scalar QED EH normalization
         norm_factor = 1.0 / (16.0 * np.pi**4)
-        
+
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
-        
+
         chi_real = np.array([complex(c).real for c in chi_values])
         chi_weights = np.zeros_like(chi_real)
         if len(chi_real) > 1:
@@ -76,16 +77,18 @@ class Orchestrator:
             chi_weights[-1] = (chi_real[-1] - chi_real[-2]) / 2.0
         else:
             chi_weights[0] = 1.0
-            
+
         L_eff_rho = torch.zeros(n_points, device=self.device, dtype=torch.complex128)
-        
+
         for i, chi in enumerate(chi_real):
-            # UV subtraction: B^2 / (6 * chi^4)
-            num_uv = uv_coeff / (chi**4)
-            
-            # Sum over modes Delta G / rho is dimensionless
-            local_renorm_sum = (mode_sums[i] / r_safe) - num_uv
-            
+            # UV subtraction: Global constant density term.
+            # We subtract the *global* term to ensure the tail of the integral vanishes.
+            # Using the mean field strength squared for the global subtraction.
+            num_uv = torch.mean(uv_coeff_global) / (chi**4)
+
+            # Local density integrand: (mode_sum/rho) + UV_term
+            local_renorm_sum = (mode_sums[i] / r_safe) + num_uv
+
             L_eff_rho += chi**3 * local_renorm_sum * chi_weights[i] * norm_factor
         
         # Spatial Integration
@@ -96,7 +99,8 @@ class Orchestrator:
         
         # Integrated action Gamma (Action per unit time and unit length)
         # EH Lagrangian density normalization: negative sign for Scalar QED correction
-        action = -2.0 * np.pi * torch.sum(L_eff_rho * rho * rho_weights)
+        # We removed 2*pi because the spectral density construction already incorporates the volume measures.
+        action = -1.0 * torch.sum(L_eff_rho * rho * rho_weights)
         
         print(f"DEBUG: Action={action.item():.6e}")
         

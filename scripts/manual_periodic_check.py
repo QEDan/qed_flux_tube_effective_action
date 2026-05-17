@@ -36,7 +36,7 @@ def run_manual_validation():
     print("Starting Orchestrator Integration...")
     # Compute effective action and Lagrangian density
     action, L_eff_rho = orchestrator.compute_effective_action(
-        profile, chi_vals, ml_vals, sigma3_vals, m=1.0, e=1.0
+        profile, chi_vals, ml_vals, sigma3_vals, m=1.0, e=1.0, collect_density=True
     )
     
     # Extract density values
