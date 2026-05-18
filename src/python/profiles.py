@@ -197,3 +197,22 @@ class MLPProfile(FieldProfile):
         r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
         # da_phi = B - a_phi / rho
         self.da_phi = self.B_vals - self.a_phi / r_safe
+
+class PureGaugeProfile(FieldProfile):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], F: float, e: float = 1.0) -> None:
+        """
+        Represents a vacuum profile with non-zero vector potential corresponding to a total flux F.
+        B = 0 everywhere, but A_phi = F / (2*pi*rho).
+        Used for topological vacuum subtraction.
+        """
+        super().__init__(rho)
+        self.F = F
+        self.e = e
+        self.update()
+
+    def update(self) -> None:
+        r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
+        pre = self.F / (2.0 * np.pi)
+        self.a_phi = pre / r_safe
+        self.da_phi = -pre / (r_safe**2)
+

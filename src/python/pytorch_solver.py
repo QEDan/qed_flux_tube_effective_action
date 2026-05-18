@@ -126,9 +126,10 @@ class PyTorchSolver:
         
         import mpmath
         rho_max = rho[-1].item()
+        # k2_ext = chi^2 - m^2. For Euclidean chi = iQ, k2_ext = -Q^2 - m^2 = -kappa^2.
         k2_ext = params['chi']*params['chi'] - params['m']*params['m']
-        k2_ext = torch.where(torch.abs(k2_ext) < 1e-12, torch.tensor(1e-12 + 0j, dtype=torch.complex128), k2_ext)
-        # Backward boundary condition: use F=0 for vacuum check
+        
+        # Backward boundary condition: 
         F_val = F if F is not None else 0.0
         n_order = params['ml'].to(torch.float64) - (params['e'] * (F_val) / (2.0 * np.pi))
 
@@ -138,16 +139,20 @@ class PyTorchSolver:
         
         for b in range(n_batch):
             k2, ord_val = k2_ext[b].item(), n_order[b].item()
+            # Handle both Minkowski (k2 > 0) and Euclidean (k2 < 0)
             if k2.real > 0:
+                # Oscillatory (Minkowski)
                 k_val = np.sqrt(k2)
                 z = k_val * rho_max
                 u_mp = mpmath.bessely(ord_val, z)
                 du_mp = mpmath.diff(lambda x: mpmath.bessely(ord_val, x), z) * k_val
             else:
-                kappa = np.sqrt(-k2)
+                # Decaying (Euclidean) - This is the preferred stable mode
+                kappa = np.sqrt(-k2 + 0j)
                 z = kappa * rho_max
                 u_mp = mpmath.besselk(ord_val, z)
                 du_mp = mpmath.diff(lambda x: mpmath.besselk(ord_val, x), z) * kappa
+                
             mag_mp = mpmath.sqrt(abs(u_mp)**2 + abs(du_mp)**2)
             u_inf_init[b] = complex(u_mp / mag_mp)
             du_inf_init[b] = complex(du_mp / mag_mp)

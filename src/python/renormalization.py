@@ -13,70 +13,65 @@ class Renormalizer:
         self.device = torch.device(device)
         self._g0_cache: Dict[Tuple[complex, int], torch.Tensor] = {}
 
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor) -> torch.Tensor:
+    def compute_g0_local(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         """
-        Computes the analytic vacuum Green's function G0_ml(rho, rho) for the ODE.
-        The result is G0 = -pi/2 * rho * J_ml(k*rho) * Y_ml(k*rho).
-        Units: [Length]
+        Computes the topological vacuum Green's function G0_ml(rho, rho) 
+        matching the local vector potential A(rho).
         """
+        _, a_phi, _ = field_profile.get_arrays(as_numpy=False)
+        e = 1.0
+        
+        # k = sqrt(chi^2 - m^2)
         k2 = chi*chi - m*m
-        k2 = torch.where(torch.abs(k2) < 1e-12, torch.tensor(1e-12, dtype=torch.complex128), k2)
-        k = torch.sqrt(k2).to(torch.complex128)
-
-        n_points = len(rho)
+        
         n_batch = len(chi)
+        n_points = len(rho)
         
-        g0 = torch.zeros((n_batch, n_points), device=self.device, dtype=torch.complex128)
+        # n_local: (n_batch, n_points)
+        n_local = ml.unsqueeze(-1) - e * (a_phi * rho).unsqueeze(0)
         
-        # Identify unique (chi, ml) pairs to compute
-        to_compute_indices: List[int] = []
+        # Convert to numpy for scipy
+        n_np = n_local.detach().cpu().numpy()
+        k2_np = k2.detach().cpu().numpy()
+        rho_np = rho.detach().cpu().numpy()
+        
+        res_np = np.zeros_like(n_np, dtype=np.complex128)
+        
+        from scipy.special import iv, kv, jv, yv
+        
         for i in range(n_batch):
-            c_val = complex(chi[i].item())
-            m_val = int(ml[i].item())
-            key = (c_val, m_val)
-            if key in self._g0_cache:
-                g0[i] = self._g0_cache[key]
+            k2_val = k2_np[i]
+            # Potential only depends on order squared, so we use abs(order)
+            # for numerical stability in Bessel functions.
+            order = np.abs(n_np[i])
+            
+            if k2_val.real < 0:
+                # EUCLIDEAN: k = i * kappa
+                kappa = np.sqrt(-k2_val.real)
+                z = kappa * rho_np
+                
+                # Asymptotic is very stable: G_radial = 1 / (2 * sqrt(n^2 + z^2))
+                res_np[i] = 0.5 / np.lib.scimath.sqrt(order**2 + z**2 + 1e-15)
+                
+                # Use iv * kv for small values where asymptotic might be off
+                # abs(order) ensures we use the correct branch for non-integer orders
+                mask_reg = (order < 50) & (z < 100)
+                if np.any(mask_reg):
+                    res_np[i][mask_reg] = iv(order[mask_reg], z[mask_reg]) * kv(order[mask_reg], z[mask_reg])
             else:
-                to_compute_indices.append(i)
-                
-        if to_compute_indices:
-            idx = torch.tensor(to_compute_indices, device=self.device)
-            sub_k = k[idx]
-            sub_ml = ml[idx]
-            
-            sub_k_rho = sub_k.unsqueeze(-1) * rho.unsqueeze(0)
-            sub_k_rho_np = sub_k_rho.detach().cpu().numpy()
-            sub_ml_np = sub_ml.detach().cpu().numpy()
-            
-            sub_g0_np = np.zeros_like(sub_k_rho_np, dtype=np.complex128)
-            
-            for i, m_val in enumerate(sub_ml_np):
-                m_abs = np.abs(m_val)
-                z = sub_k_rho_np[i]
-                
-                # Use approximation for large ml to avoid overflow in Y_ml
-                # For m >> z: G_radial_0 = 1 / (2 * sqrt(m^2 - z^2))
-                # For z >> m: G_radial_0 = -i / (2 * sqrt(z^2 - m^2))
-                # Both are handled by complex square root.
-                if m_abs > 50:
-                    # Dimension: [L^0] for G_radial_0 (scale invariant part)
-                    val = 0.5 / np.lib.scimath.sqrt(m_abs**2 - z**2 + 1e-15)
-                    sub_g0_np[i] = val
-                else:
-                    res_j = jv(float(m_val), z)
-                    res_y = yv(float(m_val), z)
-                    sub_g0_np[i] = -0.5 * np.pi * res_j * res_y
-            
-            # G = rho * G_radial_0
-            sub_g0_final = torch.from_numpy(rho.detach().cpu().numpy() * sub_g0_np).to(self.device).to(torch.complex128)
-            
-            # Update cache and result
-            for i, actual_idx in enumerate(to_compute_indices):
-                g0[actual_idx] = sub_g0_final[i]
-                c_val = complex(chi[actual_idx].item())
-                m_val = int(ml[actual_idx].item())
-                self._g0_cache[(c_val, m_val)] = sub_g0_final[i]
-                
+                # MINKOWSKI
+                k = np.sqrt(k2_val)
+                z = k * rho_np
+                mask_asym = (z < order) | (order > 50)
+                res_np[i] = 0.5 / np.lib.scimath.sqrt(order**2 - z**2 + 1e-15)
+                mask_reg = ~mask_asym
+                if np.any(mask_reg):
+                    res_j = jv(order[mask_reg], z[mask_reg])
+                    res_y = yv(order[mask_reg], z[mask_reg])
+                    res_np[i][mask_reg] = -0.5 * np.pi * res_j * res_y
+
+        # G = rho * G_radial
+        g0 = torch.from_numpy(rho_np * res_np).to(self.device).to(torch.complex128)
         return g0
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
