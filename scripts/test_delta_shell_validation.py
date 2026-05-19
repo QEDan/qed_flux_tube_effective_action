@@ -59,7 +59,10 @@ def get_analytic_delta_shell_g(rho, R, F, chi, ml, sigma3, m=1.0, e=1.0):
                 C = np.linalg.solve(mat, vec)
                 u0_val = C[0] * iv(n_nu, kappa*r) + C[1] * kv(n_nu, kappa*r)
                 uinf_val = kv(n_nu, kappa*r)
-            g[i] = (r * u0_val * uinf_val) / W0
+            # The Green's function satisfies (L - E)G = (1/r)delta.
+            # For L = (1/r)d/dr(r d/dr) - V, G = - u0*uinf / W0.
+            # The result here is r*G to match the numerical solver.
+            g[i] = - (r * u0_val * uinf_val) / W0
             
     else: # k2 > 0
         k = np.sqrt(k2 + 0j)
@@ -96,7 +99,10 @@ def get_analytic_delta_shell_g(rho, R, F, chi, ml, sigma3, m=1.0, e=1.0):
                 C = np.linalg.solve(mat, vec)
                 u0_val = C[0] * jv(n_nu, k*r) + C[1] * yv(n_nu, k*r)
                 uinf_val = yv(n_nu, k*r)
-            g[i] = (r * u0_val * uinf_val) / W0
+            # The Green's function satisfies (L - E)G = (1/r)delta.
+            # For L = (1/r)d/dr(r d/dr) - V, G = - u0*uinf / W0.
+            # The result here is r*G to match the numerical solver.
+            g[i] = - (r * u0_val * uinf_val) / W0
             
     return g
 

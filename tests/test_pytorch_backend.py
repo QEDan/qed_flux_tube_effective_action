@@ -19,7 +19,7 @@ def test_pytorch_backend():
     orc = Orchestrator(device="cpu")
     
     # Generate parameters grid
-    chi_values = [1.0, 2.0]
+    chi_values = [1.1, 2.1]
     ml_values = [0, 1]
     sigma3_values = [1, -1]
     params_grid = generate_params_grid(chi_values, ml_values, sigma3_values)

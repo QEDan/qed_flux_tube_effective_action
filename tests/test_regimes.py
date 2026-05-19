@@ -47,10 +47,10 @@ def test_regime_smoothness():
     diff_dec = np.diff(res_dec)
     assert np.max(np.abs(diff_dec)) < 0.1
     
-    # Check that decaying regime is stable (converges to a constant 1/2kappa)
+    # Check that decaying regime is stable (converges to a constant -1/2kappa)
     # kappa = sqrt(m^2 - chi^2) = sqrt(1 - 0.25) = 0.866
-    # 1/2kappa = 0.577
-    theoretical_const = 1.0 / (2.0 * np.sqrt(m**2 - params_dec[0]['chi'].real**2))
+    # -1/2kappa = -0.577
+    theoretical_const = -1.0 / (2.0 * np.sqrt(m**2 - params_dec[0]['chi'].real**2))
     assert np.abs(res_dec[-1] - theoretical_const) < 0.1
     
     # Ensure it's not growing exponentially

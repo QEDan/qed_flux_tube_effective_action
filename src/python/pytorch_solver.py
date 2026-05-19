@@ -194,5 +194,9 @@ class PyTorchSolver:
         # Ensure W0 is stable, avoiding division by zero or near-zero
         W0_stable = torch.where(torch.abs(W0) < 1e-12, torch.sgn(W0) * 1e-12, W0)
         log_diff = (log_scale_u0 + log_scale_uinf) - (log_acc_u0 + log_acc_uinf_init).unsqueeze(1)
-        res = (rho.unsqueeze(0) * u0 * uinf) / (W0_stable.unsqueeze(1)) * torch.exp(log_diff)
+
+        # The Green's function G(r, r') for the operator [d^2/dr^2 + (1/r)d/dr - V_eff]
+        # satisfies (H - E)G = (1/r)delta(r-r').
+        # Using benchmark comparison, G = -r * u0 * uinf / W0 satisfies the correct physical convention.
+        res = - (rho.unsqueeze(0) * u0 * uinf) / (W0_stable.unsqueeze(1)) * torch.exp(log_diff)
         return res, W0

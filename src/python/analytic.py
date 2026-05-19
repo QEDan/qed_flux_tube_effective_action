@@ -40,6 +40,35 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
     val, _ = quad(integrand, 0, 500.0)
     return - (e * B)**2 / (8.0 * np.pi**2) * val
 
+def heisenberg_euler_integrand(Q: float, B: float, m: float = 1.0, e: float = 1.0) -> float:
+    """
+    Computes the Heisenberg-Euler spectral integrand in Euclidean space.
+    Matches the form expected by Orchestrator: L = Integral Q dQ norm_factor * [Integrand].
+    The returned value is the term in the brackets: [-Delta_G/rho - B^2/12Q^2]
+    """
+    if abs(B) < 1e-12:
+        return 0.0
+    
+    # s = 1/Q^2
+    s = 1.0 / (Q**2 + 1e-15)
+    esB = abs(e * B * s)
+    
+    # Standard HE for Spinor QED (single spin state = 1/2 of full): 
+    # f(x) = x/tanh(x) - 1 - x^2/3
+    # For small x: f(x) ~ -x^4/45
+    if esB < 1e-3:
+        f_val = - (esB**4) / 45.0
+    else:
+        f_val = (esB / np.tanh(esB)) - 1.0 - (esB**2 / 3.0)
+        
+    # The spectral transformation factor s->Q is Q^2 * exp(-m^2/Q^2).
+    # Derived from ds = -2/Q^3 dQ and 1/s^3 = Q^6.
+    # L = - (eB)^2 / 8pi^2 * Integral Q^3 dQ exp(-m^2/Q^2) f(eB/Q^2) * (-2)
+    # Orchestrator: L = (1/4pi^2) * Integral Q dQ [Integrand]
+    # So [Integrand] = (eB)^2 * Q^2 * exp(-m^2/Q^2) * f(eB/Q^2)
+    
+    return (e * B)**2 * Q**2 * np.exp(-m**2 / Q**2) * f_val
+
 def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: float = 1.0) -> float:
     """
     Computes the first-order derivative correction to the effective Lagrangian.
@@ -184,7 +213,6 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     mat = np.array([[j_l, y_l], [dj_l, dy_l]])
     vec = np.array([u0_l, du0_l - jump_val * u0_l])
     coeffs_u0 = np.linalg.solve(mat, vec)
-    print(f"DEBUG: mat={mat}, vec={vec}, coeffs_u0={coeffs_u0}")
 
     # For uinf (regular at infinity/boundary):
     # du_int = du_ext + jump
@@ -192,22 +220,17 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     duinf_l_ext = dy_l
     duinf_l_int = duinf_l_ext + jump_val * uinf_l
 
-    # du_int = du_ext + 2*F_cal / lambd^2 * u
-    duinf_l_int = duinf_l_ext + (2.0 * F_cal / lambd**2) * uinf_l
-
     u_m_l, du_m_l = get_u_and_du(lambd, True)
     u_w_l, du_w_l = get_u_and_du(lambd, False)
     mat_inf = np.array([[u_m_l, u_w_l], [du_m_l, du_w_l]])
     vec_inf = np.array([uinf_l, duinf_l_int])
     coeffs_uinf = np.linalg.solve(mat_inf, vec_inf)
-    print(f"DEBUG: mat_inf={mat_inf}, vec_inf={vec_inf}, coeffs_uinf={coeffs_uinf}")
 
     # 4. Construct Full Solution
     g_full = np.zeros(len(rho_grid), dtype=complex)
     
     # W0 = rho * (u0' * uinf - u0 * uinf')
     # Using rho * W(A*J+B*Y, Y) = A * rho * W(J, Y) = A * (-2/pi)
-    # This is more robust as it matches the exterior normalization directly.
     W0 = coeffs_u0[0] * (-2.0 / np.pi)
     
     for i, r in enumerate(rho_grid):
@@ -218,7 +241,8 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
             u0_val = coeffs_u0[0] * jv(n, k_ext * r) + coeffs_u0[1] * yv(n, k_ext * r)
             uinf_val = yv(n, k_ext * r)
         
-        g_full[i] = (r * u0_val * uinf_val) / W0
+        # Consistent with PyTorchSolver: G = - r * u0 * uinf / W0
+        g_full[i] = - (r * u0_val * uinf_val) / W0
         
     return g_full
 
@@ -232,7 +256,7 @@ def get_analytic_wronskian(chi: complex, ml: int, sigma3: int, m: float, lambd: 
     # M' W - M W' identity
     # DLMF 13.14.30: W{M, W} = M W' - M' W = -gamma(1+2mu)/gamma(1/2+mu-kappa)
     # Our W0 = rho * (u0' uinf - u0 uinf')
-    # Empirically, the solver yields a negative Wronskian for the positive potential.
+    # The solver yields a positive Wronskian for the standard case.
     wronskian_mw = -mpmath.gamma(1 + 2 * mu) / mpmath.gamma(0.5 + mu - kappa)
     
     W0 = (2.0 * F_cal / lambd**2) * complex(wronskian_mw)
