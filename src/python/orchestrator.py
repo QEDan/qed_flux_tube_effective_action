@@ -107,23 +107,27 @@ class Orchestrator:
 
         for i, Q in enumerate(chi_real):
             if lcf_threshold is not None and Q > lcf_threshold:
-                # Negate the HE integrand to match the numerical mode sum convention (positive Lagrangian)
-                # Use Q dQ compatible HE integrand
-                lcf_integrand = np.array([-heisenberg_euler_integrand(Q, B, m=m, e=e) / (Q**2 + 1e-15) for B in B_local])
+                # Standard HE normalization: L = (1/8pi^2) * Integral Q^3 dQ * [-HE_integrand(Q)]
+                # Our orchestrator normalizes using norm_factor = 1.0 / (8.0 * pi^2)
+                # So we simply pass the negated HE integrand directly.
+                lcf_integrand = np.array([-heisenberg_euler_integrand(Q, B, m=m, e=e) for B in B_local])
                 local_renorm_sum = torch.from_numpy(lcf_integrand).to(self.device).to(torch.complex128)
             else:
-                # Renormalized Integrand = sum_{sigma3} (-2 * G_ren / r)
-                # Counter-term for 2 states is B^2/3/Q^2 (in Q dQ measure)
-                uv_sub = uv_coeff_local / (Q**2 + 1e-15)
+                # Renormalized Integrand for 4 spinor states in Q^3 dQ measure
+                # G_WKB is B^2/(3Q^4) for 4 states
+                uv_sub = (uv_coeff_local * 2.0) / (Q**4 + 1e-15)
 
-                # Mode sum contribution (summed over spin)
-                mode_sum_i = mode_sums[i]
+                # Mode sum contribution (summed over sigma3=+-1, so 2 states)
+                # We multiply by 2 to get all 4 states
+                mode_sum_4states = mode_sums[i] * 2.0
 
-                # Integrand for L_eff = - 2 * ( (mode_sum - G0_sum)/r - uv_sub )
-                local_renorm_sum = - 2.0 * (mode_sums[i].real / r_safe) + uv_sub.real
+                # local_renorm_sum for 4 spinor states in Q^3 dQ measure
+                # The relationship L_eff = (1/8pi^2) * Integral Q^3 dQ * [ Sum (G_int - G_bg)/r + uv_sub ]
+                # corresponds to the correct 4D EH normalization.
+                local_renorm_sum = (mode_sum_4states.real / r_safe) + uv_sub.real
 
-            # Integral over Q
-            L_eff_rho += Q * local_renorm_sum * chi_weights[i] * norm_factor
+            # Integral over Q using Q^3 dQ measure
+            L_eff_rho += Q**3 * local_renorm_sum * chi_weights[i] * norm_factor
 
         # Spatial Integration
         rho_weights = torch.zeros_like(rho)

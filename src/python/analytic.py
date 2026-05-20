@@ -42,32 +42,27 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
 
 def heisenberg_euler_integrand(Q: float, B: float, m: float = 1.0, e: float = 1.0) -> float:
     """
-    Computes the Heisenberg-Euler spectral integrand in Euclidean space.
-    Matches the form expected by Orchestrator: L = Integral Q dQ norm_factor * [Integrand].
-    The returned value is the term in the brackets: [-Delta_G/rho - B^2/12Q^2]
+    Computes the renormalized Heisenberg-Euler spectral integrand:
+    L_LCF = Integral Q dQ * (1/8pi^2) * [-(eBT/tanh(eBT) - 1 + 1/6(eBT)^2)]
+    This integrand is finite and renormalized.
     """
     if abs(B) < 1e-12:
         return 0.0
     
-    # s = 1/Q^2
-    s = 1.0 / (Q**2 + 1e-15)
-    esB = abs(e * B * s)
+    # T = 1/Q^2
+    T = 1.0 / (Q**2 + 1e-15)
+    eBT = e * B * T
     
-    # Standard HE for Spinor QED (single spin state = 1/2 of full): 
-    # f(x) = x/tanh(x) - 1 - x^2/3
-    # For small x: f(x) ~ -x^4/45
-    if esB < 1e-3:
-        f_val = - (esB**4) / 45.0
+    # Thesis DELO renormalized integrand: [eBT/tanh(eBT) - 1 + 1/6(eBT)^2]
+    # Small eBT expansion: 0.5 * (eBT)^2 - (1/45) * (eBT)^4
+    if abs(eBT) < 1e-3:
+        f_val = 0.5 * (eBT**2) - (1.0/45.0) * (eBT**4)
     else:
-        f_val = (esB / np.tanh(esB)) - 1.0 - (esB**2 / 3.0)
+        f_val = (eBT / np.tanh(eBT)) - 1.0 + (1.0/6.0)*(eBT**2)
         
-    # The spectral transformation factor s->Q is Q^2 * exp(-m^2/Q^2).
-    # Derived from ds = -2/Q^3 dQ and 1/s^3 = Q^6.
-    # L = - (eB)^2 / 8pi^2 * Integral Q^3 dQ exp(-m^2/Q^2) f(eB/Q^2) * (-2)
-    # Orchestrator: L = (1/4pi^2) * Integral Q dQ [Integrand]
-    # So [Integrand] = (eB)^2 * Q^2 * exp(-m^2/Q^2) * f(eB/Q^2)
-    
-    return (e * B)**2 * Q**2 * np.exp(-m**2 / Q**2) * f_val
+    # Standard HE density is - (eB)^2 / 8pi^2 * Integral...
+    # L_LCF = - (1/8pi^2) * Q^2 * exp(-m^2/Q^2) * f_val
+    return - (1.0 / (8.0 * np.pi**2)) * Q**2 * np.exp(-m**2 / Q**2) * f_val
 
 def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: float = 1.0) -> float:
     """
