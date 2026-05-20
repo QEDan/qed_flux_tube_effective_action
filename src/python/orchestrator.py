@@ -17,13 +17,13 @@ def generate_params_grid(chi_values, ml_values, sigma3_values, m=1.0, e=1.0):
     return grid
 
 class Orchestrator:
-    def __init__(self, device: Optional[str] = 'cpu', batch_size: int = 1024) -> None:
+    def __init__(self, device: Optional[str] = 'cpu', batch_size: int = 1024, strategy: str = "analytic") -> None:
         self.device = torch.device(device)
         self.batch_size = batch_size
         from pytorch_solver import PyTorchSolver
         from renormalization import Renormalizer
         self.backend = PyTorchSolver(device=device)
-        self.renormalizer = Renormalizer(device=device)
+        self.renormalizer = Renormalizer(device=device, strategy=strategy, solver=self.backend)
 
     def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0, collect_density: bool = False, lcf_threshold: Optional[float] = 20.0) -> Any:
         """
@@ -71,7 +71,7 @@ class Orchestrator:
                 # Using the actual field_profile ensures n = ml - e*A_phi*rho in compute_g0_local
                 batch_chi = torch.tensor([p['chi'] for p in euclidean_batch], device=self.device, dtype=torch.complex128)
                 batch_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.float64)
-                num_bg = self.renormalizer.compute_g0_local(batch_chi, batch_ml, m, rho, field_profile)
+                num_bg = self.renormalizer.compute_g0(batch_chi, batch_ml, m, rho, field_profile)
                 
                 for idx, p in enumerate(batch):
                     chi_idx = chi_map[complex(p['chi'])]

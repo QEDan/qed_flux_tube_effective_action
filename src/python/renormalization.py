@@ -3,84 +3,80 @@ import numpy as np
 from scipy.special import jv, yv
 from typing import Union, Dict, Tuple, Any, Optional, List
 
-class Renormalizer:
-    """
-    Handles vacuum subtraction and UV renormalization terms for the effective action.
-    This class provides the background Green's function (G0) and the counter-terms
-    needed to ensure the convergence of the spectral integral over chi.
-    """
+import torch
+import numpy as np
+from scipy.special import jv, yv
+from typing import Union, Dict, Tuple, Any, Optional, List
+from abc import ABC, abstractmethod
+
+class BackgroundStrategy(ABC):
+    @abstractmethod
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+        pass
+
+class AnalyticBackgroundStrategy(BackgroundStrategy):
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
-        self._g0_cache: Dict[Tuple[complex, int], torch.Tensor] = {}
 
-    def compute_g0_local(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        """
-        Computes the topological vacuum Green's function G0_ml(rho, rho) 
-        matching the local vector potential A(rho).
-        """
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         _, a_phi, _ = field_profile.get_arrays(as_numpy=False)
         e = 1.0
-        
-        # k = sqrt(chi^2 - m^2)
         k2 = chi*chi - m*m
-        
         n_batch = len(chi)
         n_points = len(rho)
-        
-        # n_local: (n_batch, n_points)
         n_local = ml.unsqueeze(-1) - e * (a_phi * rho).unsqueeze(0)
-        
-        # Convert to numpy for scipy
         n_np = n_local.detach().cpu().numpy()
         k2_np = k2.detach().cpu().numpy()
         rho_np = rho.detach().cpu().numpy()
-        
         res_np = np.zeros_like(n_np, dtype=np.complex128)
-        
-        from scipy.special import iv, kv, ive, kve, jv, yv
-        
-        # Vectorized calculation
+        from scipy.special import iv, kv, ive, kve, jv, yv, hankel1
         for i in range(n_batch):
             order = n_np[i]
             k2_val = k2_np[i]
-            
             if k2_val.real < 0:
-                # EUCLIDEAN: k = i * kappa
                 kappa = np.sqrt(-k2_val.real)
                 z = kappa * rho_np
-                
-                # Use modified Bessel I, K for all regions.
-                # Exponentially scaled versions (ive, kve) are numerically stable for large order/z.
-                res_np[i] = - ive(order, z) * kve(order, z)
+                denom = np.sqrt(order**2 + z**2 + 1e-15)
+                res_np[i] = - 0.5 / denom
+                mask_asym = (order**2 + z**2 > 100.0)
+                mask_reg = ~mask_asym
+                if np.any(mask_reg):
+                    res_np[i][mask_reg] = - ive(order[mask_reg], z[mask_reg]) * kve(order[mask_reg], z[mask_reg])
             else:
-                # MINKOWSKI: k^2 > 0
                 k = np.sqrt(k2_val)
                 z = k * rho_np
-                
-                # Minkowski: G_radial = - 0.5 * pi * i * H_n^{(1)}(z) * J_n(z)
-                # Correct sign for matching interacting Green's function (positive).
-                from scipy.special import hankel1
-                
                 res_np[i] = - 0.5 * np.pi * 1j * jv(order, z) * hankel1(order, z)
-                
-                # Mask out singularities
                 mask_sing = (z < 1e-5)
                 if np.any(mask_sing):
-                    # Asymptotic for n=0: G ~ log(z) (divergent)
-                    # For n>0: G ~ -1/(2*n)
-                    # For simplicity, avoid singularity by masking if rho is too small
-                    # or returning 0 at r=0.
                     res_np[i][mask_sing] = 0.0
+        return torch.from_numpy(rho_np * res_np).to(self.device).to(torch.complex128)
 
-        # G = rho * G_radial
-        g0 = torch.from_numpy(rho_np * res_np).to(self.device).to(torch.complex128)
-        return g0
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Optional[Any] = None) -> torch.Tensor:
-        """Alias for compute_g0_local for backward compatibility."""
-        from src.python.profiles import FieldProfile
-        if field_profile is None:
-            field_profile = FieldProfile(rho)
-        return self.compute_g0_local(chi, ml, m, rho, field_profile)
+class NumericalBackgroundStrategy(BackgroundStrategy):
+    def __init__(self, solver: Any, device: str = "cpu") -> None:
+        self.solver = solver
+        self.device = torch.device(device)
+
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+        from profiles import PureGaugeProfile
+        pure_gauge_profile = PureGaugeProfile(rho, F=0.0)
+        batch = []
+        for i in range(len(chi)):
+            batch.append({'chi': chi[i].item(), 'ml': ml[i].item(), 'sigma3': 1, 'm': m, 'e': 1.0})
+        results, _ = self.solver.solve_batch(batch, pure_gauge_profile)
+        return results
+
+class Renormalizer:
+    def __init__(self, device: str = "cpu", strategy: str = "analytic", solver: Optional[Any] = None) -> None:
+        self.device = torch.device(device)
+        self._g0_cache: Dict[Tuple[complex, int], torch.Tensor] = {}
+        # Force numerical strategy for all background calculations to ensure consistency
+        if solver is None:
+             raise ValueError("Solver required for renormalization.")
+        self.strategy = NumericalBackgroundStrategy(solver, device=device)
+
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+        return self.strategy.compute_g0(chi, ml, m, rho, field_profile)
+
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         """

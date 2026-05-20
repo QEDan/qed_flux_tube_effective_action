@@ -22,10 +22,10 @@ class PyTorchSolver:
         # Interaction terms from -Pi^2 + e*sigma3*B
         v_ml = params['e']**2 * a_phi**2 + params['e']*params['sigma3']*b_field - 2*params['e']*params['ml']*a_phi/r
         
-        r_eps = torch.where(torch.abs(r) < 1e-15, torch.tensor(1e-15, device=self.device), r)
         # Centrifugal term and spectral shift
-        # Note: ml^2/r^2 is the standard radial term for cylindrical symmetry.
-        res = v_ml + (params['ml'].to(torch.float64)**2) / (r_eps*r_eps) - (params['chi']**2 - params['m']**2)
+        # Use a more robust EPS for r^2 in the denominator
+        r2_eps = torch.max(r*r, torch.tensor(1e-20, device=self.device))
+        res = v_ml + (params['ml'].to(torch.float64)**2) / r2_eps - (params['chi']**2 - params['m']**2)
         return res
 
     def rk4_step(self, r: torch.Tensor, h: torch.Tensor, state: torch.Tensor, params: Dict[str, torch.Tensor], 
@@ -83,12 +83,17 @@ class PyTorchSolver:
         k_eff2 = -(v_eff_start - (abs_ml*abs_ml) / (rho[0]*rho[0]))
         
         u0_start_norm = 1.0 - k_eff2 * rho[0]*rho[0] / (4.0 * (abs_ml + 1.0))
-        du0_start_norm = (abs_ml / rho[0]) * u0_start_norm - (k_eff2 * rho[0] / (2.0 * (abs_ml + 1.0)))
+        # Initialize derivative, ensuring stability for small rho
+        rho_val = torch.max(rho[0], torch.tensor(1e-10, device=self.device))
+        du0_start_norm = (abs_ml / rho_val) * u0_start_norm - (k_eff2 * rho_val / (2.0 * (abs_ml + 1.0)))
         
+        # Ensure finite state
         state_u0 = torch.stack([u0_start_norm + 0j, du0_start_norm + 0j], dim=1)
+        state_u0 = torch.where(torch.isfinite(state_u0), state_u0, torch.tensor([1.0+0j, 0.0+0j], device=self.device))
+        
         norm0 = torch.norm(state_u0, dim=1, keepdim=True) + 1e-100
         state_u0 = state_u0 / norm0
-        log_acc_u0 = abs_ml * torch.log(rho[0]) + torch.log(norm0.squeeze(1))
+        log_acc_u0 = abs_ml * torch.log(rho_val) + torch.log(norm0.squeeze(1))
         
         u0[:, 0] = state_u0[:, 0]
         log_scale_u0[:, 0] = log_acc_u0
@@ -148,7 +153,8 @@ class PyTorchSolver:
                 du_mp = mpmath.diff(lambda x: mpmath.bessely(ord_val, x), z) * k_val
             else:
                 # Decaying (Euclidean) - This is the preferred stable mode
-                kappa = np.sqrt(-k2 + 0j)
+                # Add small eps to kappa to avoid singularity at k=0
+                kappa = np.sqrt(-k2 + 1e-15 + 0j)
                 z = kappa * rho_max
                 u_mp = mpmath.besselk(ord_val, z)
                 du_mp = mpmath.diff(lambda x: mpmath.besselk(ord_val, x), z) * kappa
@@ -192,7 +198,8 @@ class PyTorchSolver:
         W0 = rho[-1] * (state_u0[:, 1] * u_inf_init - state_u0[:, 0] * du_inf_init)
         
         # Ensure W0 is stable, avoiding division by zero or near-zero
-        W0_stable = torch.where(torch.abs(W0) < 1e-12, torch.sgn(W0) * 1e-12, W0)
+        # Ensure W0 is stable, avoiding division by zero
+        W0_stable = torch.where(torch.abs(W0) < 1e-12, torch.tensor(1e-12, device=self.device, dtype=W0.dtype), W0)
         log_diff = (log_scale_u0 + log_scale_uinf) - (log_acc_u0 + log_acc_uinf_init).unsqueeze(1)
 
         # The Green's function G(r, r') for the operator [d^2/dr^2 + (1/r)d/dr - V_eff]
