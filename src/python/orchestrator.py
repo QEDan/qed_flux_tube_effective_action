@@ -67,11 +67,17 @@ class Orchestrator:
                     
                 num_results, _ = self.backend.solve_batch(euclidean_batch, field_profile)
                 
+                if torch.any(torch.isnan(num_results)):
+                    print(f"DEBUG: NaNs detected in num_results for batch starting at {i}")
+                
                 # Local topological vacuum subtraction: matching A_phi but with B=0
                 # Using the actual field_profile ensures n = ml - e*A_phi*rho in compute_g0_local
                 batch_chi = torch.tensor([p['chi'] for p in euclidean_batch], device=self.device, dtype=torch.complex128)
                 batch_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.float64)
                 num_bg = self.renormalizer.compute_g0(batch_chi, batch_ml, m, rho, field_profile)
+                
+                if torch.any(torch.isnan(num_bg)):
+                    print(f"DEBUG: NaNs detected in num_bg for batch starting at {i}")
                 
                 for idx, p in enumerate(batch):
                     chi_idx = chi_map[complex(p['chi'])]
@@ -101,28 +107,23 @@ class Orchestrator:
 
         for i, Q in enumerate(chi_real):
             if lcf_threshold is not None and Q > lcf_threshold:
-                lcf_integrand = np.array([heisenberg_euler_integrand(Q, B, m=m, e=e) for B in B_local])
+                # Negate the HE integrand to match the numerical mode sum convention (positive Lagrangian)
+                # Use Q dQ compatible HE integrand
+                lcf_integrand = np.array([-heisenberg_euler_integrand(Q, B, m=m, e=e) / (Q**2 + 1e-15) for B in B_local])
                 local_renorm_sum = torch.from_numpy(lcf_integrand).to(self.device).to(torch.complex128)
             else:
                 # Renormalized Integrand = sum_{sigma3} (-2 * G_ren / r)
-                # where G_ren = G_interacting - G0 - G_WKB_counterterm
-                # The factor of 2 accounts for spin summation.
-                # G_WKB is B^2/(6Q^4)
-
-                # Counter-term for 2 states is B^2/3/Q^4
-                uv_sub = uv_coeff_local / (Q**4 + 1e-15)
+                # Counter-term for 2 states is B^2/3/Q^2 (in Q dQ measure)
+                uv_sub = uv_coeff_local / (Q**2 + 1e-15)
 
                 # Mode sum contribution (summed over spin)
                 mode_sum_i = mode_sums[i]
 
                 # Integrand for L_eff = - 2 * ( (mode_sum - G0_sum)/r - uv_sub )
-                # Mode_sum (already contains G_int - G0).
-                # Factor of 2 matches the spectral transform from 2D mode sum to 4D EH.
-
                 local_renorm_sum = - 2.0 * (mode_sums[i].real / r_safe) + uv_sub.real
 
             # Integral over Q
-            L_eff_rho += Q**3 * local_renorm_sum * chi_weights[i] * norm_factor
+            L_eff_rho += Q * local_renorm_sum * chi_weights[i] * norm_factor
 
         # Spatial Integration
         rho_weights = torch.zeros_like(rho)

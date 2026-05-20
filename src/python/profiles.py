@@ -216,3 +216,31 @@ class PureGaugeProfile(FieldProfile):
         self.a_phi = pre / r_safe
         self.da_phi = -pre / (r_safe**2)
 
+class LocalBackgroundProfile(FieldProfile):
+    def __init__(self, parent_profile: FieldProfile) -> None:
+        """
+        A background profile that matches the vector potential A_phi of the parent_profile
+        at each point, but has a zero magnetic field B=0.
+        This is used for local topological vacuum subtraction in the numerical strategy,
+        ensuring that discretization errors between the interacting and background 
+        solvers cancel exactly.
+        """
+        super().__init__(parent_profile.rho)
+        self.parent = parent_profile
+        self.update()
+
+    def update(self) -> None:
+        # Match A_phi exactly
+        _, a_phi, _ = self.parent.get_arrays(as_numpy=False)
+        self.a_phi = a_phi.clone()
+        
+        # Set B = A/rho + dA/dr = 0 => dA/dr = -A/rho
+        r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
+        self.da_phi = -self.a_phi / r_safe
+
+    def get_discontinuities(self) -> List[Discontinuity]:
+        # Background is usually assumed smooth for renormalization purposes,
+        # but we could inherit discontinuities if they are not B-field related.
+        # For now, return empty as standard renormalization vacuums are smooth.
+        return []
+

@@ -24,7 +24,8 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
         k2 = chi*chi - m*m
         n_batch = len(chi)
         n_points = len(rho)
-        n_local = ml.unsqueeze(-1) - e * (a_phi * rho).unsqueeze(0)
+        # Centrifugal order must be absolute value: sqrt((ml - e*A*rho)^2)
+        n_local = torch.abs(ml.unsqueeze(-1) - e * (a_phi * rho).unsqueeze(0))
         n_np = n_local.detach().cpu().numpy()
         k2_np = k2.detach().cpu().numpy()
         rho_np = rho.detach().cpu().numpy()
@@ -42,14 +43,23 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
                 mask_reg = ~mask_asym
                 if np.any(mask_reg):
                     res_np[i][mask_reg] = - ive(order[mask_reg], z[mask_reg]) * kve(order[mask_reg], z[mask_reg])
+                
+                # Zero out singular points at r=0 for order > 0
+                mask_zero = (z < 1e-15) & (order > 0)
+                if np.any(mask_zero):
+                    res_np[i][mask_zero] = 0.0
             else:
                 k = np.sqrt(k2_val)
                 z = k * rho_np
                 res_np[i] = - 0.5 * np.pi * 1j * jv(order, z) * hankel1(order, z)
-                mask_sing = (z < 1e-5)
+                mask_sing = (z < 1e-15)
                 if np.any(mask_sing):
                     res_np[i][mask_sing] = 0.0
-        return torch.from_numpy(rho_np * res_np).to(self.device).to(torch.complex128)
+        
+        # Multiply by rho and ensure origin is zeroed to avoid 0 * inf = NaN
+        final_res_np = rho_np * res_np
+        final_res_np[:, 0] = 0.0
+        return torch.from_numpy(final_res_np).to(self.device).to(torch.complex128)
 
 class NumericalBackgroundStrategy(BackgroundStrategy):
     def __init__(self, solver: Any, device: str = "cpu") -> None:
@@ -57,22 +67,27 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
         self.device = torch.device(device)
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        from profiles import PureGaugeProfile
-        pure_gauge_profile = PureGaugeProfile(rho, F=0.0)
+        from profiles import LocalBackgroundProfile
+        # Use LocalBackgroundProfile to match local A_phi exactly
+        bg_profile = LocalBackgroundProfile(field_profile)
         batch = []
         for i in range(len(chi)):
+            # Background is spin-independent (B=0), but we must provide a sigma3 for the solver
             batch.append({'chi': chi[i].item(), 'ml': ml[i].item(), 'sigma3': 1, 'm': m, 'e': 1.0})
-        results, _ = self.solver.solve_batch(batch, pure_gauge_profile)
+        results, _ = self.solver.solve_batch(batch, bg_profile)
         return results
 
 class Renormalizer:
     def __init__(self, device: str = "cpu", strategy: str = "analytic", solver: Optional[Any] = None) -> None:
         self.device = torch.device(device)
         self._g0_cache: Dict[Tuple[complex, int], torch.Tensor] = {}
-        # Force numerical strategy for all background calculations to ensure consistency
-        if solver is None:
-             raise ValueError("Solver required for renormalization.")
-        self.strategy = NumericalBackgroundStrategy(solver, device=device)
+        
+        if strategy == "numerical":
+            if solver is None:
+                 raise ValueError("Solver required for numerical renormalization strategy.")
+            self.strategy = NumericalBackgroundStrategy(solver, device=device)
+        else:
+            self.strategy = AnalyticBackgroundStrategy(device=device)
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         return self.strategy.compute_g0(chi, ml, m, rho, field_profile)
