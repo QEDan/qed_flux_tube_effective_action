@@ -212,5 +212,5 @@ class PyTorchSolver:
         res = - (rho.unsqueeze(0) * u0 * uinf) / (W0_stable.unsqueeze(1)) * torch.exp(log_diff)
         
         # Explicitly zero out the origin to avoid 0 * inf = NaN
-        res[:, 0] = 0.0
+        res[:, 0] = torch.where(rho[0] == 0, torch.tensor(0.0, device=self.device, dtype=res.dtype), res[:, 0])
         return res, W0

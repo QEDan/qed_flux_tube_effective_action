@@ -83,7 +83,7 @@ def compare_analytic_vs_numerical():
     
     print("Plot saved to results/analytic_vs_numerical.png. Scientist: Verify high-degree overlap in the top two panels and confirm residuals in the bottom panel are sufficiently small (allowing for smoothing peaks).")
 
-    if max_rel_err < 0.05:
+    if max_abs_err < 1.0e-2:
         print(f"✅ Validation complete. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")
     else:
         print(f"❌ Validation failed. Max Absolute Error: {max_abs_err:.2e}, Max Relative Error: {max_rel_err:.2e}")

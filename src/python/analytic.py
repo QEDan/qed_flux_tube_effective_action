@@ -43,26 +43,27 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
 def heisenberg_euler_integrand(Q: float, B: float, m: float = 1.0, e: float = 1.0) -> float:
     """
     Computes the renormalized Heisenberg-Euler spectral integrand:
-    L_LCF = Integral Q dQ * (1/8pi^2) * [-(eBT/tanh(eBT) - 1 + 1/6(eBT)^2)]
-    This integrand is finite and renormalized.
+    L_LCF = (1/4pi^2) * Integral Q^3 dQ * [exp(-m^2/Q^2) * (eBT/tanh(eBT) - 1 - 1/3(eBT)^2)]
+    This matches the standard Spinor QED (4 states) result.
     """
     if abs(B) < 1e-12:
         return 0.0
-    
+
     # T = 1/Q^2
     T = 1.0 / (Q**2 + 1e-15)
     eBT = e * B * T
-    
-    # Thesis DELO renormalized integrand: [eBT/tanh(eBT) - 1 + 1/6(eBT)^2]
-    # Small eBT expansion: 0.5 * (eBT)^2 - (1/45) * (eBT)^4
+
+    # HE renormalized integrand part: [eBT/tanh(eBT) - 1 - 1/3(eBT)^2]
+    # Small eBT expansion: -1/45 * (eBT)^4
     if abs(eBT) < 1e-3:
-        f_val = 0.5 * (eBT**2) - (1.0/45.0) * (eBT**4)
+        f_val = - (1.0/45.0) * (eBT**4)
     else:
-        f_val = (eBT / np.tanh(eBT)) - 1.0 + (1.0/6.0)*(eBT**2)
-        
-    # Standard HE density is - (eB)^2 / 8pi^2 * Integral...
-    # L_LCF = - (1/8pi^2) * Q^2 * exp(-m^2/Q^2) * f_val
-    return - (1.0 / (8.0 * np.pi**2)) * Q**2 * np.exp(-m**2 / Q**2) * f_val
+        f_val = (eBT / np.tanh(eBT)) - 1.0 - (1.0/3.0)*(eBT**2)
+
+    # Return the DIMENSIONLESS part that matches the orchestrator's local_renorm_sum
+    # norm_factor is 1/8pi^2. 
+    return np.exp(-m^2 / Q**2) * f_val
+
 
 def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: float = 1.0) -> float:
     """

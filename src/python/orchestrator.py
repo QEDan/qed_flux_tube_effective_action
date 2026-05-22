@@ -65,22 +65,20 @@ class Orchestrator:
                     eb['chi'] = 1j * abs(p['chi'])
                     euclidean_batch.append(eb)
                     
+                # Solve for the numerical interacting case and background on the exact same grid
                 num_results, _ = self.backend.solve_batch(euclidean_batch, field_profile)
                 
-                if torch.any(torch.isnan(num_results)):
-                    print(f"DEBUG: NaNs detected in num_results for batch starting at {i}")
-                
-                # Local topological vacuum subtraction: matching A_phi but with B=0
-                # Using the actual field_profile ensures n = ml - e*A_phi*rho in compute_g0_local
+                # Compute background on the same grid/params to ensure exact cancellation
                 batch_chi = torch.tensor([p['chi'] for p in euclidean_batch], device=self.device, dtype=torch.complex128)
                 batch_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.float64)
+                
+                # Explicitly align background calculation with the solver's grid
                 num_bg = self.renormalizer.compute_g0(batch_chi, batch_ml, m, rho, field_profile)
                 
-                if torch.any(torch.isnan(num_bg)):
-                    print(f"DEBUG: NaNs detected in num_bg for batch starting at {i}")
-                
+                # Point-wise renormalization subtraction
                 for idx, p in enumerate(batch):
                     chi_idx = chi_map[complex(p['chi'])]
+                    # Direct subtraction before any integration
                     mode_sums[chi_idx] += (num_results[idx] - num_bg[idx])
 
         # 4. Renormalization and Spectral Integration
@@ -89,17 +87,22 @@ class Orchestrator:
 
         from analytic import heisenberg_euler_integrand
 
-        # Consistent Scalar QED EH normalization for Q^3 dQ measure
-        # L = (1/8pi^2) * Integral Q^3 dQ * [ Integrand ]
-        norm_factor = 1.0 / (8.0 * np.pi**2)
+        # Consistent with 4D Spinor QED HE normalization (4 states)
+        norm_factor = 1.0 / (4.0 * np.pi**2)
 
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
         chi_real = np.array([abs(complex(c)) for c in chi_values])
+        
+        # Spectral weight for Q^3 dQ measure
         chi_weights = np.zeros_like(chi_real)
         if len(chi_real) > 1:
-            chi_weights[1:-1] = (chi_real[2:] - chi_real[:-2]) / 2.0
-            chi_weights[0] = (chi_real[1] - chi_real[0]) / 2.0
-            chi_weights[-1] = (chi_real[-1] - chi_real[-2]) / 2.0
+            for i in range(len(chi_real)):
+                if i == 0:
+                    chi_weights[i] = (chi_real[1] - chi_real[0]) * (chi_real[0]**3) / 2.0
+                elif i == len(chi_real) - 1:
+                    chi_weights[i] = (chi_real[-1] - chi_real[-2]) * (chi_real[-1]**3) / 2.0
+                else:
+                    chi_weights[i] = (chi_real[i+1] - chi_real[i-1]) * (chi_real[i]**3) / 2.0
         else:
             chi_weights[0] = 1.0
 
@@ -107,27 +110,15 @@ class Orchestrator:
 
         for i, Q in enumerate(chi_real):
             if lcf_threshold is not None and Q > lcf_threshold:
-                # Standard HE normalization: L = (1/8pi^2) * Integral Q^3 dQ * [-HE_integrand(Q)]
-                # Our orchestrator normalizes using norm_factor = 1.0 / (8.0 * pi^2)
-                # So we simply pass the negated HE integrand directly.
-                lcf_integrand = np.array([-heisenberg_euler_integrand(Q, B, m=m, e=e) for B in B_local])
-                local_renorm_sum = torch.from_numpy(lcf_integrand).to(self.device).to(torch.complex128)
+                local_renorm_sum = torch.from_numpy(np.array([heisenberg_euler_integrand(Q, B, m=m, e=e) for B in B_local])).to(self.device).to(torch.complex128)
             else:
-                # Renormalized Integrand for 4 spinor states in Q^3 dQ measure
-                # G_WKB is B^2/(3Q^4) for 4 states
-                uv_sub = (uv_coeff_local * 2.0) / (Q**4 + 1e-15)
-
-                # Mode sum contribution (summed over sigma3=+-1, so 2 states)
-                # We multiply by 2 to get all 4 states
+                # Renormalized Integrand for 4 spinor states
+                uv_sub = - uv_coeff_local / (Q**4 + 1e-15)
                 mode_sum_4states = mode_sums[i] * 2.0
-
-                # local_renorm_sum for 4 spinor states in Q^3 dQ measure
-                # The relationship L_eff = (1/8pi^2) * Integral Q^3 dQ * [ Sum (G_int - G_bg)/r + uv_sub ]
-                # corresponds to the correct 4D EH normalization.
                 local_renorm_sum = (mode_sum_4states.real / r_safe) + uv_sub.real
 
-            # Integral over Q using Q^3 dQ measure
-            L_eff_rho += Q**3 * local_renorm_sum * chi_weights[i] * norm_factor
+            # Q^3 is already in chi_weights
+            L_eff_rho += local_renorm_sum * chi_weights[i] * norm_factor
 
         # Spatial Integration
         rho_weights = torch.zeros_like(rho)

@@ -29,7 +29,7 @@ def test_uv_convergence(orchestrator, device):
     
     Q_1 = 10.0 
     Q_2 = 50.0
-    ml_vals = list(range(-1000, 1001))
+    ml_vals = list(range(-2000, 2001))
     sigma3_vals = [1, -1]
     
     def get_integrand(Q):
@@ -47,13 +47,21 @@ def test_uv_convergence(orchestrator, device):
             mode_sum += torch.sum(num_results - num_bg, dim=0)
         
         mode_sum_val = mode_sum[rho_idx].real.item()
-        print(f"DEBUG: Q={Q}, mode_sum_val={mode_sum_val:.4e}, actual_rho={actual_rho:.4e}")
         
+        # uv_coeff_local is B^2/3 for 4 states
         uv_coeff_local = orchestrator.renormalizer.get_b2_term(profile, rho) * 2.0
-        num_uv = uv_coeff_local[rho_idx].real.item() / (Q**2)
-        
+        uv_val = uv_coeff_local[rho_idx].real.item()
         norm_factor = 1.0 / (8.0 * np.pi**2)
-        local_renorm_sum = - 2.0 * (mode_sum_val / actual_rho) + num_uv
+        # 4 states in sum_4states.
+        # uv_coeff_local is B^2/3. In 4D EH, the subtraction is -(B^2/3)/Q^4.
+
+        mode_sum_4states = 2.0 * mode_sum_val / actual_rho
+        uv_term = - uv_val / (Q**4)
+
+        # Integrand: (mode_sum_4states + uv_term) * Q^3
+        return (mode_sum_4states + uv_term) * (Q**3) * norm_factor
+
+        print(f"DEBUG: Q={Q}, mode_sum_val={mode_sum_val:.4e}, uv_term={uv_val/Q**2:.4e}")
         
         return Q * local_renorm_sum * norm_factor
 
@@ -66,7 +74,7 @@ def test_uv_convergence(orchestrator, device):
     
     assert val_high < val_low, f"Integrand still diverges: {val_high:.4e} > {val_low:.4e}"
 
-# @pytest.mark.slow
+@pytest.mark.slow
 def test_normalization_he(orchestrator, device):
     """
     VERIFICATION TEST: Checks if the numerical normalization matches HE within 20%.

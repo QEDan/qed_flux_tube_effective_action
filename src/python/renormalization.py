@@ -22,9 +22,13 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
         _, a_phi, _ = field_profile.get_arrays(as_numpy=False)
         e = 1.0
         k2 = chi*chi - m*m
-        n_batch = len(chi)
+        n_batch = len(ml)
         n_points = len(rho)
         # Centrifugal order must be absolute value: sqrt((ml - e*A*rho)^2)
+        # Handle broadcasting: if chi has length 1, repeat it to match ml
+        if len(chi) == 1 and n_batch > 1:
+            k2 = k2.repeat(n_batch)
+        
         n_local = torch.abs(ml.unsqueeze(-1) - e * (a_phi * rho).unsqueeze(0))
         n_np = n_local.detach().cpu().numpy()
         k2_np = k2.detach().cpu().numpy()
@@ -42,7 +46,9 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
                 mask_asym = (order**2 + z**2 > 100.0)
                 mask_reg = ~mask_asym
                 if np.any(mask_reg):
-                    res_np[i][mask_reg] = - ive(order[mask_reg], z[mask_reg]) * kve(order[mask_reg], z[mask_reg])
+                    res_np[i][mask_reg] = - ive(order[mask_reg], z[mask_reg]) * kve(order[mask_reg], z[mask_reg]) * np.exp(z[mask_reg]) * np.exp(-z[mask_reg])
+                    # Corrected to -I_nu * K_nu
+                    res_np[i][mask_reg] = - iv(order[mask_reg], z[mask_reg]) * kv(order[mask_reg], z[mask_reg])
                 
                 # Zero out singular points at r=0 for order > 0
                 mask_zero = (z < 1e-15) & (order > 0)
@@ -51,14 +57,20 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
             else:
                 k = np.sqrt(k2_val)
                 z = k * rho_np
-                res_np[i] = - 0.5 * np.pi * 1j * jv(order, z) * hankel1(order, z)
+                # G_bg = - 0.5 * pi * 1j * J_nu(z) * H_nu^{(1)}(z)
+                # = - 0.5 * pi * 1j * J_nu(z) * (J_nu(z) + 1j * Y_nu(z))
+                # = - 0.5 * pi * 1j * J_nu^2(z) + 0.5 * pi * J_nu(z) * Y_nu(z)
+                # The real part is 0.5 * pi * J_nu(z) * Y_nu(z)
+                # The imaginary part is -0.5 * pi * J_nu^2(z)
+                res_np[i] = 0.5 * np.pi * jv(order, z) * yv(order, z) - 0.5 * np.pi * 1j * jv(order, z)**2
                 mask_sing = (z < 1e-15)
                 if np.any(mask_sing):
                     res_np[i][mask_sing] = 0.0
         
         # Multiply by rho and ensure origin is zeroed to avoid 0 * inf = NaN
         final_res_np = rho_np * res_np
-        final_res_np[:, 0] = 0.0
+        if rho_np[0] == 0:
+            final_res_np[:, 0] = 0.0
         return torch.from_numpy(final_res_np).to(self.device).to(torch.complex128)
 
 class NumericalBackgroundStrategy(BackgroundStrategy):

@@ -6,7 +6,7 @@ This project is a high-precision scientific instrument for computing quantum eff
 All code changes that affect mathematical results or physical observables MUST be validated against known benchmarks.
 - **Verification vs. Validation:** Verification confirms the code solves the equations correctly (e.g., matching numerical ODE solutions to Whittaker analytic forms). Validation confirms the equations describe the physics correctly (e.g., matching the Local Constant Field approximation in slowly varying limits).
 - **Symbolic Grounding:** Use SageMath or SymPy in the `symbolic_validations/` directory to derive and confirm every normalization factor, spectral measure, and coordinate transform identity.
-- **Dimensional Consistency:** Always verify the units/dimensions of every term in the spectral integral. A change in measure (e.g., $Q dQ \to Q^3 dQ$) requires a re-derivation of the associated normalization coefficients.
+- **Dimensional Consistency:** Always verify the units/dimensions of every term in an expression. Document expected dimensionalities in docstrings (and comments where needed). We are working in Heaviside-Lorentz Natural Units where c=hbar=1. A change in measure (e.g., $Q dQ \to Q^3 dQ$) requires a re-derivation of the associated normalization coefficients.
 
 ## 2. Development Workflow
 ### Research Phase
@@ -28,5 +28,12 @@ All code changes that affect mathematical results or physical observables MUST b
 - **Renormalizer:** The `NumericalBackgroundStrategy` must always match the local vector potential $A_\phi$ of the interacting case to ensure cancellation of topological vacuum shifts.
 - **Orchestrator:** Spectral integration must use the 4D-correct $Q^3 dQ$ measure unless explicitly working in a lower-dimensional theory.
 
-## 4. Documentation
+## 4. Plotting
+- Every axis should have a label and include units.
+- LaTeX math symbols are preferred for axes labels
+- Units should be natural units with the c's, e's, and hbar's explicit (e.g. Magnetic Flux $$\left(\frac{\pi \hbar}{e}\right)$$
+- File names should make clear what the plot shows (e.g. EA_vs_lambda_step_profile.png)
+
+## 5. Documentation
 Every significant mathematical fix must be accompanied by a diagnostic script in `debug/` that illustrates the "before" and "after" state, ensuring the fix is rooted in data, not just intuition.
+
