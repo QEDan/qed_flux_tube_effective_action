@@ -227,6 +227,8 @@ class LocalBackgroundProfile(FieldProfile):
         """
         super().__init__(parent_profile.rho)
         self.parent = parent_profile
+        # Ensure flux attribute is inherited for correct boundary conditions
+        self.F = getattr(parent_profile, 'F', 0.0)
         self.update()
 
     def update(self) -> None:

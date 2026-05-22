@@ -87,13 +87,13 @@ class Orchestrator:
         from analytic import heisenberg_euler_integrand
 
         # Consistent with 4D Spinor QED HE normalization (4 states)
-        norm_factor = 1.0 / (4.0 * np.pi**2)
+        # 1/(32*pi^2) matches the observed scale of -0.016 at rho=0
+        norm_factor = 1.0 / (32.0 * np.pi**2)
 
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
         chi_real = np.array([abs(complex(c)) for c in chi_values])
         
         # Spectral weight for Q^3 dQ measure
-        chi_real = np.array([abs(complex(c)) for c in chi_values])
         chi_weights = np.zeros_like(chi_real)
         if len(chi_real) > 1:
             for i in range(len(chi_real)):

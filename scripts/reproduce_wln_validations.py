@@ -24,7 +24,8 @@ def reproduce_fig_7_3():
     # Spectral parameters
     chi_vals = [complex(c) for c in np.logspace(-1, 1.3, 10)]
     # Shifted mode range to capture the physics of the flux tube (F_cal = 100)
-    ml_vals = list(range(-150, 251)) 
+    # 201 modes centered around 100: [0, 200]
+    ml_vals = list(range(0, 201)) 
     sigma3_vals = [1, -1]
     
     rho = torch.linspace(0.01, 30.0, 10)
