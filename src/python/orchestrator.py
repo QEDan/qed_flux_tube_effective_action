@@ -87,8 +87,9 @@ class Orchestrator:
         from analytic import heisenberg_euler_integrand
 
         # Consistent with 4D Spinor QED HE normalization (4 states)
-        # 1/(32*pi^2) matches the observed scale of -0.016 at rho=0
-        norm_factor = 1.0 / (32.0 * np.pi**2)
+        # Theoretical normalization: 1/(8*pi**3)
+        norm_factor = 1.0 / (8.0 * np.pi**3)
+
 
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
         chi_real = np.array([abs(complex(c)) for c in chi_values])
@@ -130,7 +131,6 @@ class Orchestrator:
         # Sign: Positive for Scalar QED, Negative for Fermions.
         # Heisenberg-Euler is positive. Our sum is negative?
         # Let's make it positive to match HE convention.
-        # Note: 2*pi factor from angular integration over phi
-        action = -2.0 * np.pi * torch.sum(L_eff_rho.real * rho * rho_weights)
+        action = -1.0 * torch.sum(L_eff_rho.real * rho * rho_weights)
         
         return action, -1.0 * L_eff_rho
