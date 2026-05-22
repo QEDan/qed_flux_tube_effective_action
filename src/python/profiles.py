@@ -74,7 +74,7 @@ class StepFunctionProfile(FieldProfile):
             # B = da_phi + A/rho
             # For rho < lambd: B = pre/l^2 + pre*rho/l^2/rho = 2*pre/l^2
             # For rho > lambd: B = -pre/r^2 + pre/r^2 = 0
-            b_field = self.da_phi + self.a_phi / self.rho
+            self.B_vals = self.da_phi + self.a_phi / self.rho
 
         else:
             # Smoothed step function using sigmoid for theta(lambd - rho)
@@ -123,13 +123,13 @@ class ZeroFluxProfile(FieldProfile):
         inner = self.rho < self.lambd
         
         # B_field(rho)
-        b_field = torch.where(inner, self.B * (1.0 - 2.0 * self.rho**2 / self.lambd**2), torch.zeros_like(self.rho))
+        self.B_vals = torch.where(inner, self.B * (1.0 - 2.0 * self.rho**2 / self.lambd**2), torch.zeros_like(self.rho))
         
         # A_phi(rho)
         self.a_phi = torch.where(inner, (self.B * self.rho / 2.0) * (1.0 - self.rho**2 / self.lambd**2), torch.zeros_like(self.rho))
         
         # da_phi = B - A_phi/rho
-        self.da_phi = b_field - self.a_phi / r_safe
+        self.da_phi = self.B_vals - self.a_phi / r_safe
 
 class SuperGaussianProfile(FieldProfile):
     def __init__(self, rho: Union[np.ndarray, torch.Tensor], B0: float, lambd: float, e: float = 1.0) -> None:
@@ -180,10 +180,10 @@ class WLNFluxTubeProfile(FieldProfile):
         self.a_phi = pre_A * self.rho / denom
         
         # B_z = pre_A * (2 * lambd^2) / denom^2
-        b_field = pre_A * (2.0 * self.lambd**2) / (denom**2)
+        self.B_vals = pre_A * (2.0 * self.lambd**2) / (denom**2)
         
         # da_phi = B - A_phi / rho
-        self.da_phi = b_field - self.a_phi / r_safe
+        self.da_phi = self.B_vals - self.a_phi / r_safe
 
 class MLPProfile(FieldProfile):
     def __init__(self, rho: torch.Tensor, B_vals: torch.Tensor, a_phi: torch.Tensor, e: float = 1.0) -> None:

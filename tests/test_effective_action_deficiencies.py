@@ -14,6 +14,7 @@ def device():
 def orchestrator(device):
     return Orchestrator(device=device, strategy="numerical")
 
+@pytest.mark.slow
 def test_uv_convergence(orchestrator, device):
     """
     VERIFICATION TEST: Checks if the spectral integrand now decays using Euclidean momenta.

@@ -16,15 +16,15 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
     if abs(B) < 1e-12:
         return 0.0
         
-    # For small B, use the B^4 expansion to avoid numerical issues with quad
-    # L_HE = (eB)^4 / (360 * pi^2 * m^4)
+    # For small B, use the B**4 expansion to avoid numerical issues with quad
+    # L_HE = (eB)**4 / (360 * pi**2 * m**4)
     if abs(e * B) < 0.05 * m**2:
         return (e * B)**4 / (360.0 * np.pi**2 * m**4)
 
     def integrand(s):
-        # (s*coth(s) - 1 - s^2/3) / s^3
-        # Expansion: 1 + s^2/3 - s^4/45 + 2s^6/945
-        # f(s) = (1 + s^2/3 - s^4/45 - 1 - s^2/3) / s^3 = -s/45
+        # (s*coth(s) - 1 - s**2/3) / s**3
+        # Expansion: 1 + s**2/3 - s**4/45 + 2s**6/945
+        # f(s) = (1 + s**2/3 - s**4/45 - 1 - s**2/3) / s**3 = -s/45
         if s < 1e-4:
             return -s/45.0 + 2.0*s**3/945.0
         
@@ -43,26 +43,26 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
 def heisenberg_euler_integrand(Q: float, B: float, m: float = 1.0, e: float = 1.0) -> float:
     """
     Computes the renormalized Heisenberg-Euler spectral integrand:
-    L_LCF = (1/4pi^2) * Integral Q^3 dQ * [exp(-m^2/Q^2) * (eBT/tanh(eBT) - 1 - 1/3(eBT)^2)]
+    L_LCF = (1/4pi**2) * Integral Q**3 dQ * [exp(-m**2/Q**2) * (eBT/tanh(eBT) - 1 - 1/3(eBT)**2)]
     This matches the standard Spinor QED (4 states) result.
     """
     if abs(B) < 1e-12:
         return 0.0
 
-    # T = 1/Q^2
+    # T = 1/Q**2
     T = 1.0 / (Q**2 + 1e-15)
     eBT = e * B * T
 
-    # HE renormalized integrand part: [eBT/tanh(eBT) - 1 - 1/3(eBT)^2]
-    # Small eBT expansion: -1/45 * (eBT)^4
+    # HE renormalized integrand part: [eBT/tanh(eBT) - 1 - 1/3(eBT)**2]
+    # Small eBT expansion: -1/45 * (eBT)**4
     if abs(eBT) < 1e-3:
         f_val = - (1.0/45.0) * (eBT**4)
     else:
         f_val = (eBT / np.tanh(eBT)) - 1.0 - (1.0/3.0)*(eBT**2)
 
     # Return the DIMENSIONLESS part that matches the orchestrator's local_renorm_sum
-    # norm_factor is 1/8pi^2. 
-    return np.exp(-m^2 / Q**2) * f_val
+    # norm_factor is 1/8pi**2. 
+    return np.exp(-m**2 / Q**2) * f_val
 
 
 def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: float = 1.0) -> float:
@@ -87,10 +87,10 @@ def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: flo
             
         # Stable form for f''' = (s*coth(s))'''
         # f = s/tanh(s)
-        # f' = coth(s) - s*csch^2(s)
-        # f'' = -2*csch^2(s) + 2*s*csch^2(s)*coth(s)
-        # f''' = 4*csch^2(s)*coth(s) - 2*csch^2(s)*coth(s)*2*s*coth(s) - 4*s*csch^4(s)
-        #      = 4*csch^2*coth - 4*s*csch^2*coth^2 - 4*s*csch^4
+        # f' = coth(s) - s*csch**2(s)
+        # f'' = -2*csch**2(s) + 2*s*csch**2(s)*coth(s)
+        # f''' = 4*csch**2(s)*coth(s) - 2*csch**2(s)*coth(s)*2*s*coth(s) - 4*s*csch**4(s)
+        #      = 4*csch**2*coth - 4*s*csch**2*coth**2 - 4*s*csch**4
         cs = 1.0/np.sinh(s)
         ct = 1.0/np.tanh(s)
         f3 = 4*cs**2*ct - 4*s*cs**2*ct**2 - 4*s*cs**4
@@ -131,14 +131,14 @@ def get_step_function_params(chi: complex, ml: int, sigma3: int, m: float, lambd
     # F is the total flux, F_cal is e*F / (2*pi)
     F_cal = e * F / (2.0 * np.pi)
     
-    # Whittaker parameters: kappa = (chi^2 - m^2) / (4 * e * F_dim / lambda^2) + (ml - sigma3)/2
-    # Equation derived from matching ODE to Whittaker form z'' + (-1/4 + kappa/z + (1/4-mu^2)/z^2) z = 0
-    # Our ODE: u'' + 1/r u' - ((ml-eA)^2/r^2 + e*s3*B + m^2 - chi^2) u = 0
-    # For interior A = (F_cal/l^2) * r, B = 2*F_cal/l^2
-    # kappa = (chi^2 - m^2 - 2*e*s3*F_cal/l^2) / (4*F_cal/l^2) + ml/2 ?? 
+    # Whittaker parameters: kappa = (chi**2 - m**2) / (4 * e * F_dim / lambda**2) + (ml - sigma3)/2
+    # Equation derived from matching ODE to Whittaker form z'' + (-1/4 + kappa/z + (1/4-mu**2)/z**2) z = 0
+    # Our ODE: u'' + 1/r u' - ((ml-eA)**2/r**2 + e*s3*B + m**2 - chi**2) u = 0
+    # For interior A = (F_cal/l**2) * r, B = 2*F_cal/l**2
+    # kappa = (chi**2 - m**2 - 2*e*s3*F_cal/l**2) / (4*F_cal/l**2) + ml/2 ?? 
     # Let's use the dissertation's kappa if possible.
-    # Eq 2.76: k^2 = chi^2 - m^2 - 2*F_cal/l^2 * (sigma3 - ml)
-    # Eq 2.73/2.74: kappa = l^2 * k^2 / (4 * F_cal)
+    # Eq 2.76: k**2 = chi**2 - m**2 - 2*F_cal/l**2 * (sigma3 - ml)
+    # Eq 2.73/2.74: kappa = l**2 * k**2 / (4 * F_cal)
     
     k2 = chi**2 - m**2 - (2.0 * F_cal / lambd**2) * (sigma3 - ml)
     kappa = (lambd**2 * k2) / (4.0 * F_cal)
@@ -151,8 +151,8 @@ def get_interior_solutions(rho: np.ndarray, chi: complex, ml: int, sigma3: int, 
     Compute analytic solutions u0 (regular at 0) and uinf (regular at infinity)
     for the interior region (rho < lambd).
     The radial wavefunction u(rho) satisfies the radial ODE.
-    Whittaker M/W functions for the potential V ~ r^2 are related to u via:
-    u(rho) = M_{kappa, mu}(z) / rho, where z ~ rho^2 and mu = ml/2.
+    Whittaker M/W functions for the potential V ~ r**2 are related to u via:
+    u(rho) = M_{kappa, mu}(z) / rho, where z ~ rho**2 and mu = ml/2.
     """
     F_cal, _, kappa, mu = get_step_function_params(chi, ml, sigma3, m, lambd, F, e)
 
@@ -201,7 +201,7 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     dy_l = k_ext * 0.5 * (yv(n-1, k_ext * lambd) - yv(n+1, k_ext * lambd))
     
     # 3. Matching Conditions
-    # Physical jump condition: du_ext - du_int = - (2*F_cal / lambd^2) * u(l)
+    # Physical jump condition: du_ext - du_int = - (2*F_cal / lambd**2) * u(l)
     jump_val = (2.0 * F_cal / lambd**2)
     
     # For u0 (regular at origin):

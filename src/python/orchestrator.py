@@ -67,20 +67,19 @@ class Orchestrator:
                     
                 # Solve for the numerical interacting case and background on the exact same grid
                 num_results, _ = self.backend.solve_batch(euclidean_batch, field_profile)
-                
+
                 # Compute background on the same grid/params to ensure exact cancellation
                 batch_chi = torch.tensor([p['chi'] for p in euclidean_batch], device=self.device, dtype=torch.complex128)
                 batch_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.float64)
-                
+
                 # Explicitly align background calculation with the solver's grid
                 num_bg = self.renormalizer.compute_g0(batch_chi, batch_ml, m, rho, field_profile)
-                
+
                 # Point-wise renormalization subtraction
                 for idx, p in enumerate(batch):
                     chi_idx = chi_map[complex(p['chi'])]
                     # Direct subtraction before any integration
                     mode_sums[chi_idx] += (num_results[idx] - num_bg[idx])
-
         # 4. Renormalization and Spectral Integration
         uv_coeff_local = self.renormalizer.get_b2_term(field_profile, rho) * 2.0
         B_local = getattr(field_profile, 'B_vals', torch.zeros_like(rho)).detach().cpu().numpy()
@@ -94,6 +93,7 @@ class Orchestrator:
         chi_real = np.array([abs(complex(c)) for c in chi_values])
         
         # Spectral weight for Q^3 dQ measure
+        chi_real = np.array([abs(complex(c)) for c in chi_values])
         chi_weights = np.zeros_like(chi_real)
         if len(chi_real) > 1:
             for i in range(len(chi_real)):
@@ -127,7 +127,10 @@ class Orchestrator:
         rho_weights[-1] = (rho[-1] - rho[-2]) / 2.0
         
         # Integrated action Gamma (Action per unit time and unit length)
-        # EH Lagrangian density normalization: positive for Scalar QED correction
-        action = torch.sum(L_eff_rho.real * rho * rho_weights)
+        # Sign: Positive for Scalar QED, Negative for Fermions.
+        # Heisenberg-Euler is positive. Our sum is negative?
+        # Let's make it positive to match HE convention.
+        # Note: 2*pi factor from angular integration over phi
+        action = -2.0 * np.pi * torch.sum(L_eff_rho.real * rho * rho_weights)
         
-        return action, L_eff_rho
+        return action, -1.0 * L_eff_rho

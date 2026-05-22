@@ -23,15 +23,16 @@ def reproduce_fig_7_3():
     
     # Spectral parameters
     chi_vals = [complex(c) for c in np.logspace(-1, 1.3, 10)]
-    ml_vals = list(range(-50, 51))
+    # Shifted mode range to capture the physics of the flux tube (F_cal = 100)
+    ml_vals = list(range(-150, 251)) 
     sigma3_vals = [1, -1]
     
-    rho = torch.linspace(0.01, 30.0, 20)
+    rho = torch.linspace(0.01, 30.0, 10)
     profile = WLNFluxTubeProfile(rho, lambd=lambd, F=F_val)
 
     print("Computing Effective Action Density...")
     action, L_eff_rho = orchestrator.compute_effective_action(
-        profile, chi_vals, ml_vals, sigma3_vals, collect_density=True, lcf_threshold=20.0
+        profile, chi_vals, ml_vals, sigma3_vals, collect_density=True, lcf_threshold=2.0
     )
 
     # The effective action density is defined as L_eff, 
@@ -48,6 +49,9 @@ def reproduce_fig_7_3():
     # Multiply by -1.
     L_eff_np = -1.0 * L_eff_rho.real.detach().cpu().numpy()
     rho_np = rho.detach().cpu().numpy()
+
+    print(f"L_eff_np[0]: {L_eff_np[0]:.6e}")
+    print(f"L_eff_np[-1]: {L_eff_np[-1]:.6e}")
 
     # Compute LCF approximation (Heisenberg-Euler)
     B_theory = F_val * lambd**2 / (np.pi * (lambd**2 + rho_np**2)**2)
