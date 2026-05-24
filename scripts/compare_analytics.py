@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from src.python import constants
 """
 Compares numerical Green's function results against analytic Whittaker/Bessel benchmarks.
 """
@@ -19,7 +23,7 @@ def compare_analytic_vs_numerical():
     # Parameters
     lambd = 1.0
     F = 2.0 * np.pi * 1.0
-    m = 1.0
+    m = constants.ELECTRON_MASS
     chi = 1.5 + 0.5j
     ml = 1
     sigma3 = 1
@@ -32,7 +36,7 @@ def compare_analytic_vs_numerical():
     
     # Numerical solver
     orc = Orchestrator(device="cpu")
-    params = [{'chi': chi, 'ml': ml, 'sigma3': sigma3, 'm': m, 'e': 1.0}]
+    params = [{"chi": chi, "ml": ml, "sigma3": sigma3, "m": m, "e": constants.ELECTRON_CHARGE}]
     results_num, W0_num = orc.backend.solve_batch(params, profile)
     res_num = results_num[0].detach().numpy()
     

@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath("."))
 from src.python import constants
 import sys, os; sys.path.append(os.path.abspath("."))
 sys.path.append(os.path.abspath("src/python"))
@@ -121,9 +124,9 @@ def run_delta_shell_validation():
     chi = 0.5
     ml = 1
     sigma3 = 1
-    m = 1.0
+    m = constants.ELECTRON_MASS
     
-    params = [{'chi': complex(chi), 'ml': ml, 'sigma3': sigma3, 'm': m, 'e': 1.0}]
+    params = [{'chi': complex(chi), 'ml': ml, 'sigma3': sigma3, 'm': m, 'e': constants.ELECTRON_CHARGE}]
     
     print(f"Solving numerically for chi={chi}, ml={ml}, sigma3={sigma3}...")
     num_g_batch, _ = orchestrator.backend.solve_batch(params, profile)
