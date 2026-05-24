@@ -1,3 +1,4 @@
+from src.python import constants
 import torch
 import numpy as np
 from scipy.special import jv, yv
@@ -62,7 +63,7 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
                 # = - 0.5 * pi * 1j * J_nu^2(z) + 0.5 * pi * J_nu(z) * Y_nu(z)
                 # The real part is 0.5 * pi * J_nu(z) * Y_nu(z)
                 # The imaginary part is -0.5 * pi * J_nu^2(z)
-                res_np[i] = 0.5 * np.pi * jv(order, z) * yv(order, z) - 0.5 * np.pi * 1j * jv(order, z)**2
+                res_np[i] = 0.5 * constants.PI * jv(order, z) * yv(order, z) - 0.5 * constants.PI * 1j * jv(order, z)**2
                 mask_sing = (z < 1e-15)
                 if np.any(mask_sing):
                     res_np[i][mask_sing] = 0.0
@@ -134,7 +135,7 @@ class Renormalizer:
         import mpmath
         
         e = 1.0
-        F_cal = (e * F) / (2.0 * np.pi)
+        F_cal = (e * F) / (constants.TWO_PI)
         k2 = chi*chi - m*m
         
         # kappa = lambda^2 * k^2 / (4 * F_cal) + (ml - sigma3)/2

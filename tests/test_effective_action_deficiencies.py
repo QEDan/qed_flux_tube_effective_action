@@ -1,3 +1,4 @@
+from src.python import constants
 import torch
 import numpy as np
 import pytest
@@ -92,12 +93,12 @@ def test_normalization_he(orchestrator, device):
     sigma3_vals = [1, -1]
     
     _, L_eff_rho = orchestrator.compute_effective_action(
-        profile, chi_vals, ml_vals, sigma3_vals, m=1.0, e=1.0, collect_density=True,
+        profile, chi_vals, ml_vals, sigma3_vals, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE, collect_density=True,
         lcf_threshold=None
     )
     
     solver_density = L_eff_rho[rho_idx].real.item()
-    he_density = heisenberg_euler_lagrangian(B, m=1.0, e=1.0)
+    he_density = heisenberg_euler_lagrangian(B, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE)
     
     print(f"\nNumerical Normalization Check (B={B}):")
     print(f"Solver Density: {solver_density:.4e}")
@@ -123,7 +124,7 @@ def test_local_vacuum_consistency(orchestrator, device):
     sigma3_vals = [1]
     
     _, L_eff_rho = orchestrator.compute_effective_action(
-        profile, chi_vals, ml_vals, sigma3_vals, m=1.0, e=1.0, collect_density=True
+        profile, chi_vals, ml_vals, sigma3_vals, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE, collect_density=True
     )
     
     density_out = L_eff_rho[rho_idx].real.item()

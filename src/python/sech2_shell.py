@@ -1,10 +1,11 @@
 import numpy as np
 import torch
 from typing import Union
+from src.python import constants
 from src.python.profiles import FieldProfile
 
 class Sech2ShellProfile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], R: float, B: float, lambd: float, e: float = 1.0) -> None:
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], R: float, B: float, lambd: float, e: float = constants.ELECTRON_CHARGE) -> None:
         """
         Displaced sech2 flux tube:
         B(rho) = B * sech^2((rho - R) / lambd)

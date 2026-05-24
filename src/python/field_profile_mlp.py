@@ -1,3 +1,4 @@
+from src.python import constants
 import torch
 import torch.nn as nn
 import numpy as np
@@ -9,9 +10,9 @@ class BasisProfile(nn.Module):
     B(rho) = sum_i w_i * exp(-(rho - c_i)^2 / (2 * sigma^2))
     The total flux is conserved by re-normalizing the sum at each step.
     """
-    def __init__(self, num_basis: int = 8, total_flux: float = 2.0*np.pi*0.4, rho_max: float = 10.0) -> None:
+    def __init__(self, num_basis: int = 8, total_flux: float = 2.0*constants.PI*0.4, rho_max: float = 10.0) -> None:
         super().__init__()
-        self.Phi_over_2pi = total_flux / (2.0 * np.pi)
+        self.Phi_over_2pi = total_flux / (constants.TWO_PI)
         self.num_basis = num_basis
         
         # Basis parameters
@@ -42,9 +43,9 @@ class BasisProfile(nn.Module):
         # rho_weights calculated for integration
         dr = rho[1] - rho[0] if len(rho) > 1 else torch.tensor(0.1)
         rho_vals = rho.view(-1)
-        raw_flux = 2.0 * np.pi * torch.sum(B_raw.squeeze() * rho_vals * dr)
+        raw_flux = constants.TWO_PI * torch.sum(B_raw.squeeze() * rho_vals * dr)
         
-        norm_factor = (self.Phi_over_2pi * 2.0 * np.pi) / (raw_flux + 1e-15)
+        norm_factor = (self.Phi_over_2pi * constants.TWO_PI) / (raw_flux + 1e-15)
         B_vals = B_raw * norm_factor
         
         # Clamp B_vals to prevent numerical divergence
@@ -70,12 +71,12 @@ class SplineProfile(nn.Module):
     Provides C2 continuity, local support, and a low-dimensional parameter space
     ideal for landscape mapping and Hessian analysis.
     """
-    def __init__(self, num_basis: int = 15, total_flux: float = 2.0*np.pi*0.4, rho_max: float = 10.0, 
+    def __init__(self, num_basis: int = 15, total_flux: float = 2.0*constants.PI*0.4, rho_max: float = 10.0, 
                  positivity_constraint: bool = True) -> None:
         super().__init__()
         self.num_basis = num_basis
         self.total_flux = total_flux
-        self.Phi_over_2pi = total_flux / (2.0 * np.pi)
+        self.Phi_over_2pi = total_flux / (constants.TWO_PI)
         self.rho_max = rho_max
         self.positivity_constraint = positivity_constraint
         
@@ -123,9 +124,9 @@ class SplineProfile(nn.Module):
         # Renormalize to conserve flux: Phi = 2*pi * integral(rho * B) = total_flux
         dr = rho[1] - rho[0] if len(rho) > 1 else torch.tensor(0.1)
         rho_vals = rho.view(-1)
-        raw_flux = 2.0 * np.pi * torch.sum(B_raw.squeeze() * rho_vals * dr)
+        raw_flux = constants.TWO_PI * torch.sum(B_raw.squeeze() * rho_vals * dr)
         
-        norm_factor = (self.Phi_over_2pi * 2.0 * np.pi) / (raw_flux + 1e-15)
+        norm_factor = (self.Phi_over_2pi * constants.TWO_PI) / (raw_flux + 1e-15)
         B_vals = B_raw * norm_factor
         
         # Clamp B_vals to prevent numerical divergence in extreme regimes

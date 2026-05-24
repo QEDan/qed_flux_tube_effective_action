@@ -1,3 +1,4 @@
+from src.python import constants
 import torch
 import numpy as np
 from typing import List, Dict, Any, Tuple, Union, Optional
@@ -129,7 +130,7 @@ class PyTorchSolver:
         
         # Backward boundary condition: 
         F_val = F if F is not None else 0.0
-        n_order = params['ml'].to(torch.float64) - (params['e'] * (F_val) / (2.0 * np.pi))
+        n_order = params['ml'].to(torch.float64) - (params['e'] * (F_val) / (constants.TWO_PI))
 
         u_inf_init = torch.zeros(n_batch, device=self.device, dtype=torch.complex128)
         du_inf_init = torch.zeros(n_batch, device=self.device, dtype=torch.complex128)

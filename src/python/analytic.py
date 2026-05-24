@@ -1,11 +1,12 @@
 import numpy as np
 import mpmath
 from typing import Union, Tuple, Any
+from src.python import constants
 
 # Set precision for mpmath
 mpmath.mp.dps = 25
 
-def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> float:
+def heisenberg_euler_lagrangian(B: float, m: float = constants.ELECTRON_MASS, e: float = constants.ELECTRON_CHARGE) -> float:
     """
     Computes the exact renormalized Heisenberg-Euler Lagrangian density for a constant B field.
     Includes all orders in B, but excludes derivative terms.
@@ -19,7 +20,7 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
     # For small B, use the B**4 expansion to avoid numerical issues with quad
     # L_HE = (eB)**4 / (360 * pi**2 * m**4)
     if abs(e * B) < 0.05 * m**2:
-        return (e * B)**4 / (360.0 * np.pi**2 * m**4)
+        return (e * B)**4 / (360.0 * constants.PI**2 * m**4)
 
     def integrand(s):
         # (s*coth(s) - 1 - s**2/3) / s**3
@@ -38,9 +39,9 @@ def heisenberg_euler_lagrangian(B: float, m: float = 1.0, e: float = 1.0) -> flo
     # Use a finite upper bound to avoid issues with divergent integrands in quad
     # The exponential factor exp(-2s) (for m=1, B=0.5) suppresses the integrand.
     val, _ = quad(integrand, 0, 500.0)
-    return - (e * B)**2 / (8.0 * np.pi**2) * val
+    return - (e * B)**2 * constants.HE_NORMALIZATION_FACTOR * val
 
-def heisenberg_euler_integrand(Q: float, B: float, m: float = 1.0, e: float = 1.0) -> float:
+def heisenberg_euler_integrand(Q: float, B: float, m: float = constants.ELECTRON_MASS, e: float = constants.ELECTRON_CHARGE) -> float:
     """
     Computes the renormalized Heisenberg-Euler spectral integrand:
     L_LCF = (1/4pi**2) * Integral Q**3 dQ * [exp(-m**2/Q**2) * (eBT/tanh(eBT) - 1 - 1/3(eBT)**2)]
@@ -65,7 +66,7 @@ def heisenberg_euler_integrand(Q: float, B: float, m: float = 1.0, e: float = 1.
     return np.exp(-m**2 / Q**2) * f_val
 
 
-def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: float = 1.0) -> float:
+def derivative_correction_lagrangian(B: float, dB: float, m: float = constants.ELECTRON_MASS, e: float = constants.ELECTRON_CHARGE) -> float:
     """
     Computes the first-order derivative correction to the effective Lagrangian.
     Matches Eq 15 in Dunne & Hall (1997).
@@ -98,7 +99,7 @@ def derivative_correction_lagrangian(B: float, dB: float, m: float = 1.0, e: flo
         return (1.0/s) * np.exp(-m**2 * s / (e * abs(B))) * f3
         
     val, _ = quad(integrand, 0, 500.0)
-    return - e * (dB**2) / (64.0 * np.pi**2 * abs(B)) * val
+    return - e * (dB**2) / (constants.SIXTEEN_PI * constants.FOUR_PI * abs(B)) * val
 
 def M_whittaker(z: Union[float, np.ndarray], kappa: complex, mu: float) -> Union[complex, np.ndarray]:
     """
@@ -124,12 +125,12 @@ def W_whittaker(z: Union[float, np.ndarray], kappa: complex, mu: float) -> Union
         return np.array([single_val(zv) for zv in z])
     return single_val(z)
 
-def get_step_function_params(chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = 1.0) -> Tuple[float, complex, complex, float]:
+def get_step_function_params(chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = constants.ELECTRON_CHARGE) -> Tuple[float, complex, complex, float]:
     """
     Calculate intermediate parameters for step function analytic solution.
     """
     # F is the total flux, F_cal is e*F / (2*pi)
-    F_cal = e * F / (2.0 * np.pi)
+    F_cal = e * F / (constants.TWO_PI)
     
     # Whittaker parameters: kappa = (chi**2 - m**2) / (4 * e * F_dim / lambda**2) + (ml - sigma3)/2
     # Equation derived from matching ODE to Whittaker form z'' + (-1/4 + kappa/z + (1/4-mu**2)/z**2) z = 0
@@ -146,7 +147,7 @@ def get_step_function_params(chi: complex, ml: int, sigma3: int, m: float, lambd
     
     return F_cal, k2, kappa, mu
 
-def get_interior_solutions(rho: np.ndarray, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = 1.0) -> Tuple[np.ndarray, np.ndarray]:
+def get_interior_solutions(rho: np.ndarray, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = constants.ELECTRON_CHARGE) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute analytic solutions u0 (regular at 0) and uinf (regular at infinity)
     for the interior region (rho < lambd).
@@ -162,7 +163,7 @@ def get_interior_solutions(rho: np.ndarray, chi: complex, ml: int, sigma3: int, 
     uinf = W_whittaker(z, kappa, mu) / rho
 
     return u0, uinf
-def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = 1.0) -> np.ndarray:
+def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = constants.ELECTRON_CHARGE) -> np.ndarray:
     """
     Computes the full analytic Green's function G(rho, rho) for the step function profile
     by matching interior (Whittaker) and exterior (Bessel) solutions at rho = lambd.
@@ -227,7 +228,7 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
     
     # W0 = rho * (u0' * uinf - u0 * uinf')
     # Using rho * W(A*J+B*Y, Y) = A * rho * W(J, Y) = A * (-2/pi)
-    W0 = coeffs_u0[0] * (-2.0 / np.pi)
+    W0 = coeffs_u0[0] * (-2.0 / constants.PI)
     
     for i, r in enumerate(rho_grid):
         if r <= lambd:
@@ -242,7 +243,7 @@ def get_full_analytic_solution(rho_grid: np.ndarray, chi: complex, ml: int, sigm
         
     return g_full
 
-def get_analytic_wronskian(chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = 1.0) -> complex:
+def get_analytic_wronskian(chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, e: float = constants.ELECTRON_CHARGE) -> complex:
     """
     Compute analytic Wronskian W0 = rho * (u0' * uinf - u0 * uinf')
     for the interior solutions.

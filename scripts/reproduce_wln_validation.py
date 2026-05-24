@@ -1,3 +1,4 @@
+from src.python import constants
 """
 Attempts to reproduce validation figures from the WLNumerics project.
 """
@@ -47,7 +48,7 @@ def run_validation():
         print(f"  ml={batch[i]['ml']}, dG/rho={diff[i, 0] / rho_grid[0].item():.4e}")
 
     action, L_eff = orchestrator.compute_effective_action(
-        profile, chi_grid, ml_grid, [1, -1], m=m_val, e=1.0
+        profile, chi_grid, ml_grid, [1, -1], m=m_val, e=constants.ELECTRON_CHARGE
     )
     
     L_num = L_eff.real.detach().cpu().numpy()

@@ -1,3 +1,4 @@
+from src.python import constants
 """
 Compares numerical results with Local Constant Field (LCF) benchmarks for periodic profiles.
 """
@@ -11,7 +12,7 @@ from src.python.profiles import MLPProfile, FieldProfile
 from src.python.pytorch_solver import PyTorchSolver
 from src.python.renormalization import Renormalizer
 
-def compute_lcf_density(B_vals, m=1.0, e=1.0, chi_max=100.0, n_chi=500, factor=1.0):
+def compute_lcf_density(B_vals, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE, chi_max=100.0, n_chi=500, factor=1.0):
     chi_vals = np.linspace(0.1, chi_max, n_chi)
     dchi = chi_vals[1] - chi_vals[0]
     density = np.zeros_like(B_vals)

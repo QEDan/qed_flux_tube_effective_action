@@ -1,3 +1,4 @@
+from src.python import constants
 """
 Performs manual verification of periodic boundary condition behavior in the solver.
 """
@@ -10,7 +11,7 @@ from src.python.orchestrator import Orchestrator
 from src.python.profiles import FieldProfile
 from src.python.analytic import heisenberg_euler_lagrangian
 
-def compute_lcf_density(B_vals, m=1.0, e=1.0):
+def compute_lcf_density(B_vals, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE):
     density = np.zeros_like(B_vals)
     for i, B in enumerate(B_vals):
         density[i] = heisenberg_euler_lagrangian(B, m=m, e=e)
@@ -36,7 +37,7 @@ def run_manual_validation():
     print("Starting Orchestrator Integration...")
     # Compute effective action and Lagrangian density
     action, L_eff_rho = orchestrator.compute_effective_action(
-        profile, chi_vals, ml_vals, sigma3_vals, m=1.0, e=1.0, collect_density=True
+        profile, chi_vals, ml_vals, sigma3_vals, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE, collect_density=True
     )
     
     # Extract density values
@@ -49,7 +50,7 @@ def run_manual_validation():
     b_val = B_vals[idx]
     
     # Theoretical EH density at this B_val
-    theoretical_density = heisenberg_euler_lagrangian(b_val, m=1.0, e=1.0)
+    theoretical_density = heisenberg_euler_lagrangian(b_val, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE)
     
     print(f"\n--- Normalization Audit ---")
     print(f"B_val at center: {b_val:.4e}")

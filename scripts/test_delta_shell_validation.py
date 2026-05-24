@@ -1,3 +1,4 @@
+from src.python import constants
 import sys, os; sys.path.append(os.path.abspath("."))
 sys.path.append(os.path.abspath("src/python"))
 import numpy as np
@@ -7,7 +8,7 @@ from src.python.orchestrator import Orchestrator
 from src.python.delta_shell import DeltaFunctionShellProfile
 from scipy.special import iv, kv, jv, yv
 
-def get_analytic_delta_shell_g(rho, R, F, chi, ml, sigma3, m=1.0, e=1.0):
+def get_analytic_delta_shell_g(rho, R, F, chi, ml, sigma3, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE):
     """
     Compute analytic Green's function G(rho, rho) for a delta shell.
     Based on matching I/K (or J/Y) functions at rho=R with jump condition.

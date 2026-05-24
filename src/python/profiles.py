@@ -1,3 +1,5 @@
+from src.python import constants
+
 import numpy as np
 import torch
 from typing import Union, Tuple, Optional, Any, List
@@ -37,7 +39,7 @@ class FieldProfile:
         return []
 
 class StepFunctionProfile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], lambd: float, F: float, e: float = 1.0, smooth_width: Optional[float] = None) -> None:
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], lambd: float, F: float, e: float = constants.ELECTRON_CHARGE, smooth_width: Optional[float] = None) -> None:
         """
         Magnetic field B = (F / (pi * lambd^2)) * theta(lambd - rho)
         A_phi = (F / (2*pi)) * f_lambda(rho) / rho
@@ -51,7 +53,7 @@ class StepFunctionProfile(FieldProfile):
         self.update()
 
     def update(self) -> None:
-        pre = self.F / (2.0 * np.pi)
+        pre = self.F / (constants.TWO_PI)
         
         if self.smooth_width is None:
             # Sharp step function
@@ -103,10 +105,10 @@ class StepFunctionProfile(FieldProfile):
         if self.smooth_width is not None or self.lambd <= 0 or abs(self.F) < 1e-12:
             return []
         # Jump = -e * F / (pi * lambda^2)
-        return [Discontinuity(location=self.lambd, magnitude=-self.e * self.F / (np.pi * self.lambd**2))]
+        return [Discontinuity(location=self.lambd, magnitude=-self.e * self.F / (constants.PI * self.lambd**2))]
 
 class ZeroFluxProfile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = 1.0) -> None:
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = constants.ELECTRON_CHARGE) -> None:
         """
         Magnetic field B(rho) = B * (1 - 2*rho^2/lambd^2) for rho < lambd, else 0.
         A_phi(rho) = (B*rho/2) * (1 - rho^2/lambd^2) for rho < lambd, else 0.
@@ -132,7 +134,7 @@ class ZeroFluxProfile(FieldProfile):
         self.da_phi = self.B_vals - self.a_phi / r_safe
 
 class SuperGaussianProfile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B0: float, lambd: float, e: float = 1.0) -> None:
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B0: float, lambd: float, e: float = constants.ELECTRON_CHARGE) -> None:
         """
         Magnetic field B(rho) = B0 * exp(-(rho/lambd)^4).
         A_phi(rho) = (sqrt(pi) * B0 * lambd^2 / (4 * rho)) * erf((rho/lambd)^2).
@@ -151,14 +153,14 @@ class SuperGaussianProfile(FieldProfile):
         
         # A_phi(rho) using torch.erf
         # Integral_0^rho r * exp(-(r/lambda)^4) dr = (lambda^2 * sqrt(pi) / 4) * erf((rho/lambda)^2)
-        pre = (np.sqrt(np.pi) * self.B0 * self.lambd**2) / 4.0
+        pre = (np.sqrt(constants.PI) * self.B0 * self.lambd**2) / 4.0
         self.a_phi = pre * torch.erf((self.rho / self.lambd)**2) / r_safe
         
         # da_phi = B - A_phi/rho
         self.da_phi = b_field - self.a_phi / r_safe
 
 class WLNFluxTubeProfile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], lambd: float, F: float, e: float = 1.0) -> None:
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], lambd: float, F: float, e: float = constants.ELECTRON_CHARGE) -> None:
         """
         Profile from docs/WLNumerics.tex:
         f_lambda(rho^2) = rho^2 / (lambda^2 + rho^2)
@@ -173,7 +175,7 @@ class WLNFluxTubeProfile(FieldProfile):
 
     def update(self) -> None:
         r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
-        pre_A = self.F / (2.0 * np.pi)
+        pre_A = self.F / (constants.TWO_PI)
         
         # A_phi = pre_A * rho / (lambd^2 + rho^2)
         denom = self.lambd**2 + self.rho**2
@@ -186,7 +188,7 @@ class WLNFluxTubeProfile(FieldProfile):
         self.da_phi = self.B_vals - self.a_phi / r_safe
 
 class MLPProfile(FieldProfile):
-    def __init__(self, rho: torch.Tensor, B_vals: torch.Tensor, a_phi: torch.Tensor, e: float = 1.0) -> None:
+    def __init__(self, rho: torch.Tensor, B_vals: torch.Tensor, a_phi: torch.Tensor, e: float = constants.ELECTRON_CHARGE) -> None:
         super().__init__(rho)
         self.B_vals = B_vals
         self.a_phi = a_phi
@@ -199,7 +201,7 @@ class MLPProfile(FieldProfile):
         self.da_phi = self.B_vals - self.a_phi / r_safe
 
 class PureGaugeProfile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], F: float, e: float = 1.0) -> None:
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], F: float, e: float = constants.ELECTRON_CHARGE) -> None:
         """
         Represents a vacuum profile with non-zero vector potential corresponding to a total flux F.
         B = 0 everywhere, but A_phi = F / (2*pi*rho).
@@ -212,7 +214,7 @@ class PureGaugeProfile(FieldProfile):
 
     def update(self) -> None:
         r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
-        pre = self.F / (2.0 * np.pi)
+        pre = self.F / (constants.TWO_PI)
         self.a_phi = pre / r_safe
         self.da_phi = -pre / (r_safe**2)
 

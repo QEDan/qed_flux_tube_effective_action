@@ -1,10 +1,12 @@
+from src.python import constants
+from src.python import constants
 import torch
 import numpy as np
 from src.python.profiles import FieldProfile
 from scipy.special import expi
 
 class LatticeBumpProfile(FieldProfile):
-    def __init__(self, rho: torch.Tensor, a: float, lambd: float, F: float, lambd_min: float = None, e: float = 1.0) -> None:
+    def __init__(self, rho: torch.Tensor, a: float, lambd: float, F: float, lambd_min: float = None, e: float = constants.ELECTRON_CHARGE) -> None:
         """
         Cylindrically symmetric flux tube lattice model from docs/periodic.tex.
         
@@ -45,7 +47,7 @@ class LatticeBumpProfile(FieldProfile):
         # In our StepFunctionProfile, self.F is total flux Phi.
         # Let's clarify: The document says F = e/(2*pi) * Phi.
         # So we'll treat the input F as the total flux, and convert to cal_F = F * e / (2*pi).
-        cal_F = self.F * self.e / (2.0 * np.pi)
+        cal_F = self.F * self.e / (constants.TWO_PI)
         
         term_l = (self.lambd - self.lambd_min) / (self.a - self.lambd_min)
         
@@ -112,7 +114,7 @@ if __name__ == "__main__":
     # Fig 10.2: a = sqrt(8)*lambda_e, lambda_min = 0.1a. 
     # Use lambda_e = 1.0 (m=1)
     a_val = np.sqrt(8.0)
-    profile = LatticeBumpProfile(rho, a=a_val, lambd=0.6*a_val, F=2.0*np.pi)
+    profile = LatticeBumpProfile(rho, a=a_val, lambd=0.6*a_val, F=2.0*constants.PI)
     
     r, a_p, da_p = profile.get_arrays()
     B = profile.B_vals.detach().numpy()

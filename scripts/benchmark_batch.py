@@ -1,3 +1,4 @@
+from src.python import constants
 """
 Benchmarks the numerical solver by running a batch of parameter configurations.
 """
@@ -40,11 +41,11 @@ def benchmark_batch_sizes():
             orc = Orchestrator(device=device, batch_size=bs)
             
             # Warm-up run
-            _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=1.0)
+            _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=constants.ELECTRON_MASS)
             
             # Timed run
             start = time.time()
-            _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=1.0)
+            _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=constants.ELECTRON_MASS)
             end = time.time()
             
             duration = end - start

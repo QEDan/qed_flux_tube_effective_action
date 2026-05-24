@@ -1,10 +1,11 @@
+from src.python import constants
 import numpy as np
 import torch
 from typing import Union, List
 from src.python.profiles import FieldProfile, Discontinuity
 
 class DeltaFunctionShellProfile(FieldProfile):
-    def __init__(self, rho: Union[np.ndarray, torch.Tensor], R: float, F: float, e: float = 1.0) -> None:
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], R: float, F: float, e: float = constants.ELECTRON_CHARGE) -> None:
         """
         Delta-function shell magnetic field profile:
         B(rho) = (F / (2*pi*R)) * delta(rho - R)
@@ -22,7 +23,7 @@ class DeltaFunctionShellProfile(FieldProfile):
         # However, it is mathematically more robust to define the A_phi directly:
         # A_phi(rho) = (F / 2*pi) * (1/rho) * theta(rho - R)
         
-        pre = self.F / (2.0 * np.pi)
+        pre = self.F / (constants.TWO_PI)
         
         # A_phi(rho) = (pre / rho) for rho >= R, else 0
         self.a_phi = torch.where(self.rho >= self.R, pre / self.rho, torch.zeros_like(self.rho))
@@ -37,4 +38,4 @@ class DeltaFunctionShellProfile(FieldProfile):
         Jump in u' across a delta-function shell.
         jump = du_ext - du_int = + e * sigma3 * B_dist * u
         """
-        return [Discontinuity(location=self.R, magnitude=self.e * (self.F / (2.0 * np.pi * self.R)), is_sigma3_dependent=True)]
+        return [Discontinuity(location=self.R, magnitude=self.e * (self.F / (constants.TWO_PI * self.R)), is_sigma3_dependent=True)]

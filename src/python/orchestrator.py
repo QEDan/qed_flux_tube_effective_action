@@ -1,8 +1,10 @@
+from src.python import constants
+
 import torch
 import numpy as np
 from typing import List, Dict, Any, Tuple, Union, Optional
 
-def generate_params_grid(chi_values, ml_values, sigma3_values, m=1.0, e=1.0):
+def generate_params_grid(chi_values, ml_values, sigma3_values, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE):
     grid = []
     for chi in chi_values:
         for ml in ml_values:
@@ -25,7 +27,7 @@ class Orchestrator:
         self.backend = PyTorchSolver(device=device)
         self.renormalizer = Renormalizer(device=device, strategy=strategy, solver=self.backend)
 
-    def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = 1.0, e: float = 1.0, collect_density: bool = False, lcf_threshold: Optional[float] = 20.0) -> Any:
+    def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = constants.ELECTRON_MASS, e: float = constants.ELECTRON_CHARGE, collect_density: bool = False, lcf_threshold: Optional[float] = 20.0) -> Any:
         """
         Computes the 1-loop effective action (Gamma) and the intensive Lagrangian density L_eff(rho).
         Normalization aligns with Scalar QED HE (1/16pi^2) for each spin state.
@@ -88,7 +90,7 @@ class Orchestrator:
 
         # Consistent with 4D Spinor QED HE normalization (4 states)
         # 1/(32*pi^2) matches the observed scale of -0.016 at rho=0
-        norm_factor = 1.0 / (32.0 * np.pi**2)
+        norm_factor = 1.0 / (constants.THIRTY_TWO_PI_SQUARED)
 
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
         chi_real = np.array([abs(complex(c)) for c in chi_values])
@@ -131,6 +133,6 @@ class Orchestrator:
         # Heisenberg-Euler is positive. Our sum is negative?
         # Let's make it positive to match HE convention.
         # Note: 2*pi factor from angular integration over phi
-        action = -2.0 * np.pi * torch.sum(L_eff_rho.real * rho * rho_weights)
+        action = -constants.TWO_PI * torch.sum(L_eff_rho.real * rho * rho_weights)
         
         return action, -1.0 * L_eff_rho
