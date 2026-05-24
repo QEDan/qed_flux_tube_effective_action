@@ -1,15 +1,13 @@
+from src.python import constants
 import torch
 import numpy as np
 import pytest
-import sys
-import os
 
 # Add src/python to path
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
 
-from pytorch_solver import PyTorchSolver
-from analytic import get_interior_solutions, get_analytic_wronskian
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.analytic import get_interior_solutions, get_analytic_wronskian
+from src.python.profiles import StepFunctionProfile
 
 def test_exact_boundary_conditions():
     """
@@ -19,11 +17,11 @@ def test_exact_boundary_conditions():
     """
     lambd = 1.0
     F = 2.0 * np.pi * 1.0
-    m = 1.0
+    m = constants.ELECTRON_MASS
     chi = 1.5 + 0.5j
     ml = 1
     sigma3 = 1
-    e = 1.0
+    e = constants.ELECTRON_CHARGE
     
     # We will solve the ODE on the interior domain [0.1, lambd]
     # to isolate interior dynamics from the complex exterior jump.

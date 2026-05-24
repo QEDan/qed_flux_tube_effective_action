@@ -1,15 +1,13 @@
-import sys
-import os
+from src.python import constants
 import torch
 import numpy as np
 import pytest
 
 # Add src/python to path
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
 
-from pytorch_solver import PyTorchSolver
-from analytic import get_interior_solutions, get_analytic_wronskian
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.analytic import get_interior_solutions, get_analytic_wronskian
+from src.python.profiles import StepFunctionProfile
 
 def test_step_function_exact_normalization():
     """
@@ -18,11 +16,11 @@ def test_step_function_exact_normalization():
     """
     lambd = 1.0
     F = 2.0 * np.pi * 1.0
-    m = 1.0
+    m = constants.ELECTRON_MASS
     chi = 1.5 + 0.5j
     ml = 1
     sigma3 = 1
-    e = 1.0
+    e = constants.ELECTRON_CHARGE
     
     # We use a very dense grid to minimize integration error
     rho_np = np.linspace(0.1, lambd, 1000)
