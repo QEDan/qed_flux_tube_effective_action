@@ -5,7 +5,7 @@ import pytest
 from src.python.pytorch_solver import PyTorchSolver
 from src.python.profiles import StepFunctionProfile, FieldProfile
 from src.python.orchestrator import Orchestrator
-from src.python.analytic import heisenberg_euler_lagrangian
+from src.python.analytic_step_profile import heisenberg_euler_lagrangian
 
 @pytest.fixture
 def device():

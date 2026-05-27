@@ -6,7 +6,7 @@ import pytest
 # Add src/python to path
 
 from src.python.pytorch_solver import PyTorchSolver
-from src.python.analytic import get_interior_solutions, get_analytic_wronskian
+from src.python.analytic_step_profile import get_interior_solutions, get_analytic_wronskian
 from src.python.profiles import StepFunctionProfile
 
 def test_step_function_exact_normalization():

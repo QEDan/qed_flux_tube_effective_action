@@ -1,3 +1,4 @@
+from src.python.locally_constant_field import heisenberg_euler_integrand
 from src.python import constants
 
 import torch
@@ -22,8 +23,8 @@ class Orchestrator:
     def __init__(self, device: Optional[str] = 'cpu', batch_size: int = 1024, strategy: str = "analytic") -> None:
         self.device = torch.device(device)
         self.batch_size = batch_size
-        from src.python.pytorch_solver import PyTorchSolver
-        from src.python.renormalization import Renormalizer
+        from pytorch_solver import PyTorchSolver
+        from renormalization import Renormalizer
         self.backend = PyTorchSolver(device=device)
         self.renormalizer = Renormalizer(device=device, strategy=strategy, solver=self.backend)
 
@@ -86,8 +87,6 @@ class Orchestrator:
         uv_coeff_local = self.renormalizer.get_b2_term(field_profile, rho) * 2.0
         B_local = getattr(field_profile, 'B_vals', torch.zeros_like(rho)).detach().cpu().numpy()
 
-        from src.python.analytic import heisenberg_euler_integrand
-
         # Consistent with 4D Spinor QED HE normalization (4 states)
         # 1/(32*pi^2) matches the observed scale of -0.016 at rho=0
         norm_factor = 1.0 / (constants.THIRTY_TWO_PI_SQUARED)
@@ -115,16 +114,9 @@ class Orchestrator:
                 local_renorm_sum = torch.from_numpy(np.array([heisenberg_euler_integrand(Q, B, m=m, e=e) for B in B_local])).to(self.device).to(torch.complex128)
             else:
                 # Renormalized Integrand for 4 spinor states
-                # Spectral density must include the exp(-m^2/Q^2) factor to match HE benchmark
                 uv_sub = - uv_coeff_local / (Q**4 + 1e-15)
                 mode_sum_4states = mode_sums[i] * 2.0
                 local_renorm_sum = (mode_sum_4states.real / r_safe) + uv_sub.real
-                
-                # Apply IR regulation factor
-                local_renorm_sum = local_renorm_sum * np.exp(- (m**2) / (Q**2 + 1e-15))
-                
-                if i == 0:
-                    print(f"DEBUG: Q={Q:.2f}, mode_sum={mode_sum_4states.real[0]/r_safe[0]:.4e}, uv_sub={uv_sub.real[0]:.4e}, total_renorm={local_renorm_sum[0]:.4e}")
 
             # Q^3 is already in chi_weights
             L_eff_rho += local_renorm_sum * chi_weights[i] * norm_factor

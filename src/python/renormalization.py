@@ -21,7 +21,7 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         _, a_phi, _ = field_profile.get_arrays(as_numpy=False)
-        e = getattr(field_profile, 'e', constants.ELECTRON_CHARGE)
+        e = 1.0
         k2 = chi*chi - m*m
         n_batch = len(ml)
         n_points = len(rho)
@@ -43,12 +43,13 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
                 kappa = np.sqrt(-k2_val.real)
                 z = kappa * rho_np
                 denom = np.sqrt(order**2 + z**2 + 1e-15)
-                res_np[i] = 0.5 / denom
+                res_np[i] = - 0.5 / denom
                 mask_asym = (order**2 + z**2 > 100.0)
                 mask_reg = ~mask_asym
                 if np.any(mask_reg):
-                    # Corrected to +I_nu * K_nu to match solver's positive G
-                    res_np[i][mask_reg] = iv(order[mask_reg], z[mask_reg]) * kv(order[mask_reg], z[mask_reg])
+                    res_np[i][mask_reg] = - ive(order[mask_reg], z[mask_reg]) * kve(order[mask_reg], z[mask_reg]) * np.exp(z[mask_reg]) * np.exp(-z[mask_reg])
+                    # Corrected to -I_nu * K_nu
+                    res_np[i][mask_reg] = - iv(order[mask_reg], z[mask_reg]) * kv(order[mask_reg], z[mask_reg])
                 
                 # Zero out singular points at r=0 for order > 0
                 mask_zero = (z < 1e-15) & (order > 0)
@@ -79,16 +80,13 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
         self.device = torch.device(device)
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        from src.python.profiles import LocalBackgroundProfile
+        from profiles import LocalBackgroundProfile
         # Use LocalBackgroundProfile to match local A_phi exactly
         bg_profile = LocalBackgroundProfile(field_profile)
-        # Inherit physical charge e from the profile if available, otherwise default to constant
-        e = getattr(field_profile, 'e', constants.ELECTRON_CHARGE)
-        
         batch = []
         for i in range(len(chi)):
             # Background is spin-independent (B=0), but we must provide a sigma3 for the solver
-            batch.append({'chi': chi[i].item(), 'ml': ml[i].item(), 'sigma3': 1, 'm': m, 'e': e})
+            batch.append({'chi': chi[i].item(), 'ml': ml[i].item(), 'sigma3': 1, 'm': m, 'e': 1.0})
         results, _ = self.solver.solve_batch(batch, bg_profile)
         return results
 
@@ -133,7 +131,7 @@ class Renormalizer:
         Matches Eq 2.76 / 2.100 of greensfunc.tex.
         Dimension: [L] (rho-scaled Green's function)
         """
-        from analytic import M_whittaker, W_whittaker
+        from analytic_step_profile import M_whittaker, W_whittaker
         import mpmath
         
         e = 1.0
