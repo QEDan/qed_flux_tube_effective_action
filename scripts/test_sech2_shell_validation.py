@@ -37,13 +37,15 @@ def run_sech2_shell_validation():
     m = 1.0
     
     params = [{'chi': complex(chi), 'ml': ml, 'sigma3': sigma3, 'm': m, 'e': 1.0}]
+    e_val = params[0]['e']
     
     print(f"Solving numerically for chi={chi}, ml={ml}, sigma3={sigma3}...")
     num_g_batch, _ = orchestrator.backend.solve_batch(params, profile)
     num_g = num_g_batch[0].cpu().numpy()
     
     print("Computing analytic delta-shell equivalent (as benchmark)...")
-    ana_g = get_analytic_delta_shell_g(rho_np, R, F, chi, ml, sigma3, m)
+    # Must pass e=e_val to ensure consistent coupling between numerical and analytic benchmarks
+    ana_g = get_analytic_delta_shell_g(rho_np, R, F, chi, ml, sigma3, m, e=e_val)
     
     # Visualization: 3 subplots (Real, Imag, Residuals)
     fig, axes = plt.subplots(3, 1, figsize=(10, 15), sharex=True)
@@ -59,7 +61,7 @@ def run_sech2_shell_validation():
     # 2. Imaginary part
     axes[1].plot(rho_np, num_g.imag, label='Numerical Sech2 (Imag)', color='blue')
     axes[1].plot(rho_np, ana_g.imag, label='Analytic Delta-Shell (Imag)', linestyle='--', color='red')
-    axes[1].axvline(x=R, color='gray', linestyle=':', label='Shell Radius R')
+    axes[1].axvline(x=R, color='gray', linestyle=':')
     axes[1].set_ylabel(r"$\mathfrak{Im}\{G(\rho, \rho)\}$")
     axes[1].legend()
     axes[1].grid(True)
@@ -67,7 +69,7 @@ def run_sech2_shell_validation():
     # 3. Residuals
     residuals = np.abs(num_g - ana_g)
     axes[2].plot(rho_np, residuals, label='|Num Sech2 - Ana Delta|', color='black')
-    axes[2].axvline(x=R, color='gray', linestyle=':', label='Shell Radius R')
+    axes[2].axvline(x=R, color='gray', linestyle=':')
     axes[2].set_xlabel('rho')
     axes[2].set_ylabel('Residual')
     axes[2].set_yscale('log')
@@ -83,7 +85,7 @@ def run_sech2_shell_validation():
     error = np.linalg.norm(num_g - ana_g) / np.linalg.norm(ana_g)
     print(f"Relative difference: {error:.2e}")
     
-    if error < 0.1:
+    if error < 0.05:
         print("✅ Sech2-shell Green's function validation passed!")
     else:
         print("⚠️ Sech2-shell Green's function validation: difference from delta-shell may be significant.")
