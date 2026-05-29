@@ -7,15 +7,9 @@ Identifies regimes where residuals are high or numerical errors (NaN, Inf) occur
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
-from analytic import get_full_analytic_solution
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
+from src.python.analytic_step_profile import get_full_analytic_solution
 
 def audit_stability():
     print("--- Auditing Green's Function Stability ---")

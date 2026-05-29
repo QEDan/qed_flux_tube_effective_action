@@ -1,14 +1,8 @@
 import torch
 import numpy as np
 import pytest
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
 
 def test_full_orchestrator_pytorch():
     # Setup grid

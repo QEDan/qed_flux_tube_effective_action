@@ -2,9 +2,13 @@
 Validates the Green's function computation for the Sech2-shell profile.
 """
 
-import sys, os; sys.path.append(os.path.abspath("."))
-sys.path.append(os.path.abspath("src/python"))
-sys.path.append(os.path.abspath("scripts"))
+import sys
+from pathlib import Path
+
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

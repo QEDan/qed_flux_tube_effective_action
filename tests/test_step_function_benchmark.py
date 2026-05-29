@@ -2,9 +2,6 @@ from src.python import constants
 import torch
 import numpy as np
 import pytest
-
-# Add src/python to path
-
 from src.python.pytorch_solver import PyTorchSolver
 from src.python.analytic_step_profile import get_interior_solutions, get_analytic_wronskian
 from src.python.profiles import StepFunctionProfile
@@ -28,11 +25,11 @@ def test_step_function_exact_normalization():
     solver = PyTorchSolver(device="cpu")
     
     # 1. Get exact analytic values at start of integration grid (rho_np[0])
-    u0_ana, _ = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd, F)
+    u0_ana, _ = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd, F, e=e)
     # We need derivative at rho[0]. Using finite difference.
     h = 1e-5
-    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd, F)
-    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd, F)
+    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd, F, e=e)
+    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd, F, e=e)
     du0_ana = (u0_p[0] - u0_m[0]) / (2 * h)
     
     # 2. Numerical integration (forward from rho[0])

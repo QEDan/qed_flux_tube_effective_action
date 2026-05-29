@@ -78,6 +78,52 @@ def heisenberg_euler_density(
     return (1.0 / (4.0 * np.pi)) * total_val
 
 
+def heisenberg_euler_density_at_rho_cm(
+        rho_cm: np.ndarray,
+        B: np.ndarray,
+        m: float = constants.ELECTRON_MASS,
+        e: float = constants.ELECTRON_CHARGE) -> np.ndarray:
+    """
+    Local effective action density ρ(ρ_cm) in the LCF / Heisenberg–Euler approximation:
+
+    ρ(ρ_cm) = 1/(8π²) ∫_0^∞ dT  e^{-m^2 T} T^{-3}
+    [ eB(ρ_cm) T coth(eB(ρ_cm) T) − 1 − (1/3)(eB(ρ_cm) T)^2 ]
+
+    so that EA^{(1)}_{ferm} = 2π ∫_0^∞ dρ_cm  ρ(ρ_cm).
+
+    Parameters
+    ----------
+    rho_cm, B
+        Radial coordinate(s) and magnetic field B(ρ_cm) (same shape, broadcastable).
+    """
+    rho_cm = np.atleast_1d(np.asarray(rho_cm, dtype=float))
+    B = np.atleast_1d(np.asarray(B, dtype=float))
+    if rho_cm.shape != B.shape:
+        B = np.broadcast_to(B, rho_cm.shape)
+
+    limit = 500.0 / (m ** 2 + 1e-15)
+    quad_pts = [1e-4, 1e-2, 1.0]
+    rho_out = np.zeros_like(rho_cm, dtype=float)
+
+    for i, b_val in enumerate(B):
+
+        def proper_time_integrand(T: float) -> float:
+            if T < 1e-12:
+                return 0.0
+            return float(heisenberg_euler_integrand(T, np.array([b_val]), m, e)[0] / (T ** 3))
+
+        val, _ = quad(proper_time_integrand, 1e-12, limit, points=quad_pts)
+        rho_out[i] = val / (8.0 * np.pi ** 2)
+
+    return rho_out
+
+
+def heisenberg_euler_ea_from_density(
+        rho_cm: np.ndarray,
+        rho_density: np.ndarray) -> float:
+    """EA^{(1)} = 2π ∫ ρ(ρ_cm) dρ_cm from tabulated density."""
+    return float(2.0 * np.pi * np.trapz(rho_density, rho_cm))
+
 
 def const_field_heisenberg_euler_lagrangian(
         B: float,

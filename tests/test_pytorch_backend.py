@@ -1,12 +1,8 @@
-import sys
-import os
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-
 import numpy as np
 import torch
-from orchestrator import Orchestrator
-from orchestrator import generate_params_grid
-from profiles import StepFunctionProfile
+from src.python.orchestrator import Orchestrator
+from src.python.orchestrator import generate_params_grid
+from src.python.profiles import StepFunctionProfile
 
 def test_pytorch_backend():
     """

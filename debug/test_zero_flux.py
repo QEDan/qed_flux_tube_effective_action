@@ -1,13 +1,7 @@
 import torch
 import numpy as np
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import ZeroFluxProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import ZeroFluxProfile
 
 def exact_zero_flux_ea(B_peak, lambd, m):
     """

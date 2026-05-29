@@ -1,14 +1,9 @@
-import sys
-import os
 import torch
 import numpy as np
 import pytest
 
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from pytorch_solver import PyTorchSolver
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.profiles import StepFunctionProfile
 
 def test_regime_smoothness():
     """

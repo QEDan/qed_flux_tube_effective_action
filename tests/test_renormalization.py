@@ -1,14 +1,10 @@
-import sys
-import os
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-
 import torch
 import numpy as np
 import pytest
-from renormalization import Renormalizer
-from profiles import StepFunctionProfile
+from src.python.renormalization import Renormalizer
+from src.python.profiles import StepFunctionProfile
 
-from pytorch_solver import PyTorchSolver
+from src.python.pytorch_solver import PyTorchSolver
 
 @pytest.fixture
 def solver():

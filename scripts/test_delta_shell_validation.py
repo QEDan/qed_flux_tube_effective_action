@@ -1,9 +1,4 @@
-import sys
-import os
-sys.path.append(os.path.abspath("."))
 from src.python import constants
-import sys, os; sys.path.append(os.path.abspath("."))
-sys.path.append(os.path.abspath("src/python"))
 import numpy as np
 import torch
 import matplotlib.pyplot as plt

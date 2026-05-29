@@ -1,13 +1,7 @@
 import torch
 import numpy as np
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
 
 def test_zero_field_cancellation():
     """
@@ -41,7 +35,6 @@ def test_zero_field_cancellation():
     print(f"Action: {action.item()}")
     print(f"L_eff_rho sum: {L_eff_rho.sum().item()}")
 
-    
     # Assert pointwise action density is near zero
     # Relaxing tolerance for now to account for numerical noise at small rho
     assert torch.max(torch.abs(L_eff_rho)) < 5e-3, f"Pointwise density should be near zero, got {torch.max(torch.abs(L_eff_rho)).item()}"
@@ -49,7 +42,6 @@ def test_zero_field_cancellation():
     # Assert action is near zero within a tolerance accounting for grid integration discretization
     assert torch.abs(action) < 1e-2, f"Action should be zero for zero field, got {action.item()}"
     print("✅ Zero-field cancellation validated: Renormalized action is zero as expected for zero magnetic flux.")
-
 
 if __name__ == "__main__":
     test_zero_field_cancellation()

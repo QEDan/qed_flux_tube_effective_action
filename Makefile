@@ -16,7 +16,7 @@ VALIDATION_SAGE = symbolic_validations/verify_ode.sage \
                          symbolic_validations/derive_wkb_limit.sage \
                          symbolic_validations/derive_flux_quantization.sage
 
-validate: 
+validate:
 	@if ! command -v sage > /dev/null; then \
 		echo "Error: 'sage' command not found. Please activate your SageMath environment (e.g., 'conda activate sage') before running validations."; \
 		exit 1; \
@@ -26,7 +26,7 @@ validate:
 	for script in $(VALIDATION_PY); do \
 		echo ""; \
 		echo "Executing $$script..."; \
-		python3 $$script || failed=1; \
+		PYTHONPATH=. python3 $$script || failed=1; \
 	done; \
 	echo "--- Running SageMath/Symbolic Validations ---"; \
 	for script in $(VALIDATION_SAGEMATH_PY); do \
@@ -59,8 +59,7 @@ validate:
 	@echo "6. scripts/plot_sech2_greens_function.py: Check results/sech2_shell_greens_function_comparison.png. Verify comparison plot; divergences should be localized to shell boundaries."
 	@echo "7. scripts/validate_wkb.py: Check results/wkb_validation_visual.png. Verify oscillatory match between numerical solver and WKB benchmark, observing amplitude and offset residuals."
 
-
 .PHONY: all clean validate
 
 test: all
-	pytest tests
+	PYTHONPATH=. pytest tests

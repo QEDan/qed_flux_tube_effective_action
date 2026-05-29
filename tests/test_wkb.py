@@ -2,12 +2,8 @@
 import numpy as np
 import torch
 import pytest
-import sys
-import os
-
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-from pytorch_solver import PyTorchSolver
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.profiles import StepFunctionProfile
 
 def test_wkb_approximation_limit():
     """

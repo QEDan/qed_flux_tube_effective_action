@@ -1,13 +1,7 @@
 import torch
 import numpy as np
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
 
 def schwinger_ea_density(B, m=1.0, e=1.0):
     """

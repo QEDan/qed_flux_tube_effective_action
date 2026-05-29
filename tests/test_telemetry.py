@@ -1,13 +1,7 @@
-import sys
-import os
 import torch
 import pytest
-
-# Add src/python to path
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
 
 def test_telemetry_density_integrand():
     """

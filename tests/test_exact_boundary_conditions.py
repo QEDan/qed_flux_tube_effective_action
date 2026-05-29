@@ -2,9 +2,6 @@ from src.python import constants
 import torch
 import numpy as np
 import pytest
-
-# Add src/python to path
-
 from src.python.pytorch_solver import PyTorchSolver
 from src.python.analytic_step_profile import get_interior_solutions, get_analytic_wronskian
 from src.python.profiles import StepFunctionProfile
@@ -35,18 +32,18 @@ def test_exact_boundary_conditions():
     
     # 1. Analytic reference at boundaries [0.1, rho_np[-1]]
     # We use lambd_eff to match the profile.
-    u0_ana, uinf_ana = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd_eff, F)
+    u0_ana, uinf_ana = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd_eff, F, e=e)
     
     # Finite difference derivatives for exact ICs
     h = 1e-5
     # Start: rho[0]
-    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd_eff, F)
-    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd_eff, F)
+    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd_eff, F, e=e)
+    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd_eff, F, e=e)
     du0_ana = (u0_p[0] - u0_m[0]) / (2 * h)
     
     # End: rho[-1]
-    _, uinf_p = get_interior_solutions(np.array([rho_np[-1] + h]), chi, ml, sigma3, m, lambd_eff, F)
-    _, uinf_m = get_interior_solutions(np.array([rho_np[-1] - h]), chi, ml, sigma3, m, lambd_eff, F)
+    _, uinf_p = get_interior_solutions(np.array([rho_np[-1] + h]), chi, ml, sigma3, m, lambd_eff, F, e=e)
+    _, uinf_m = get_interior_solutions(np.array([rho_np[-1] - h]), chi, ml, sigma3, m, lambd_eff, F, e=e)
     duinf_ana = (uinf_p[0] - uinf_m[0]) / (2 * h)
 
     # 2. Manual RK4 integration using Exact BCs

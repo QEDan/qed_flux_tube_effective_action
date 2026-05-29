@@ -1,23 +1,15 @@
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.python import constants
 """
 Compares numerical Green's function results against analytic Whittaker/Bessel benchmarks.
 """
 
-import sys
-import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
-from analytic import get_full_analytic_solution
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
+from src.python.analytic_step_profile import get_full_analytic_solution
 
 def compare_analytic_vs_numerical():
     # Parameters

@@ -5,14 +5,8 @@ Plots the effective action as a function of the magnetic field strength.
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import Sech2Profile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import Sech2Profile
 
 def plot_ea_vs_field():
     # Setup

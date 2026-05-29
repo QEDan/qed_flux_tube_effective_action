@@ -5,14 +5,10 @@ Validates the numerical solver against WKB approximation limits.
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-import sys
-import os
 from scipy.signal import hilbert
 from scipy.integrate import cumulative_trapezoid
-
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-from pytorch_solver import PyTorchSolver
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.profiles import StepFunctionProfile
 
 def visualize_wkb_validation():
     # Parameters

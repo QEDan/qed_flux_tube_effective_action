@@ -6,15 +6,9 @@ Attempts to reproduce validation figures from the WLNumerics project.
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import WLNFluxTubeProfile, FieldProfile
-from analytic import heisenberg_euler_lagrangian
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import WLNFluxTubeProfile, FieldProfile
+from src.python.locally_constant_field import const_field_heisenberg_euler_lagrangian as heisenberg_euler_lagrangian
 
 def run_validation():
     print("--- Reproducing WLN Validation (Figure 4.7) ---")

@@ -5,15 +5,9 @@ Compares numerical, analytic, and LCF effective actions for the step-function pr
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile, FieldProfile
-from analytic import heisenberg_euler_lagrangian, get_full_analytic_solution
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile, FieldProfile
+from src.python.locally_constant_field import const_field_heisenberg_euler_lagrangian as heisenberg_euler_lagrangian, get_full_analytic_solution
 
 def plot_effective_action_comparison():
     print("--- Generating Effective Action Comparison Plot ---")

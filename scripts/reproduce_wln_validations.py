@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from src.python.orchestrator import Orchestrator
 from src.python.profiles import WLNFluxTubeProfile
-from src.python.analytic_step_profile import heisenberg_euler_lagrangian
+from src.python.locally_constant_field import const_field_heisenberg_euler_lagrangian as heisenberg_euler_lagrangian
 
 def reproduce_fig_7_3():
     """

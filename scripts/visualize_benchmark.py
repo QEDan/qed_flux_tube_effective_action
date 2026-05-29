@@ -2,18 +2,13 @@
 Visualizes benchmark results to confirm agreement between numerical and analytic amplitudes.
 """
 
-import sys
-import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from pytorch_solver import PyTorchSolver
-from analytic import get_interior_solutions
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.analytic_step_profile import get_interior_solutions
+from src.python.profiles import StepFunctionProfile
 
 def visualize_test_benchmark():
     # Parameters from tests/test_step_function_benchmark.py
@@ -38,11 +33,11 @@ def visualize_test_benchmark():
     }
     
     # Analytic u0 (interior)
-    u0_ana, _ = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd, F)
+    u0_ana, _ = get_interior_solutions(rho_np, chi, ml, sigma3, m, lambd, F, e=e)
     # Get derivative for exact IC
     h = 1e-5
-    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd, F)
-    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd, F)
+    u0_p, _ = get_interior_solutions(np.array([rho_np[0] + h]), chi, ml, sigma3, m, lambd, F, e=e)
+    u0_m, _ = get_interior_solutions(np.array([rho_np[0] - h]), chi, ml, sigma3, m, lambd, F, e=e)
     du0_ana = (u0_p[0] - u0_m[0]) / (2 * h)
     
     # Numerical integration with exact analytic IC

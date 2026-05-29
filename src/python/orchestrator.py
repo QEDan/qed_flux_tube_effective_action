@@ -23,8 +23,8 @@ class Orchestrator:
     def __init__(self, device: Optional[str] = 'cpu', batch_size: int = 1024, strategy: str = "analytic") -> None:
         self.device = torch.device(device)
         self.batch_size = batch_size
-        from pytorch_solver import PyTorchSolver
-        from renormalization import Renormalizer
+        from src.python.pytorch_solver import PyTorchSolver
+        from src.python.renormalization import Renormalizer
         self.backend = PyTorchSolver(device=device)
         self.renormalizer = Renormalizer(device=device, strategy=strategy, solver=self.backend)
 

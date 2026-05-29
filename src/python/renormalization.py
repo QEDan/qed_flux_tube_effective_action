@@ -80,7 +80,7 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
         self.device = torch.device(device)
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        from profiles import LocalBackgroundProfile
+        from src.python.profiles import LocalBackgroundProfile
         # Use LocalBackgroundProfile to match local A_phi exactly
         bg_profile = LocalBackgroundProfile(field_profile)
         batch = []
@@ -131,7 +131,7 @@ class Renormalizer:
         Matches Eq 2.76 / 2.100 of greensfunc.tex.
         Dimension: [L] (rho-scaled Green's function)
         """
-        from analytic_step_profile import M_whittaker, W_whittaker
+        from src.python.analytic_step_profile import M_whittaker, W_whittaker
         import mpmath
         
         e = 1.0

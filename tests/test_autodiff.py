@@ -1,11 +1,7 @@
-import sys
-import os
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-
 import torch
 import numpy as np
-from orchestrator import Orchestrator
-from profiles import FieldProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import FieldProfile
 
 class OptimizableProfile(FieldProfile):
     """

@@ -1,14 +1,8 @@
 import torch
 import numpy as np
 import pytest
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.join(os.getcwd(), 'src/python'))
-
-from pytorch_solver import PyTorchSolver
-from profiles import StepFunctionProfile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.profiles import StepFunctionProfile
 
 def test_rk4_step_midpoint_consistency():
     """

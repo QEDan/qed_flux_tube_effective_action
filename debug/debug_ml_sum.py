@@ -1,13 +1,7 @@
 import torch
 import numpy as np
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
 
 def debug_ml_sum():
     print("--- ML Sum Convergence Debug ---")
@@ -29,7 +23,7 @@ def debug_ml_sum():
         num_res, _ = orc.backend.solve_batch(params, profile)
         
         # Solve background (B=0)
-        from profiles import FieldProfile
+        from src.python.profiles import FieldProfile
         bg_profile = FieldProfile(rho)
         num_bg, _ = orc.backend.solve_batch(params, bg_profile)
         

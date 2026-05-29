@@ -1,13 +1,7 @@
-import sys
-import os
 import torch
 import numpy as np
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from pytorch_solver import PyTorchSolver
-from profiles import Sech2Profile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.sech2_shell import Sech2ShellProfile
 
 def test_global_effective_action_invariance():
     """
@@ -26,8 +20,10 @@ def test_global_effective_action_invariance():
     solver = PyTorchSolver(device="cpu")
     ml_range = range(-10, 11)
     
+    R = 2.0 * lambd
+
     def get_global_action(B_val):
-        profile = Sech2Profile(np.array([10.0]), B=B_val, lambd=lambd, e=e)
+        profile = Sech2ShellProfile(np.array([10.0]), R=R, B=B_val, lambd=lambd, e=e)
         params = [{'chi': chi + 0j, 'ml': ml, 'sigma3': 1, 'm': m, 'e': e} for ml in ml_range]
         # We compute the sum of Green's functions, which is proportional to the effective action
         results, _ = solver.solve_batch(params, profile)

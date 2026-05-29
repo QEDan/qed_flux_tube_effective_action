@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from src.python.periodic_profile import LatticeBumpProfile
 from src.python.orchestrator import Orchestrator
 from src.python.profiles import FieldProfile
-from src.python.analytic_step_profile import heisenberg_euler_lagrangian
+from src.python.locally_constant_field import const_field_heisenberg_euler_lagrangian as heisenberg_euler_lagrangian
 
 def compute_lcf_density(B_vals, m=constants.ELECTRON_MASS, e=constants.ELECTRON_CHARGE):
     density = np.zeros_like(B_vals)

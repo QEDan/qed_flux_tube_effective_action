@@ -1,13 +1,7 @@
 import torch
 import numpy as np
-import sys
-import os
-
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from orchestrator import Orchestrator
-from profiles import StepFunctionProfile
+from src.python.orchestrator import Orchestrator
+from src.python.profiles import StepFunctionProfile
 
 def diagnostic_ml_convergence():
     print("--- Spectral Sum Diagnostic: Sech2 Profile (B=0.5) ---")
@@ -16,7 +10,7 @@ def diagnostic_ml_convergence():
     rho = torch.linspace(0.1, 5.0, 100, dtype=torch.float64)
     lambd = 2.0
     B_peak = 0.5
-    from profiles import Sech2Profile
+    from src.python.profiles import Sech2Profile
     profile = Sech2Profile(rho, B=B_peak, lambd=lambd)
     
     orc = Orchestrator(device="cpu")

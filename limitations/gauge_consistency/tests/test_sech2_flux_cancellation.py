@@ -1,14 +1,9 @@
-import sys
-import os
 import torch
 import numpy as np
 import pytest
 
-# Add src/python to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src", "python")))
-
-from pytorch_solver import PyTorchSolver
-from profiles import Sech2Profile
+from src.python.pytorch_solver import PyTorchSolver
+from src.python.sech2_shell import Sech2ShellProfile
 
 def test_sech2_flux_cancellation():
     """
@@ -31,9 +26,9 @@ def test_sech2_flux_cancellation():
     ml_check_range = range(-5, 6)
     
     # Profile with B = 1.0 (Flux F_bar = 1.0)
-    profile_f = Sech2Profile(np.array([rho_val]), B=B, lambd=lambd, e=e)
-    # Profile with B = 0.0 (Zero Flux)
-    profile_zero = Sech2Profile(np.array([rho_val]), B=0.0, lambd=lambd, e=e)
+    R = 2.0 * lambd
+    profile_f = Sech2ShellProfile(np.array([rho_val]), R=R, B=B, lambd=lambd, e=e)
+    profile_zero = Sech2ShellProfile(np.array([rho_val]), R=R, B=0.0, lambd=lambd, e=e)
     
     for ml in ml_check_range:
         res_int = solver.solve_batch([{'chi': chi + 0j, 'ml': ml, 'sigma3': 1, 'm': m, 'e': e}], profile_f)[0].item()

@@ -1,11 +1,11 @@
 # Project Standards: Green's Function Numerics for QED
 
-This project is a high-precision scientific instrument for computing quantum effective actions. Maintenance and development require adherence to rigorous engineering and scientific standards.
+This project is a high-precision scientific instrument for computing quantum effective actions of cylindrically symmetric magnetic flux tubes. Maintenance and development require adherence to rigorous engineering and scientific standards.
 
 ## 1. Scientific Integrity Mandate
-All code changes that affect mathematical results or physical observables MUST be validated against known benchmarks.
+All code changes that affect mathematical results or physical observables MUST be validated against known benchmarks when possible.
 - **Verification vs. Validation:** Verification confirms the code solves the equations correctly (e.g., matching numerical ODE solutions to Whittaker analytic forms). Validation confirms the equations describe the physics correctly (e.g., matching the Local Constant Field approximation in slowly varying limits).
-- **Symbolic Grounding:** Use SageMath or SymPy in the `symbolic_validations/` directory to derive and confirm every normalization factor, spectral measure, and coordinate transform identity.
+- **Symbolic Grounding:** Use SageMath or SymPy in the `symbolic_validations/` directory to derive and confirm every derivation, normalization factor, spectral measure, and coordinate transform identity.
 - **Dimensional Consistency:** Always verify the units/dimensions of every term in an expression. Document expected dimensionalities in docstrings (and comments where needed). We are working in Heaviside-Lorentz Natural Units where c=hbar=1. A change in measure (e.g., $Q dQ \to Q^3 dQ$) requires a re-derivation of the associated normalization coefficients.
 
 ## 2. Development Workflow
@@ -24,7 +24,7 @@ All code changes that affect mathematical results or physical observables MUST b
 - **Regression Testing:** Run `pytest tests` to ensure changes have not broken any tests. Add new tests to prevent future regressions.
 
 ## 3. Tool-Specific Instructions
-- **PyTorchSolver:** All radial integrations using RK4 must use a sufficiently fine grid. Grids with fewer than 100 points should be used with extreme caution.
+- **PyTorchSolver:** All radial integrations using RK4 must use a sufficiently fine grid. Grids with fewer than 100 points should be used with extreme caution. Coarse grids can be used when testing functionality, but should never be set as default.
 - **Renormalizer:** The `NumericalBackgroundStrategy` must always match the local vector potential $A_\phi$ of the interacting case to ensure cancellation of topological vacuum shifts.
 - **Orchestrator:** Spectral integration must use the 4D-correct $Q^3 dQ$ measure unless explicitly working in a lower-dimensional theory.
 
@@ -35,5 +35,10 @@ All code changes that affect mathematical results or physical observables MUST b
 - File names should make clear what the plot shows (e.g. EA_vs_lambda_step_profile.png)
 
 ## 5. Documentation
-Every significant mathematical fix must be accompanied by a diagnostic script in `debug/` that illustrates the "before" and "after" state, ensuring the fix is rooted in data, not just intuition.
+- Create detailed docstrings that connect implementations to the relevant source materials, symbolic_validations, and equations. However, the code should be understandable on its own, so repeat important information if it is not part of the codebase. 
+- All significant bug fixes should be accompanied by a diagnostic script in `debug/` that illustrates the "before" and "after" state, ensuring the fix is rooted in data, not just intuition. Tests should be created to prevent future regressions.
 
+## 6. Environment
+When running code:
+- Use the "sage" conda environment
+- Add the project root directory to the PYTHONPATH environment variable
