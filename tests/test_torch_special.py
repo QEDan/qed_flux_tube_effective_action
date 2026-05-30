@@ -49,9 +49,29 @@ def test_whittaker_w_matches_references(kappa, mu, z):
     rel = abs(got - ref_mp) / max(abs(ref_mp), 1e-30)
     assert rel < 1e-8
 
-    if abs(complex(z).imag) < 1e-15:
+    # scipy reference only matches when (mu, kappa, z) is outside the integer-b
+    # logarithmic-case shell where scipy.special.hyperu loses precision.
+    b = 1.0 + 2.0 * mu
+    integer_b = abs(b - round(b)) < 1e-9 and round(b) >= 1
+    if abs(complex(z).imag) < 1e-15 and not integer_b:
         ref_sp = torch_special.whittaker_w_scipy_reference(kappa, mu, z)
         assert abs(got - ref_sp) / max(abs(ref_sp), 1e-30) < 1e-9
+
+
+@pytest.mark.parametrize(
+    "kappa,mu,z,expected",
+    [
+        # Inside scipy.special.hyperu's catastrophic-cancellation shell for integer
+        # b = 1 + 2μ. mpmath reference values; scipy returned ~1e8 here pre-fix.
+        (0.03, 0.5, 0.015625, 0.9765854),
+        (-0.03, 0.5, 0.015625, 1.0066499),
+        (0.01, 0.5, 0.015625, 0.9871405),
+        (0.50, 1.0, 0.015625, 8.0617707),
+    ],
+)
+def test_whittaker_w_integer_b_no_blowup(kappa, mu, z, expected):
+    got = float(torch_special.whittaker_w(kappa, mu, z).real)
+    assert abs(got - expected) / abs(expected) < 1e-5
 
 
 @pytest.mark.parametrize(

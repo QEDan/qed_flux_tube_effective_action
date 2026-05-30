@@ -3,7 +3,8 @@ VALIDATION_PY = scripts/test_zero_field.py scripts/compare_analytics.py \
                 scripts/visualize_benchmark.py \
                 scripts/test_delta_shell_validation.py scripts/test_sech2_shell_validation.py \
                 scripts/validate_wkb.py scripts/plot_greens_function_comparison.py \
-		scripts/plot_sech2_greens_function.py 
+		scripts/plot_sech2_greens_function.py \
+                scripts/validate_step_ea.py scripts/validate_density_log.py
 
 VALIDATION_SAGEMATH_PY = symbolic_validations/numerical_spectrum.py symbolic_validations/verify_analytic_spectrum.py \
                          symbolic_validations/verify_isomorphism.py symbolic_validations/verify_ode.py \
@@ -58,6 +59,8 @@ validate:
 	@echo "5. scripts/plot_greens_function_comparison.py: Check results/greens_function_comparison.png. Verify the 2-panel comparison and residual behavior according to TECHNICAL_VALIDATION.md criteria."
 	@echo "6. scripts/plot_sech2_greens_function.py: Check results/sech2_shell_greens_function_comparison.png. Verify comparison plot; divergences should be localized to shell boundaries."
 	@echo "7. scripts/validate_wkb.py: Check results/wkb_validation_visual.png. Verify oscillatory match between numerical solver and WKB benchmark, observing amplitude and offset residuals."
+	@echo "8. scripts/validate_step_ea.py: Check results/step_ea_density_comparison.png. Verify that the analytic and numerical densities overlap (median ratio approx 1.0)."
+	@echo "9. scripts/validate_density_log.py: Check results/step_ea_density_log_rho.png. Verify the asymptotic power-law decay of the negative density as rho -> infinity."
 
 .PHONY: all clean validate
 

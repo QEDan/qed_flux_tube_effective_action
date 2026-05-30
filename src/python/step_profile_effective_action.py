@@ -1,7 +1,16 @@
 """
-Analytic 1-loop effective action and density for a step-function flux tube (dissertation Eq. 7.72).
+Analytic 1-loop effective action and density for a step-function flux tube
+(dissertation Eq. 7.72).
 
 EA^{(1)} = 2π ∫_0^∞ dρ_cm  ρ(ρ_cm)
+
+The spectral integral is taken on the Euclidean axis (χ = i Q). For the radial
+Green's function this gives k² = −Q² − m² − (2F/λ²)(σ₃ − m_l), real and negative
+for moderate Q so Whittaker M/W are evaluated far from the integer-b
+logarithmic-case shell that breaks scipy.special.hyperu. The integrand is then
+vacuum-subtracted mode-by-mode against the free massive Euclidean radial
+Green's function (−I_{|m_l|} · K_{|m_l|}), matching the convention used by the
+Orchestrator (src.python.orchestrator.Orchestrator.compute_effective_action).
 """
 
 from __future__ import annotations
@@ -15,7 +24,7 @@ from src.python import torch_special
 
 
 def _require_integer_flux(F_cal: torch.Tensor) -> None:
-    if not torch.allclose(F_cal.detach(), torch.round(F_cal.detach())):
+    if not torch.allclose(F_cal.detach(), torch.round(F_cal.detach()), atol=1e-5):
         raise NotImplementedError("F_cal must be an integer.")
 
 
@@ -29,24 +38,28 @@ def step_profile_integration_grids(
         lambd: torch.Tensor,
         F_cal: torch.Tensor,
         *,
-        n_chi: int = 20,
+        n_Q: int = 50,
         n_rho: int = 20,
+        Q_max: float = 10.0,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Return (chi_vals, rho_vals, d_chi, d_rho) on the F_cal device."""
+    """Return (Q_vals, rho_vals, d_Q, d_rho) on the F_cal device.
+
+    Q is the Euclidean spectral coordinate (χ = i Q).
+    """
     dtype, _ = _step_profile_dtypes(F_cal)
     device = F_cal.device
     lam = lambd.to(dtype=dtype, device=device)
 
-    chi_vals = torch.linspace(0.1, 5.0, n_chi, dtype=dtype, device=device)
+    Q_vals = torch.linspace(0.1, Q_max, n_Q, dtype=dtype, device=device)
     rho_unit = torch.linspace(0.001, 1.0, n_rho, dtype=dtype, device=device)
     rho_vals = rho_unit * (lam / rho_unit[-1])
-    d_chi = chi_vals[1] - chi_vals[0]
+    d_Q = Q_vals[1] - Q_vals[0]
     d_rho = rho_vals[1] - rho_vals[0]
-    return chi_vals, rho_vals, d_chi, d_rho
+    return Q_vals, rho_vals, d_Q, d_rho
 
 
 def step_profile_mode_integrand(
-        chi: torch.Tensor,
+        Q: torch.Tensor,
         ml: int,
         sigma3: float,
         F: torch.Tensor,
@@ -56,66 +69,82 @@ def step_profile_mode_integrand(
         m: float = constants.ELECTRON_MASS,
 ) -> torch.Tensor:
     """
-    Spectral integrand for one (chi, m_l, sigma3) at each radial point.
+    Vacuum-subtracted Euclidean radial spectral integrand for one (Q, m_l, σ₃),
+    returned at every ρ ∈ ``rho_vals``.
 
-    Returns a complex vector of length len(rho_vals) (Whittaker interior + Bessel exterior).
+    Returns ρ × [G_full(ρ; iQ, m_l, σ₃) − G_free(ρ; iQ, |m_l|)] where G_full
+    is the constant-B interior coincident-point radial Green's function
+    (Whittaker M·W with the dissertation Eq. 2.76 normalization) and G_free is
+    the massive Euclidean free radial Green's function (−I·K).
     """
     dtype, cdtype = _step_profile_dtypes(F)
-    mu = ml / 2.0
+    abs_ml = abs(int(ml))
+    mu = abs_ml / 2.0
     ml_t = torch.tensor(float(ml), dtype=dtype, device=F.device)
     sigma3_t = torch.tensor(sigma3, dtype=dtype, device=F.device)
     lam = lambd.to(dtype=dtype, device=F.device)
 
-    k2 = chi ** 2 - m ** 2 - (2.0 * F / lam ** 2) * (sigma3_t - ml_t)
+    # Euclidean rotation: chi^2 -> -Q^2
+    k2 = -Q ** 2 - m ** 2 - (2.0 * F / lam ** 2) * (sigma3_t - ml_t)
     kappa = (lam ** 2 * k2) / (4.0 * F)
-    gamma_arg = 0.5 * (ml_t + 1.0 - (k2 * lam ** 2) / (2.0 * F))
+    gamma_arg = 0.5 + mu - kappa
     log_gamma = torch.lgamma(gamma_arg)
-    log_factorial_ml = torch.lgamma(ml_t + 1.0)
-    w0_inv = -(lam ** 2 / (2.0 * F)) * torch.exp(log_gamma - log_factorial_ml)
+    log_factorial_ml = torch.lgamma(torch.tensor(float(abs_ml + 1), dtype=dtype, device=F.device))
+    w0_inv = (lam ** 2 / (2.0 * F)) * torch.exp(log_gamma - log_factorial_ml)
 
     z = (F / lam ** 2) * rho_vals ** 2
-    u0 = torch_special.whittaker_m(kappa, mu, z) / rho_vals
-    uinf = torch_special.whittaker_w(kappa, mu, z) / rho_vals
-    term1 = (u0 * uinf) / w0_inv
+    M_val = torch_special.whittaker_m(kappa, mu, z)
+    W_val = torch_special.whittaker_w(kappa, mu, z)
+    # Interior coincident-point radial Green's function (Eq. 2.76):
+    #     G_full(ρ) = - w0_inv * M(z) * W(z)
+    g_full = -(w0_inv * M_val * W_val).to(cdtype)
 
-    k_sq = chi ** 2 - m ** 2
-    k_ext = torch.sqrt(torch.clamp(k_sq, min=0.0))
-    kr = k_ext * rho_vals
-    bessel_product = torch_special.bessel_jv(ml, kr) * torch_special.bessel_yv(ml, kr)
-    term2 = -(constants.PI / 2.0) * bessel_product.to(cdtype)
-    # Below the mass gap, k_ext = 0 and Y_nu(0) is singular; exterior piece is absent.
-    if torch.all(k_sq <= 0):
-        term2 = torch.zeros_like(term2)
-    return (term1 + term2).to(cdtype)
+    # Free massive Euclidean radial Green's function:
+    #     G_free(ρ) = - I_{|m_l|}(κρ) K_{|m_l|}(κρ),     κ = sqrt(Q² + m²)
+    kappa_E = torch.sqrt(Q ** 2 + m ** 2)
+    z_E = kappa_E * rho_vals
+    i_val = torch_special.bessel_iv(abs_ml, z_E)
+    k_val = torch_special.bessel_kv(abs_ml, z_E)
+    g_free = (-i_val * k_val).to(cdtype)
+
+    # Return ρ × ΔG so the spectral measure Q³ dQ aligns with the orchestrator
+    # (which returns rho × radial Green's function from the solver and from
+    # AnalyticBackgroundStrategy.compute_g0).
+    return rho_vals.to(cdtype) * (g_full - g_free)
 
 
-def step_profile_chi_spectral_sum(
+def step_profile_Q_spectral_sum(
         F: torch.Tensor,
         lambd: torch.Tensor,
         rho_vals: torch.Tensor,
-        chi_vals: torch.Tensor,
-        d_chi: torch.Tensor,
+        Q_vals: torch.Tensor,
+        d_Q: torch.Tensor,
         *,
         m: float = constants.ELECTRON_MASS,
-        n_ml: int = 2,
+        ml_max: int = 10,
 ) -> torch.Tensor:
     """
-    h(ρ) = Σ_{σ3, m_l} ∫ dχ  χ³  integrand(χ, ρ).
+    h(ρ) = Σ_{σ₃, m_l} ∫ dQ  Q³  integrand(Q, ρ)
 
-    Used to build ρ(ρ_cm) = -(ρ_cm²/2) Re h(ρ) so that EA = 2π ∫ ρ dρ_cm.
+    The m_l sum runs over m_l ∈ {0, 1, …, ml_max−1}, matching the Orchestrator's
+    default `ml_values = range(10)`.
     """
-    dtype, cdtype = _step_profile_dtypes(F)
+    _, cdtype = _step_profile_dtypes(F)
     h = torch.zeros(rho_vals.shape, dtype=cdtype, device=F.device)
 
     for sigma3 in (1.0, -1.0):
-        for ml in range(n_ml):
-            for chi in chi_vals:
+        for ml in range(ml_max):
+            for Q in Q_vals:
                 integrand = step_profile_mode_integrand(
-                    chi, ml, sigma3, F, lambd, rho_vals, m=m,
+                    Q, ml, sigma3, F, lambd, rho_vals, m=m,
                 )
-                h = h + integrand * (chi ** 3) * d_chi
+                h = h + integrand * (Q ** 3) * d_Q
 
     return h
+
+
+# Backwards-compatible alias for callers that imported the old chi-named helper.
+step_profile_chi_spectral_sum = step_profile_Q_spectral_sum
 
 
 def step_profile_effective_action_density(
@@ -124,27 +153,31 @@ def step_profile_effective_action_density(
         rho_cm: Optional[torch.Tensor] = None,
         *,
         m: float = constants.ELECTRON_MASS,
-        n_chi: int = 20,
+        n_chi: int = 50,
         n_rho: int = 20,
-        n_ml: int = 2,
+        n_ml: int = 10,
+        Q_max: float = 10.0,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Effective action density ρ(ρ_cm) for the step-function flux tube.
 
     Satisfies EA^{(1)} = 2π ∫_0^∞ dρ_cm  ρ(ρ_cm), matching the convention in
-    locally_constant_field.heisenberg_euler_density_at_rho_cm() for the LCF limit.
+    locally_constant_field.heisenberg_euler_density_at_rho_cm() for the LCF
+    limit.
 
     Parameters
     ----------
     F_cal, lambd
-        Flux-tube parameters (tensors support autograd).
+        Flux-tube parameters (tensors support autograd). F_cal = e F / (2π).
     rho_cm
-        Radial grid; default spans (0, lambd] with ``n_rho`` points.
-
-    Returns
-    -------
-    rho_cm, rho_density
-        Radial grid and ρ(ρ_cm) (real, same dtype as F_cal).
+        Radial grid; default spans (0, λ] with ``n_rho`` points.
+    n_chi
+        Number of Euclidean-Q quadrature points (legacy name kept for backwards
+        compatibility with callers passing ``n_chi``).
+    n_ml
+        Number of m_l values to sum (m_l ∈ {0, …, n_ml−1}).
+    Q_max
+        Upper limit of the Euclidean spectral integration.
     """
     _require_integer_flux(F_cal)
     F = F_cal
@@ -152,18 +185,26 @@ def step_profile_effective_action_density(
 
     if rho_cm is None:
         _, rho_cm, _, _ = step_profile_integration_grids(
-            lambd, F_cal, n_chi=n_chi, n_rho=n_rho,
+            lambd, F_cal, n_Q=n_chi, n_rho=n_rho, Q_max=Q_max,
         )
     else:
         rho_cm = rho_cm.to(dtype=dtype, device=F_cal.device)
 
-    chi_vals, _, d_chi, _ = step_profile_integration_grids(
-        lambd, F_cal, n_chi=n_chi, n_rho=n_rho,
+    Q_vals, _, d_Q, _ = step_profile_integration_grids(
+        lambd, F_cal, n_Q=n_chi, n_rho=n_rho, Q_max=Q_max,
     )
-    h = step_profile_chi_spectral_sum(
-        F, lambd, rho_cm, chi_vals, d_chi, m=m, n_ml=n_ml,
+    h = step_profile_Q_spectral_sum(
+        F, lambd, rho_cm, Q_vals, d_Q, m=m, ml_max=n_ml,
     )
-    rho_density = (-0.5 * rho_cm ** 2 * h.real).to(dtype)
+    # Spinor QED 1-loop spectral normalization. Factor of 2 multiplies the
+    # mode_sum to recover all 4 spin states from the σ₃ = ±1 partial sums, as
+    # in Orchestrator.compute_effective_action (mode_sums * 2).
+    norm = 2.0 / (32.0 * constants.PI ** 2)
+
+    # ρ_density(ρ_cm) = ρ_cm × L_eff(ρ_cm). The integrand already carries one
+    # factor of ρ inside h (see step_profile_mode_integrand), so we do NOT
+    # multiply by ρ again here.
+    rho_density = (h.real * norm).to(dtype)
     return rho_cm, rho_density
 
 
@@ -173,9 +214,10 @@ def step_profile_analytic_ea(
         m: float = constants.ELECTRON_MASS,
         e: float = constants.ELECTRON_CHARGE,
         *,
-        n_chi: int = 20,
+        n_chi: int = 50,
         n_rho: int = 20,
-        n_ml: int = 2,
+        n_ml: int = 10,
+        Q_max: float = 10.0,
 ) -> torch.Tensor:
     """
     Renormalized 1-loop effective action (Eq. 7.72) via ρ integration:
@@ -184,7 +226,7 @@ def step_profile_analytic_ea(
     """
     del e  # kept for API compatibility with callers
     rho_cm, rho_density = step_profile_effective_action_density(
-        F_cal, lambd, m=m, n_chi=n_chi, n_rho=n_rho, n_ml=n_ml,
+        F_cal, lambd, m=m, n_chi=n_chi, n_rho=n_rho, n_ml=n_ml, Q_max=Q_max,
     )
     return _integrate_density(rho_cm, rho_density)
 
