@@ -205,6 +205,13 @@ def step_profile_effective_action_density(
     # factor of ρ inside h (see step_profile_mode_integrand), so we do NOT
     # multiply by ρ again here.
     rho_density = (h.real * norm).to(dtype)
+
+    # Physics constraint: density is zero for rho > lambda (exterior).
+    # The spectral integral code currently evaluates the Whittaker interior-Green's-function
+    # for all rho, which is incorrect in the exterior.
+    mask = rho_cm > lambd
+    rho_density[mask] = 0.0
+
     return rho_cm, rho_density
 
 
