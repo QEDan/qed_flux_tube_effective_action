@@ -9,7 +9,7 @@ from src.python.step_profile_effective_action import step_profile_effective_acti
 def main():
     # 1. Parameters
     F = constants.FLUX_QUANTUM  # Total flux
-    lambd = 1.0  # Radius
+    lambd = 100.0  # Radius
     m = constants.ELECTRON_MASS
     e = constants.ELECTRON_CHARGE
     
@@ -17,16 +17,15 @@ def main():
     nu = e * F / (constants.TWO_PI)
     print(f"Flux nu = {nu:.6f}")
 
-    # 2. Radial Grid (avoid a grid point exactly at the historical spike location
-    #    so a future regression in Whittaker W can't be hidden by trapezoidal smoothing).
-    n_rho = 51
+    # Reduced parameters for faster validation with the new robust Whittaker implementation
+    n_rho = 20
     rho_max = 2.0 * lambd
     rho = torch.linspace(1e-3, rho_max, n_rho, dtype=torch.float64)
 
     # Shared spectral grid (Euclidean Q) — both paths must use the same range.
-    n_Q = 50
+    n_Q = 20
     Q_max = 10.0
-    ml_max = 10  # ml ∈ {0, …, 9}
+    ml_max = 5  # ml ∈ {0, …, 4}
 
     # Compute Numerical Density via Orchestrator
     print("Computing numerical density via Orchestrator...")

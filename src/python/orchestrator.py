@@ -76,7 +76,7 @@ class Orchestrator:
                 batch_ml = torch.tensor([p['ml'] for p in batch], device=self.device, dtype=torch.float64)
 
                 # Explicitly align background calculation with the solver's grid
-                num_bg = self.renormalizer.compute_g0(batch_chi, batch_ml, m, rho, field_profile)
+                num_bg = self.renormalizer.compute_g0(batch_chi, batch_ml, m, e, rho, field_profile)
 
                 # Point-wise renormalization subtraction
                 for idx, p in enumerate(batch):

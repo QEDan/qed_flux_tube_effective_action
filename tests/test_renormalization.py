@@ -18,7 +18,8 @@ def test_g0_computation(solver):
     rho = torch.linspace(0.1, 1.0, 10, dtype=torch.float64)
     
     profile = StepFunctionProfile(rho, lambd=0.5, F=0.0)
-    g0 = renorm.compute_g0(chi, ml, m, rho, profile)
+    e = 1.0 # Arbitrary e for test
+    g0 = renorm.compute_g0(chi, ml, m, e, rho, profile)
     assert g0.shape == (2, 10)
     assert torch.all(torch.isfinite(g0))
 

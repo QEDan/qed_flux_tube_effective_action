@@ -12,16 +12,15 @@ from abc import ABC, abstractmethod
 
 class BackgroundStrategy(ABC):
     @abstractmethod
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         pass
 
 class AnalyticBackgroundStrategy(BackgroundStrategy):
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
 
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         _, a_phi, _ = field_profile.get_arrays(as_numpy=False)
-        e = 1.0
         k2 = chi*chi - m*m
         n_batch = len(ml)
         n_points = len(rho)
@@ -47,8 +46,6 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
                 mask_asym = (order**2 + z**2 > 100.0)
                 mask_reg = ~mask_asym
                 if np.any(mask_reg):
-                    res_np[i][mask_reg] = - ive(order[mask_reg], z[mask_reg]) * kve(order[mask_reg], z[mask_reg]) * np.exp(z[mask_reg]) * np.exp(-z[mask_reg])
-                    # Corrected to -I_nu * K_nu
                     res_np[i][mask_reg] = - iv(order[mask_reg], z[mask_reg]) * kv(order[mask_reg], z[mask_reg])
                 
                 # Zero out singular points at r=0 for order > 0
@@ -79,14 +76,14 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
         self.solver = solver
         self.device = torch.device(device)
 
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         from src.python.profiles import LocalBackgroundProfile
         # Use LocalBackgroundProfile to match local A_phi exactly
         bg_profile = LocalBackgroundProfile(field_profile)
         batch = []
         for i in range(len(chi)):
             # Background is spin-independent (B=0), but we must provide a sigma3 for the solver
-            batch.append({'chi': chi[i].item(), 'ml': ml[i].item(), 'sigma3': 1, 'm': m, 'e': 1.0})
+            batch.append({'chi': chi[i].item(), 'ml': ml[i].item(), 'sigma3': 1, 'm': m, 'e': e})
         results, _ = self.solver.solve_batch(batch, bg_profile)
         return results
 
@@ -102,8 +99,8 @@ class Renormalizer:
         else:
             self.strategy = AnalyticBackgroundStrategy(device=device)
 
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        return self.strategy.compute_g0(chi, ml, m, rho, field_profile)
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+        return self.strategy.compute_g0(chi, ml, m, e, rho, field_profile)
 
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
