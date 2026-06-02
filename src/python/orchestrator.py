@@ -88,8 +88,8 @@ class Orchestrator:
         B_local = getattr(field_profile, 'B_vals', torch.zeros_like(rho)).detach().cpu().numpy()
 
         # Consistent with 4D Spinor QED HE normalization (4 states)
-        # 1/(32*pi^2) matches the observed scale of -0.016 at rho=0
-        norm_factor = 1.0 / (constants.THIRTY_TWO_PI_SQUARED)
+        norm_factor = constants.HE_NORMALIZATION_FACTOR
+
 
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
         chi_real = np.array([abs(complex(c)) for c in chi_values])

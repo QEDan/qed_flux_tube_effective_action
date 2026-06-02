@@ -17,15 +17,15 @@ def main():
     nu = e * F / (constants.TWO_PI)
     print(f"Flux nu = {nu:.6f}")
 
-    # Reduced parameters for faster validation with the new robust Whittaker implementation
-    n_rho = 20
+    # Balanced parameters for convergence and speed
+    n_rho = 50
     rho_max = 2.0 * lambd
     rho = torch.linspace(1e-3, rho_max, n_rho, dtype=torch.float64)
 
     # Shared spectral grid (Euclidean Q) — both paths must use the same range.
     n_Q = 20
-    Q_max = 10.0
-    ml_max = 5  # ml ∈ {0, …, 4}
+    Q_max = 12.0
+    ml_max = 5
 
     # Compute Numerical Density via Orchestrator
     print("Computing numerical density via Orchestrator...")

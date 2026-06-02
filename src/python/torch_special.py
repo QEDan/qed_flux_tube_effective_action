@@ -241,6 +241,45 @@ class _BesselKScipy(torch.autograd.Function):
         dz = grad_output * torch.as_tensor(dz_np, dtype=z.dtype, device=z.device)
         return None, dz
 
+class _BesselIKProductScipy(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, nu: torch.Tensor, z: torch.Tensor):
+        from scipy.special import ive, kve
+        nu_np = nu.detach().cpu().numpy()
+        z_np = z.detach().cpu().numpy()
+        ctx.save_for_backward(nu, z)
+        # iv(nu, z) * kv(nu, z) = ive(nu, z) * exp(z) * kve(nu, z) * exp(-z) = ive * kve
+        # for z > 0. For z < 0, iv(nu, z) might be complex. 
+        # Here z is kappa_E * rho which is always positive.
+        out = ive(nu_np, z_np) * kve(nu_np, z_np)
+        return torch.as_tensor(out, dtype=z.dtype, device=z.device)
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        # d/dz (I_nu(z) K_nu(z)) = I'_nu K_nu + I_nu K'_nu
+        # I'_nu = I_{nu-1} - nu/z I_nu  (or other identities)
+        # Using scipy's jvp-like approach for derivatives if needed, 
+        # but for now we might not need autograd through this for the validation script.
+        # If needed:
+        from scipy.special import ivp, kvp, iv, kv
+        nu, z = ctx.saved_tensors
+        nu_np = nu.detach().cpu().numpy()
+        z_np = z.detach().cpu().numpy()
+        # ivp * kv + iv * kvp
+        # We can use scaled derivatives too: (ive*exp(z))' = ive' exp + ive exp
+        # But let's just use the direct ones if they don't overflow, 
+        # or better use identities: I_n' = 0.5(I_{n-1} + I_{n+1}), K_n' = -0.5(K_{n-1} + K_{n+1})
+        # Actually scipy has ivp and kvp.
+        d = ivp(nu_np, z_np) * kv(nu_np, z_np) + iv(nu_np, z_np) * kvp(nu_np, z_np)
+        dz = grad_output * torch.as_tensor(d, dtype=z.dtype, device=z.device)
+        return None, dz
+
+def bessel_i_k_product(nu: Number, z: Number) -> torch.Tensor:
+    """Safe product I_nu(z) * K_nu(z) using scaled functions to avoid NaN."""
+    z_t = torch.as_tensor(z, dtype=torch.float64)
+    nu_t = torch.as_tensor(nu, dtype=z_t.dtype, device=z_t.device)
+    return _BesselIKProductScipy.apply(nu_t, z_t)
+
 def bessel_jv(nu: Number, z: Number) -> torch.Tensor:
     z_t = torch.as_tensor(z, dtype=torch.float64)
     nu_t = torch.as_tensor(nu, dtype=z_t.dtype, device=z_t.device)

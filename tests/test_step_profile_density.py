@@ -20,11 +20,13 @@ from src.python.step_profile_effective_action import (
 def test_ea_equals_two_pi_density_integral():
     F_cal = torch.tensor(1.0, dtype=torch.float64)
     lambd = torch.tensor(1.0, dtype=torch.float64)
-    rho, density = step_profile_effective_action_density(F_cal, lambd)
+    n_chi = 20
+    n_ml = 5
+    rho, density = step_profile_effective_action_density(F_cal, lambd, n_chi=n_chi, n_ml=n_ml)
     ea_from_density = _integrate_density(rho, density)
-    ea_direct = step_profile_analytic_ea(F_cal, lambd)
+    ea_direct = step_profile_analytic_ea(F_cal, lambd, n_chi=n_chi, n_ml=n_ml)
     print(f"DEBUG: ea_from_density={ea_from_density}, ea_direct={ea_direct}")
-    assert torch.allclose(ea_from_density * 8.15, ea_direct, rtol=1e-1)
+    assert torch.allclose(ea_from_density, ea_direct, rtol=1e-5)
 
 
 def test_step_profile_density_autograd():

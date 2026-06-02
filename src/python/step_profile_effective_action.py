@@ -70,13 +70,10 @@ def step_profile_mode_integrand(
         m: float = constants.ELECTRON_MASS,
 ) -> torch.Tensor:
     """
-    Vacuum-subtracted Euclidean radial spectral integrand for one (Q, m_l, σ₃),
+    Vacuum-subtracted Euclidean radial spectral integrand for one or more (Q, m_l, σ₃),
     returned at every ρ ∈ ``rho_vals``.
-
-    Returns ρ × [G_full(ρ; iQ, m_l, σ₃) − G_free(ρ; iQ, |m_l|)] where G_full
-    is the constant-B interior coincident-point radial Green's function
-    (Whittaker M·W with the dissertation Eq. 2.76 normalization) and G_free is
-    the massive Euclidean free radial Green's function (−I·K).
+    Q can be a scalar or a 1D tensor of shape (n_Q,).
+    Returns tensor of shape (n_Q, n_rho) if Q is 1D, or (n_rho,) if Q is scalar.
     """
     dtype, cdtype = _step_profile_dtypes(F)
     abs_ml = abs(int(ml))
@@ -95,48 +92,90 @@ def step_profile_mode_integrand(
     z = (F / lam ** 2) * rho_vals ** 2
     # To handle large lambda, we use log-space calculations.
     # Whittaker W and M can be very small or very large.
+    # We only compute them for interior points to avoid exterior blowup.
+    interior_mask = rho_vals <= lam
+    rho_int = rho_vals[interior_mask]
+    z_int = z[interior_mask]
     
-    log_abs_M, sign_M = torch_special.whittaker_m_log(kappa, mu, z)
-    log_abs_W, sign_W = torch_special.whittaker_w_log(kappa, mu, z)
+    if Q.ndim == 0:
+        log_abs_g_full = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
+        sign_g_full = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
+    else:
+        log_abs_g_full = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
+        sign_g_full = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
     
-    # Interior coincident-point radial Green's function (Eq. 2.76):
-    #     G_full(ρ) = - (1/W_rad) * u0(ρ) * u_inf(ρ)
-    # with u0 = M(z)/ρ and u_inf = W(z)/ρ.
-    # 1/W_rad = (lambda^2 / (2*F)) * Gamma(1/2+mu-kappa) / Gamma(1+2*mu)
-    
-    log_abs_g_full = (log_gamma - log_factorial_ml) + log_abs_M + log_abs_W + \
-                     torch.log(lam ** 2 / (2.0 * F)) - 2.0 * torch.log(rho_vals)
-    
-    # helper to get sign of Gamma
-    def torch_gamma_sign(x):
-        return torch.where(x > 0, torch.ones_like(x), 
-                          torch.where(torch.remainder(torch.floor(x), 2) == 0, -torch.ones_like(x), torch.ones_like(x)))
-    
-    sign_gamma = torch_gamma_sign(gamma_arg)
-    sign_g_full = -1.0 * sign_gamma * sign_M * sign_W
+    if len(rho_int) > 0:
+        # Prepare shapes for broadcasting Whittaker calls
+        if Q.ndim > 0:
+            kp = kappa.unsqueeze(-1)
+            zi = z_int.unsqueeze(0)
+        else:
+            kp = kappa
+            zi = z_int
+
+        log_abs_M, sign_M = torch_special.whittaker_m_log(kp, mu, zi)
+        log_abs_W, sign_W = torch_special.whittaker_w_log(kp, mu, zi)
+        
+        # Broadcasting: log_gamma (n_Q,), log_abs_M (n_Q, n_rho_int), log_abs_W (n_Q, n_rho_int)
+        # log_factorial_ml (scalar), rho_int (n_rho_int)
+        
+        # Prepare shapes for broadcasting other terms
+        if Q.ndim > 0:
+            lg = log_gamma.unsqueeze(-1)
+            ri = rho_int.unsqueeze(0)
+        else:
+            lg = log_gamma
+            ri = rho_int
+
+        log_abs_g_full_int = (lg - log_factorial_ml) + log_abs_M + log_abs_W + \
+                             torch.log(lam ** 2 / (2.0 * F)) - 2.0 * torch.log(ri)
+        
+        # helper to get sign of Gamma
+        def torch_gamma_sign(x):
+            return torch.where(x > 0, torch.ones_like(x), 
+                              torch.where(torch.remainder(torch.floor(x), 2) == 0, -torch.ones_like(x), torch.ones_like(x)))
+        
+        sign_gamma = torch_gamma_sign(gamma_arg)
+        if Q.ndim > 0:
+            sg = sign_gamma.unsqueeze(-1)
+        else:
+            sg = sign_gamma
+        sign_g_full_int = -1.0 * sg * sign_M * sign_W
+        
+        if Q.ndim > 0:
+            log_abs_g_full[:, interior_mask] = log_abs_g_full_int
+            sign_g_full[:, interior_mask] = sign_g_full_int
+        else:
+            log_abs_g_full[interior_mask] = log_abs_g_full_int
+            sign_g_full[interior_mask] = sign_g_full_int
     
     g_full = (sign_g_full * torch.exp(log_abs_g_full)).to(cdtype)
+    if Q.ndim > 0:
+        g_full[:, ~interior_mask] = 0.0
+    else:
+        g_full[~interior_mask] = 0.0
 
     # Topological vacuum radial Green's function:
     #     G_free(ρ) = - I_{ν}(κρ) K_{ν}(κρ),     κ = sqrt(Q² + m²)
-    # where ν = |m_l - e*A(ρ)*ρ / (2π)| matches the local vector potential.
-    # For a step profile, e*A(ρ)*ρ / (2π) = F_cal * (ρ/λ)^2 for ρ <= λ, and F_cal for ρ > λ.
-    F_cal = F  # F passed to this function is already e*F/(2*pi)
-    # NOTE: To match the Heisenberg-Euler limit and the Orchestrator's interior behavior,
-    # we use the free vacuum order |ml| for the interior subtraction. 
-    # The topological shift is cancelled by the exterior matching/zeroing.
+    F_cal = F
     order_local = torch.where(rho_vals <= lam, torch.abs(ml_t), torch.abs(ml_t - F_cal))
     
     kappa_E = torch.sqrt(Q ** 2 + m ** 2)
-    z_E = kappa_E * rho_vals
-    i_val = torch_special.bessel_iv(order_local, z_E)
-    k_val = torch_special.bessel_kv(order_local, z_E)
-    g_free = (-i_val * k_val).to(cdtype)
+    # Broadcasting: kappa_E (n_Q,), rho_vals (n_rho)
+    if Q.ndim > 0:
+        z_E = kappa_E.unsqueeze(-1) * rho_vals.unsqueeze(0)
+        ol = order_local.unsqueeze(0)
+    else:
+        z_E = kappa_E * rho_vals
+        ol = order_local
+        
+    ik_prod = torch_special.bessel_i_k_product(ol, z_E)
+    g_free = (-ik_prod).to(cdtype)
 
-    # Return ρ × ΔG so the spectral measure Q³ dQ aligns with the orchestrator
-    # (which returns rho × radial Green's function from the solver and from
-    # AnalyticBackgroundStrategy.compute_g0).
-    return rho_vals.to(cdtype) * (g_full - g_free)
+    if Q.ndim > 0:
+        return rho_vals.unsqueeze(0).to(cdtype) * (g_full - g_free)
+    else:
+        return rho_vals.to(cdtype) * (g_full - g_free)
 
 
 def step_profile_Q_spectral_sum(
@@ -151,20 +190,20 @@ def step_profile_Q_spectral_sum(
 ) -> torch.Tensor:
     """
     h(ρ) = Σ_{σ₃, m_l} ∫ dQ  Q³  integrand(Q, ρ)
-
-    The m_l sum runs over m_l ∈ {0, 1, …, ml_max−1}, matching the Orchestrator's
-    default `ml_values = range(10)`.
     """
     _, cdtype = _step_profile_dtypes(F)
     h = torch.zeros(rho_vals.shape, dtype=cdtype, device=F.device)
 
     for sigma3 in (1.0, -1.0):
         for ml in range(ml_max):
-            for Q in Q_vals:
-                integrand = step_profile_mode_integrand(
-                    Q, ml, sigma3, F, lambd, rho_vals, m=m,
-                )
-                h = h + integrand * (Q ** 3) * d_Q
+            # Vectorized over Q
+            integrands = step_profile_mode_integrand(
+                Q_vals, ml, sigma3, F, lambd, rho_vals, m=m,
+            )
+            # integrands is (n_Q, n_rho). Q_vals is (n_Q,).
+            # We want sum_Q integrands(Q, rho) * Q^3 * d_Q
+            mode_sum = torch.sum(integrands * (Q_vals.unsqueeze(-1) ** 3) * d_Q, dim=0)
+            h = h + mode_sum
 
     return h
 
@@ -222,18 +261,11 @@ def step_profile_effective_action_density(
     h = step_profile_Q_spectral_sum(
         F, lambd, rho_cm, Q_vals, d_Q, m=m, ml_max=n_ml,
     )
-    # Spinor QED 1-loop spectral normalization.
-    # Total for fermions (sum over sigma3 and 2 spin states) = 4 states.
-    # The normalization per state is -1 / (32 * pi^2).
-    # So 4 * (-1 / (32 * pi^2)) = -1 / (8 * pi^2).
-    norm = -1.0 / (8.0 * constants.PI ** 2)
-    
-    # Factor of 2.0 to account for total spin states.
-    # The HE density is typically per-spin state. Total 4 states = 4 * density_per_state.
-    # Our spectral sum gives 2 states for sigma3=1 and 2 for sigma3=-1? No.
-    # Our spectral sum is over sigma3={1,-1}. That's 2 states.
-    # We need 2 * 2 = 4 states. So factor 4.
-    rho_density = (h.real * norm * 4.0).to(dtype)
+    # Spinor QED 1-loop spectral normalization for 4 states.
+    # h contains sum over sigma3={1,-1} (2 states).
+    # We multiply by 2.0 to account for total 4 spin states.
+    # Minus sign aligns with Orchestrator's return -1.0 * L_eff_rho.
+    rho_density = (-h.real * constants.HE_NORMALIZATION_FACTOR * 2.0).to(dtype)
 
     # Physics constraint: density is zero for rho > lambda (exterior).
     # The spectral integral code currently evaluates the Whittaker interior-Green's-function
@@ -264,8 +296,7 @@ def step_profile_analytic_ea(
     rho_cm, rho_density = step_profile_effective_action_density(
         F_cal, lambd, m=m, n_chi=n_chi, n_rho=n_rho, n_ml=n_ml, Q_max=Q_max,
     )
-    # The integration should include the factor of 4 for total spin states reconciliation.
-    return _integrate_density(rho_cm, rho_density) * 4.0
+    return _integrate_density(rho_cm, rho_density)
 
 
 def _integrate_density(rho_cm: torch.Tensor, rho_density: torch.Tensor) -> torch.Tensor:
@@ -274,7 +305,6 @@ def _integrate_density(rho_cm: torch.Tensor, rho_density: torch.Tensor) -> torch
     """
     dr = rho_cm[1:] - rho_cm[:-1]
     avg = 0.5 * (rho_density[1:] + rho_density[:-1])
-    # Factor of 4.0 to account for total spin states reconciliation.
     return (-2.0 * constants.PI * torch.sum(avg * dr)).squeeze()
 
 
