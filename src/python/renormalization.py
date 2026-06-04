@@ -12,14 +12,14 @@ from abc import ABC, abstractmethod
 
 class BackgroundStrategy(ABC):
     @abstractmethod
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any, global_mode: bool = False) -> torch.Tensor:
         pass
 
 class AnalyticBackgroundStrategy(BackgroundStrategy):
     def __init__(self, device: str = "cpu") -> None:
         self.device = torch.device(device)
 
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any, global_mode: bool = False) -> torch.Tensor:
         _, a_phi, _ = field_profile.get_arrays(as_numpy=False)
         k2 = chi*chi - m*m
         n_batch = len(ml)
@@ -29,7 +29,20 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
         if len(chi) == 1 and n_batch > 1:
             k2 = k2.repeat(n_batch)
         
-        n_local = torch.abs(ml.unsqueeze(-1) - e * (a_phi * rho).unsqueeze(0))
+        if global_mode:
+            # Match only asymptotic flux (standard vacuum subtraction)
+            # F_cal = e * F / (2*pi). Standard vacuum has A = 0 in interior, F/2pi*rho in exterior.
+            F = getattr(field_profile, 'F', 0.0)
+            F_cal = e * F / (constants.TWO_PI)
+            # Heuristic for step profile: assume interior is rho < lambda
+            # If lambda not available, use parent A_phi logic or just F_cal
+            lambd = getattr(field_profile, 'lambd', rho[-1])
+            nu_asym = torch.where(rho < lambd, torch.zeros_like(rho), torch.ones_like(rho) * F_cal)
+            n_local = torch.abs(ml.unsqueeze(-1) - nu_asym.unsqueeze(0))
+        else:
+            # Match local A_phi exactly (Topological vacuum subtraction)
+            n_local = torch.abs(ml.unsqueeze(-1) - e * (a_phi * rho).unsqueeze(0))
+
         n_np = n_local.detach().cpu().numpy()
         k2_np = k2.detach().cpu().numpy()
         rho_np = rho.detach().cpu().numpy()
@@ -41,12 +54,16 @@ class AnalyticBackgroundStrategy(BackgroundStrategy):
             if k2_val.real < 0:
                 kappa = np.sqrt(-k2_val.real)
                 z = kappa * rho_np
-                denom = np.sqrt(order**2 + z**2 + 1e-15)
-                res_np[i] = - 0.5 / denom
-                mask_asym = (order**2 + z**2 > 100.0)
-                mask_reg = ~mask_asym
-                if np.any(mask_reg):
-                    res_np[i][mask_reg] = - iv(order[mask_reg], z[mask_reg]) * kv(order[mask_reg], z[mask_reg])
+                # Use scaled Bessel functions to avoid overflow
+                # iv * kv = ive * exp(z) * kve * exp(-z) = ive * kve
+                ik = ive(order, z) * kve(order, z)
+                # Handle infs from ml=0 at z=0
+                mask_inf = np.isinf(ik)
+                if np.any(mask_inf):
+                    # For ml > 0, limit is finite. For ml=0, limit is logarithmic.
+                    # Use asymptotic form 0.5 / sqrt(order^2 + z^2) as a safe proxy
+                    ik[mask_inf] = 0.5 / np.sqrt(order[mask_inf]**2 + z[mask_inf]**2 + 1e-15)
+                res_np[i] = - ik
                 
                 # Zero out singular points at r=0 for order > 0
                 mask_zero = (z < 1e-15) & (order > 0)
@@ -76,10 +93,22 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
         self.solver = solver
         self.device = torch.device(device)
 
-    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        from src.python.profiles import LocalBackgroundProfile
-        # Use LocalBackgroundProfile to match local A_phi exactly
-        bg_profile = LocalBackgroundProfile(field_profile)
+    def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any, global_mode: bool = False) -> torch.Tensor:
+        from src.python.profiles import LocalBackgroundProfile, PureGaugeProfile
+        if global_mode:
+            # Match only asymptotic flux
+            F = getattr(field_profile, 'F', 0.0)
+            lambd = getattr(field_profile, 'lambd', rho[-1])
+            # Create a profile that is zero in interior and pure gauge in exterior
+            # For simplicity, we use PureGaugeProfile and zero it out in interior
+            bg_profile = PureGaugeProfile(rho, F, e=e)
+            inner = rho < lambd
+            bg_profile.a_phi[inner] = 0.0
+            bg_profile.da_phi[inner] = 0.0
+        else:
+            # Use LocalBackgroundProfile to match local A_phi exactly
+            bg_profile = LocalBackgroundProfile(field_profile)
+        
         batch = []
         for i in range(len(chi)):
             # Background is spin-independent (B=0), but we must provide a sigma3 for the solver
@@ -88,8 +117,9 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
         return results
 
 class Renormalizer:
-    def __init__(self, device: str = "cpu", strategy: str = "analytic", solver: Optional[Any] = None) -> None:
+    def __init__(self, device: str = "cpu", strategy: str = "analytic", solver: Optional[Any] = None, global_mode: bool = False) -> None:
         self.device = torch.device(device)
+        self.global_mode = global_mode
         self._g0_cache: Dict[Tuple[complex, int], torch.Tensor] = {}
         
         if strategy == "numerical":
@@ -100,7 +130,8 @@ class Renormalizer:
             self.strategy = AnalyticBackgroundStrategy(device=device)
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
-        return self.strategy.compute_g0(chi, ml, m, e, rho, field_profile)
+        return self.strategy.compute_g0(chi, ml, m, e, rho, field_profile, global_mode=self.global_mode)
+
 
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
@@ -112,15 +143,16 @@ class Renormalizer:
         B = (a_phi / r_safe + da_phi)
         return torch.zeros((len(chi), len(rho)), device=self.device, dtype=torch.complex128)
 
-    def get_b2_term(self, field_profile: Any, rho: torch.Tensor) -> torch.Tensor:
+    def get_b2_term(self, field_profile: Any, rho: torch.Tensor, e: float = constants.ELECTRON_CHARGE) -> torch.Tensor:
         """
         Returns (eB)^2 / 6.0 density.
         Matches Scalar QED field strength renormalization term.
         """
         _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
-        B = (a_phi / r_safe + da_phi)
-        return (B**2 / 6.0).to(torch.complex128)
+        B_phys = (a_phi / r_safe + da_phi)
+        eB = e * B_phys
+        return (eB**2 / 6.0).to(torch.complex128)
 
     def compute_whittaker_benchmark(self, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
         """

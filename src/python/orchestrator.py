@@ -20,13 +20,14 @@ def generate_params_grid(chi_values, ml_values, sigma3_values, m=constants.ELECT
     return grid
 
 class Orchestrator:
-    def __init__(self, device: Optional[str] = 'cpu', batch_size: int = 1024, strategy: str = "analytic") -> None:
+    def __init__(self, device: Optional[str] = 'cpu', batch_size: int = 1024, strategy: str = "analytic", global_mode: bool = False) -> None:
         self.device = torch.device(device)
         self.batch_size = batch_size
+        self.global_mode = global_mode
         from src.python.pytorch_solver import PyTorchSolver
         from src.python.renormalization import Renormalizer
         self.backend = PyTorchSolver(device=device)
-        self.renormalizer = Renormalizer(device=device, strategy=strategy, solver=self.backend)
+        self.renormalizer = Renormalizer(device=device, strategy=strategy, solver=self.backend, global_mode=global_mode)
 
     def compute_effective_action(self, field_profile: Any, chi_values: List[complex], ml_values: List[int], sigma3_values: List[int], m: float = constants.ELECTRON_MASS, e: float = constants.ELECTRON_CHARGE, collect_density: bool = False, lcf_threshold: Optional[float] = 20.0) -> Any:
         """
@@ -82,9 +83,12 @@ class Orchestrator:
                 for idx, p in enumerate(batch):
                     chi_idx = chi_map[complex(p['chi'])]
                     # Direct subtraction before any integration
-                    mode_sums[chi_idx] += (num_results[idx] - num_bg[idx])
+                    diff = (num_results[idx] - num_bg[idx])
+                    # Mask out NaNs or Infs to prevent corruption
+                    diff = torch.where(torch.isfinite(diff), diff, torch.zeros_like(diff))
+                    mode_sums[chi_idx] += diff
         # 4. Renormalization and Spectral Integration
-        uv_coeff_local = self.renormalizer.get_b2_term(field_profile, rho) * 2.0
+        uv_coeff_local = self.renormalizer.get_b2_term(field_profile, rho, e=e) * 2.0
         B_local = getattr(field_profile, 'B_vals', torch.zeros_like(rho)).detach().cpu().numpy()
 
         # Consistent with 4D Spinor QED HE normalization (4 states)

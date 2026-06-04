@@ -7,6 +7,7 @@ All code changes that affect mathematical results or physical observables MUST b
 - **Verification vs. Validation:** Verification confirms the code solves the equations correctly (e.g., matching numerical ODE solutions to Whittaker analytic forms). Validation confirms the equations describe the physics correctly (e.g., matching the Local Constant Field approximation in slowly varying limits).
 - **Symbolic Grounding:** Use SageMath or SymPy in the `symbolic_validations/` directory to derive and confirm every derivation, normalization factor, spectral measure, and coordinate transform identity.
 - **Dimensional Consistency:** Always verify the units/dimensions of every term in an expression. Document expected dimensionalities in docstrings (and comments where needed). We are working in Heaviside-Lorentz Natural Units where c=hbar=1. A change in measure (e.g., $Q dQ \to Q^3 dQ$) requires a re-derivation of the associated normalization coefficients.
+- **Programmer and Observer:** Develop the software and observe results of numerical experiments, but you are not a scientist and must avoid drawing conclusions. Do not make claims like "the software is now fully validated" as that is not for you to judge.
 
 ## 2. Development Workflow
 ### Research Phase

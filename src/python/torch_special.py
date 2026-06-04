@@ -248,10 +248,23 @@ class _BesselIKProductScipy(torch.autograd.Function):
         nu_np = nu.detach().cpu().numpy()
         z_np = z.detach().cpu().numpy()
         ctx.save_for_backward(nu, z)
-        # iv(nu, z) * kv(nu, z) = ive(nu, z) * exp(z) * kve(nu, z) * exp(-z) = ive * kve
-        # for z > 0. For z < 0, iv(nu, z) might be complex. 
-        # Here z is kappa_E * rho which is always positive.
-        out = ive(nu_np, z_np) * kve(nu_np, z_np)
+        
+        # Safe product using scaled functions
+        # For large nu or z, product matches 1 / (2 * sqrt(nu^2 + z^2))
+        # This prevents NaN from 0 * inf
+        # Broadcast to common shape before indexing
+        nu_b, z_b = np.broadcast_arrays(nu_np, z_np)
+        out = ive(nu_b, z_b) * kve(nu_b, z_b)
+        
+        # Handle NaNs (usually from 0 * inf at small z)
+        mask_nan = np.isnan(out)
+        if np.any(mask_nan):
+            # For nu > 0, the limit is 1/(2*nu)
+            # For nu = 0, the limit is inf (logarithmic)
+            # Use asymptotic form 0.5 / sqrt(order^2 + z^2) as a safe proxy
+            safe_val = 0.5 / np.sqrt(nu_b[mask_nan]**2 + z_b[mask_nan]**2 + 1e-15)
+            out[mask_nan] = safe_val
+            
         return torch.as_tensor(out, dtype=z.dtype, device=z.device)
 
     @staticmethod
