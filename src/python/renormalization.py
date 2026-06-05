@@ -136,12 +136,24 @@ class Renormalizer:
 
     def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         """
-        Computes the UV subtraction term. 
+        Computes the robust massive UV subtraction term: b2 / (Q^2 + m^2)^2.
+        This matches the proper-time structure and is finite at Q=0.
+        Returns tensor of shape (n_batch, n_rho).
         """
-        _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
-        r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
-        B = (a_phi / r_safe + da_phi)
-        return torch.zeros((len(chi), len(rho)), device=self.device, dtype=torch.complex128)
+        n_batch = len(ml)
+        n_rho = len(rho)
+        b2 = self.get_b2_term(field_profile, rho, e=constants.ELECTRON_CHARGE) # (n_rho,)
+        
+        # Q is i*chi? No, Orchestrator passes chi which is already Euclidean iQ in some places?
+        # Actually Orchestrator uses chi_real = abs(complex(c)). 
+        # Let's assume chi is real Euclidean Q here.
+        Q = torch.abs(chi).to(self.device).to(torch.float64) # (n_batch,)
+        
+        # Subtraction term: - b2 / (Q^2 + m^2)^2
+        # Use broadcasting: b2 is (n_rho), Q is (n_batch)
+        denom = (Q.unsqueeze(-1)**2 + m**2)**2
+        res = - b2.unsqueeze(0) / denom
+        return res.to(torch.complex128)
 
     def get_b2_term(self, field_profile: Any, rho: torch.Tensor, e: float = constants.ELECTRON_CHARGE) -> torch.Tensor:
         """

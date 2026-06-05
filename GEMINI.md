@@ -27,6 +27,7 @@ All code changes that affect mathematical results or physical observables MUST b
 ## 3. Tool-Specific Instructions
 - **PyTorchSolver:** All radial integrations using RK4 must use a sufficiently fine grid. Grids with fewer than 100 points should be used with extreme caution. Coarse grids can be used when testing functionality, but should never be set as default.
 - **Renormalizer:** The `NumericalBackgroundStrategy` must always match the local vector potential $A_\phi$ of the interacting case to ensure cancellation of topological vacuum shifts.
+- **Robust UV Subtraction:** All spectral integrations MUST use the robust massive UV subtraction form $b_2 / (Q^2 + m^2)^2$ to ensure grid independence and physical regularity at $Q=0$.
 - **Orchestrator:** Spectral integration must use the 4D-correct $Q^3 dQ$ measure unless explicitly working in a lower-dimensional theory.
 
 ## 4. Plotting

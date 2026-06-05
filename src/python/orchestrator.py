@@ -120,10 +120,16 @@ class Orchestrator:
                 local_renorm_sum = torch.zeros(n_points, device=self.device, dtype=torch.complex128)
             else:
                 # Renormalized Integrand for 4 spinor states
-                # Use robust massive subtraction to avoid Q=0 divergence
-                uv_sub = - uv_coeff_local / (Q**2 + m**2)**2
+                # Use robust massive subtraction via Renormalizer
+                Q_t = torch.tensor([Q], device=self.device, dtype=torch.complex128)
+                ml_dummy = torch.tensor([0], device=self.device)
+                uv_sub = self.renormalizer.compute_uv_subtraction(Q_t, ml_dummy, m, rho, field_profile).squeeze(0)
+                
+                # Double to account for 4 spinor states (Renormalizer returns 2 states / scalar QED term)
+                uv_sub_4states = uv_sub * 2.0
+                
                 mode_sum_4states = mode_sums[i] * 2.0
-                local_renorm_sum = (mode_sum_4states.real / r_safe) + uv_sub.real
+                local_renorm_sum = (mode_sum_4states.real / r_safe) + uv_sub_4states.real
 
             # Q^3 is already in chi_weights
             L_eff_rho += local_renorm_sum * chi_weights[i] * norm_factor
