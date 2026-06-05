@@ -61,10 +61,19 @@ def step_profile_mode_integrand(
     lam = lambd.to(dtype=dtype, device=F.device)
 
     # Euclidean rotation: chi^2 -> -Q^2
+    # Interacting case (B != 0)
     k2 = -Q ** 2 - m ** 2 - (2.0 * F / lam ** 2) * (sigma3_t - ml_t)
     kappa = (lam ** 2 * k2) / (4.0 * F)
+    
+    # Background case (B = 0, but match gauge A)
+    # The potential shift from A in the interior is -2*ml*e*A/rho + (e*A)^2
+    # which corresponds to Whittaker kappa with sigma3 = 0.
+    k2_bg = -Q ** 2 - m ** 2 - (2.0 * F / lam ** 2) * (0.0 - ml_t)
+    kappa_bg = (lam ** 2 * k2_bg) / (4.0 * F)
+
     gamma_arg = 0.5 + mu - kappa
-    log_gamma = torch.lgamma(gamma_arg)
+    gamma_arg_bg = 0.5 + mu - kappa_bg
+    
     log_factorial_ml = torch.lgamma(torch.tensor(float(abs_ml + 1), dtype=dtype, device=F.device))
 
     z = (F / lam ** 2) * rho_vals ** 2
@@ -78,97 +87,114 @@ def step_profile_mode_integrand(
     if Q.ndim == 0:
         log_abs_g_full = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
         sign_g_full = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
+        log_abs_g_base = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
+        sign_g_base = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
     else:
         log_abs_g_full = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
         sign_g_full = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
+        log_abs_g_base = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
+        sign_g_base = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
     
     if len(rho_int) > 0:
         # Prepare shapes for broadcasting Whittaker calls
         if Q.ndim > 0:
             kp = kappa.unsqueeze(-1)
+            kp_bg = kappa_bg.unsqueeze(-1)
             zi = z_int.unsqueeze(0)
         else:
             kp = kappa
+            kp_bg = kappa_bg
             zi = z_int
 
+        # Interacting Whittaker
         log_abs_M, sign_M = torch_special.whittaker_m_log(kp, mu, zi)
         log_abs_W, sign_W = torch_special.whittaker_w_log(kp, mu, zi)
         
-        # Prepare shapes for broadcasting other terms
-        if Q.ndim > 0:
-            lg = log_gamma.unsqueeze(-1)
-            ri = rho_int.unsqueeze(0)
-        else:
-            lg = log_gamma
-            ri = rho_int
+        # Background Whittaker
+        log_abs_M_bg, sign_M_bg = torch_special.whittaker_m_log(kp_bg, mu, zi)
+        log_abs_W_bg, sign_W_bg = torch_special.whittaker_w_log(kp_bg, mu, zi)
 
-        log_abs_g_full_int = (lg - log_factorial_ml) + log_abs_M + log_abs_W + \
-                             torch.log(lam ** 2 / (2.0 * F)) - 2.0 * torch.log(ri)
-        
         # helper to get sign of Gamma(x) for real x
         def torch_gamma_sign(x):
-            # Gamma(x) > 0 for x > 0
-            # For x < 0, sign is -1 for (-1, 0), +1 for (-2, -1), -1 for (-3, -2), etc.
-            # This is sign(sin(pi*x))? No.
-            # Correct logic: if floor(x) is even, Gamma is negative? 
-            # -0.5: floor=-1 (odd) -> negative
-            # -1.5: floor=-2 (even) -> positive
-            # -2.5: floor=-3 (odd) -> negative
             return torch.where(x > 0, torch.ones_like(x), 
                               torch.where(torch.remainder(torch.floor(x), 2) == 0, 
                                           torch.ones_like(x), -torch.ones_like(x)))
         
         sign_gamma = torch_gamma_sign(gamma_arg)
+        sign_gamma_bg = torch_gamma_sign(gamma_arg_bg)
+        
+        # Prepare shapes for broadcasting other terms
         if Q.ndim > 0:
+            lg = torch.lgamma(gamma_arg).unsqueeze(-1)
+            lg_bg = torch.lgamma(gamma_arg_bg).unsqueeze(-1)
+            ri = rho_int.unsqueeze(0)
             sg = sign_gamma.unsqueeze(-1)
+            sg_bg = sign_gamma_bg.unsqueeze(-1)
         else:
+            lg = torch.lgamma(gamma_arg)
+            lg_bg = torch.lgamma(gamma_arg_bg)
+            ri = rho_int
             sg = sign_gamma
+            sg_bg = sign_gamma_bg
+
+        log_abs_g_full_int = (lg - log_factorial_ml) + log_abs_M + log_abs_W + \
+                             torch.log(lam ** 2 / (2.0 * F)) - 2.0 * torch.log(ri)
         sign_g_full_int = -1.0 * sg * sign_M * sign_W
+
+        log_abs_g_base_int = (lg_bg - log_factorial_ml) + log_abs_M_bg + log_abs_W_bg + \
+                             torch.log(lam ** 2 / (2.0 * F)) - 2.0 * torch.log(ri)
+        sign_g_base_int = -1.0 * sg_bg * sign_M_bg * sign_W_bg
         
         if Q.ndim > 0:
             log_abs_g_full[:, interior_mask] = log_abs_g_full_int
             sign_g_full[:, interior_mask] = sign_g_full_int
+            log_abs_g_base[:, interior_mask] = log_abs_g_base_int
+            sign_g_base[:, interior_mask] = sign_g_base_int
         else:
             log_abs_g_full[interior_mask] = log_abs_g_full_int
             sign_g_full[interior_mask] = sign_g_full_int
+            log_abs_g_base[interior_mask] = log_abs_g_base_int
+            sign_g_base[interior_mask] = sign_g_base_int
     
     g_full = (sign_g_full * torch.exp(log_abs_g_full)).to(cdtype)
+    g_base = (sign_g_base * torch.exp(log_abs_g_base)).to(cdtype)
     
     # In the exterior, the Green's function matches onto Bessel functions.
     # For now, we set it to zero for points > lambda to avoid Whittaker blowup,
     # as the analytic form above is only valid in the interior.
     if Q.ndim > 0:
         g_full[:, ~interior_mask] = 0.0
+        g_base[:, ~interior_mask] = 0.0
     else:
         g_full[~interior_mask] = 0.0
+        g_base[~interior_mask] = 0.0
 
-    # Topological vacuum radial Green's function:
-    #     G_free(ρ) = - I_{ν}(κρ) K_{ν}(κρ),     κ = sqrt(Q² + m²)
-    if global_mode:
-        # Match only asymptotic flux (standard vacuum subtraction)
-        nu_asym = torch.where(rho_vals <= lam, torch.zeros_like(rho_vals), torch.ones_like(rho_vals) * F_cal)
-        order_local = torch.abs(ml_t - nu_asym)
-    else:
-        # Use local flux to match Orchestrator's strategy and ensure gauge invariance.
-        nu_local = torch.where(rho_vals <= lam, F_cal * (rho_vals ** 2 / lam ** 2), F_cal)
-        order_local = torch.abs(ml_t - nu_local)
+    # For the exterior and for the global vacuum strategy, we still need the Bessel background
+    nu_asym = torch.where(rho_vals <= lam, torch.zeros_like(rho_vals), torch.ones_like(rho_vals) * F_cal)
+    order_asym = torch.abs(ml_t - nu_asym)
     
     kappa_E = torch.sqrt(Q ** 2 + m ** 2)
-    # Broadcasting: kappa_E (n_Q,), rho_vals (n_rho)
     if Q.ndim > 0:
         z_E = kappa_E.unsqueeze(-1) * rho_vals.unsqueeze(0)
-        ol = order_local.unsqueeze(0)
+        oa = order_asym.unsqueeze(0)
     else:
         z_E = kappa_E * rho_vals
-        ol = order_local
+        oa = order_asym
         
-    ik_prod = torch_special.bessel_i_k_product(ol, z_E)
-    g_free = (-ik_prod).to(cdtype)
+    ik_prod_asym = torch_special.bessel_i_k_product(oa, z_E)
+    g_free_asym = (-ik_prod_asym).to(cdtype)
+
+    # Effective subtraction depends on global_mode
+    if global_mode:
+        g_ref = g_free_asym
+    else:
+        # Gauge-matching background in interior, standard asymptotic in exterior
+        g_ref = torch.where(interior_mask, g_base, g_free_asym)
 
     if Q.ndim > 0:
-        return rho_vals.unsqueeze(0).to(cdtype) * (g_full - g_free)
+        return rho_vals.unsqueeze(0).to(cdtype) * (g_full - g_ref)
     else:
-        return rho_vals.to(cdtype) * (g_full - g_free)
+        return rho_vals.to(cdtype) * (g_full - g_ref)
 
 
 def step_profile_Q_spectral_sum(
@@ -202,10 +228,11 @@ def step_profile_Q_spectral_sum(
 
     # UV subtraction (b2 term) consistent with Orchestrator.py
     # L_eff = Integral dQ Q^3 (mode_sum/rho - b2/Q^4)
-    # b2 for 4 spinor states = (eB)^2 / 3.0
-    # Here F is nu. e*B_phys = 2*nu/lambda^2.
+    # b2 for 4 spinor states = (eB)^2 / 3.0.
+    # Since we sum over 2 sigma3 states here, and the caller multiplies by 2.0 later,
+    # we use b2 for 2 states here: (eB)^2 / 6.0.
     eB = (2.0 * F / lambd**2)
-    b2 = (eB**2 / 3.0)
+    b2 = (eB**2 / 6.0)
     # Point-wise subtraction per Q: sum_Q (b2 / Q^4 * Q^3 * d_Q) = b2 * sum_Q (d_Q / Q)
     # This cancels the logarithmic divergence in the spectral integral.
     uv_sum = b2 * torch.sum(d_Q / (Q_vals + 1e-15))
@@ -229,7 +256,7 @@ def step_profile_effective_action_density(
         m: float = constants.ELECTRON_MASS,
         n_chi: int = 20, # Reduced
         n_rho: int = 20,
-        n_ml: int = 5,   # Reduced
+        n_ml: int = 100, # Increased for better convergence at large rho
         Q_max: float = 10.0,
         global_mode: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:

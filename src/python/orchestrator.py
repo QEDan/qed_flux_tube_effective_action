@@ -115,7 +115,11 @@ class Orchestrator:
 
         for i, Q in enumerate(chi_real):
             if lcf_threshold is not None and Q > lcf_threshold:
-                local_renorm_sum = torch.from_numpy(np.array([heisenberg_euler_integrand(Q, B, m=m, e=e) for B in B_local])).to(self.device).to(torch.complex128)
+                # For Q >> m and Q^2 >> eB, the renormalized integrand decays as O(Q^-6).
+                # The previously used heisenberg_euler_integrand(Q, ...) was incorrect 
+                # as it is a proper-time (T) space formula.
+                # For now, we use a safe zero as the numerical sum should have converged to the HE limit.
+                local_renorm_sum = torch.zeros(n_points, device=self.device, dtype=torch.complex128)
             else:
                 # Renormalized Integrand for 4 spinor states
                 uv_sub = - uv_coeff_local / (Q**4 + 1e-15)
