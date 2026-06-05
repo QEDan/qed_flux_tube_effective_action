@@ -9,7 +9,7 @@ from src.python.step_profile_effective_action import step_profile_effective_acti
 def main():
     # 1. Parameters
     F_cal = 1.0
-    lambd_val = 10.0 # Large radius
+    lambd_val = 5.0 # Moderate radius
     m = constants.ELECTRON_MASS
     e = constants.ELECTRON_CHARGE
     
@@ -18,24 +18,24 @@ def main():
     print(f"Flux F_cal = {F_cal:.6f}, F = {F_val:.6f}")
 
     # Balanced parameters for convergence and speed
-    n_rho = 20 
-    rho_max = 1.2 * lambd_val
-    rho = torch.linspace(0.1, rho_max, n_rho, dtype=torch.float64) 
+    n_rho = 40 
+    rho_max = 2.0 * lambd_val
+    rho = torch.linspace(0.01, rho_max, n_rho, dtype=torch.float64) 
 
     # Shared spectral grid (Euclidean Q) — both paths must use the same range.
-    n_Q = 10
-    Q_max = 10.0
-    ml_max_num = 60
-    ml_max_an = 80
+    n_Q = 20
+    Q_max = 20.0
+    ml_max = 100
+    Q_min = 0.01
 
     # Compute Numerical Density via Orchestrator (Smooth profile to avoid spikes)
     smooth_width = 0.5
-    print(f"Computing numerical density via Orchestrator (smooth_width={smooth_width}, ml_max={ml_max_num})...")
+    print(f"Computing numerical density via Orchestrator (smooth_width={smooth_width}, ml_max={ml_max})...")
     profile = StepFunctionProfile(rho, lambd_val, F_val, e=e, smooth_width=smooth_width)
     # Use global_mode=False and strategy="numerical"
     orch = Orchestrator(strategy="numerical", device='cpu', batch_size=4096, global_mode=False)
-    chi_values = torch.linspace(0.1, Q_max, n_Q, dtype=torch.complex128)
-    ml_values = list(range(-ml_max_num, ml_max_num + 1))
+    chi_values = torch.linspace(Q_min, Q_max, n_Q, dtype=torch.complex128)
+    ml_values = list(range(-ml_max, ml_max + 1))
     sigma3_values = [1, -1]
     action, num_density_L = orch.compute_effective_action(
         profile,
@@ -54,7 +54,8 @@ def main():
     # Compute Analytic Density via Euclidean Whittaker spectral integration
     # Note: step_profile_effective_action_density now uses Whittaker background
     # in interior when global_mode=False.
-    print(f"Computing analytic density via Whittaker functions (ml_max={ml_max_an})...")
+    print(f"Computing analytic density via Whittaker functions (ml_max={ml_max})...")
+    # Use a smaller rho grid for analytic if needed, but let's try same first.
     rho_t, rho_analytic = step_profile_effective_action_density(
         torch.tensor(F_cal, dtype=torch.float64),
         torch.tensor(lambd_val, dtype=torch.float64),
@@ -62,7 +63,7 @@ def main():
         m=m,
         n_chi=n_Q,
         n_rho=len(rho),
-        n_ml=ml_max_an,
+        n_ml=ml_max,
         Q_max=Q_max,
         global_mode=False, 
     )

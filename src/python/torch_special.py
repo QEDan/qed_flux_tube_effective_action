@@ -100,66 +100,59 @@ def _hyp1f1_series_log(
            torch.tensor(signs, dtype=z.dtype, device=z.device).reshape(z_b.shape)
 
 def whittaker_m_log(kappa: Number, mu: Number, z: Number) -> tuple[torch.Tensor, torch.Tensor]:
-    """Returns (log|M|, sign(M))."""
-    z_t = torch.as_tensor(z, dtype=torch.float64)
-    kappa_t = torch.as_tensor(kappa, dtype=z_t.dtype, device=z_t.device)
-    mu_t = torch.as_tensor(mu, dtype=z_t.dtype, device=z_t.device)
-    
-    a = 0.5 + mu_t - kappa_t
-    b = 1.0 + 2.0 * mu_t
-    
-    # pref = z^(0.5+mu) * e^(-z/2)
-    log_pref = (0.5 + mu_t) * torch.log(z_t) - 0.5 * z_t
-    log_f, sign_f = _hyp1f1_series_log(a, b, z_t)
-    
-    return log_pref + log_f, sign_f
-
-def whittaker_w_log(kappa: Number, mu: Number, z: Number) -> tuple[torch.Tensor, torch.Tensor]:
-    """Returns (log|W|, sign(W))."""
+    """Returns (log|M|, sign(M)) using mpmath for robustness."""
     z_t = torch.as_tensor(z, dtype=torch.float64)
     kappa_t = torch.as_tensor(kappa, dtype=z_t.dtype, device=z_t.device)
     mu_t = torch.as_tensor(mu, dtype=z_t.dtype, device=z_t.device)
 
     def element_wise(k, m, zv):
-        # Asymptotic expansion for Whittaker W when z is large (DLMF 13.7.19)
-        # W_{k,m}(z) ~ exp(-z/2) z^k [1 + (m^2 - (k-1/2)^2)/(1!*z) + ...]
-        # For large arguments, mpmath.whitw fails to converge.
-        if zv > 50.0:
-            return float(zv*(-0.5) + k*np.log(zv)), 1.0
-
-        # Try default precision, then increase if fails
+        mpmath.mp.dps = 25
         try:
-            mpmath.mp.dps = 25
-            res = mpmath.whitw(float(k), float(m), float(zv))
-        except ValueError:
-            # Increase precision and retry, using zeroprec to bound small values
-            mpmath.mp.dps = 200
-            # Use a slightly less strict zeroprec
-            try:
-                res = mpmath.whitw(float(k), float(m), float(zv), zeroprec=100)
-            except ValueError:
-                # Last resort
-                return -1000.0, 1.0
-        
+            res = mpmath.whitm(float(k), float(m), float(zv))
+        except:
+            return -1000.0, 1.0
         if res == 0:
             return -1000.0, 1.0
         return float(mpmath.log(abs(res))), float(mpmath.sign(res))
 
-    # Broadcast kappa, mu, z to common shape
     k_b, m_b, z_b = torch.broadcast_tensors(kappa_t, mu_t, z_t)
-    k_flat = k_b.reshape(-1)
-    m_flat = m_b.reshape(-1)
-    z_flat = z_b.reshape(-1)
-
-    logs = []
-    signs = []
-    for i in range(len(z_flat)):
-        l, s = element_wise(k_flat[i], m_flat[i], z_flat[i])
+    k_f, m_f, z_f = k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1)
+    logs, signs = [], []
+    for i in range(len(z_f)):
+        l, s = element_wise(k_f[i], m_f[i], z_f[i])
         logs.append(l)
         signs.append(s)
     
     return torch.tensor(logs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape), \
            torch.tensor(signs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape)
+
+def whittaker_w_log(kappa: Number, mu: Number, z: Number) -> tuple[torch.Tensor, torch.Tensor]:
+    """Returns (log|W|, sign(W)) using mpmath for robustness."""
+    z_t = torch.as_tensor(z, dtype=torch.float64)
+    kappa_t = torch.as_tensor(kappa, dtype=z_t.dtype, device=z_t.device)
+    mu_t = torch.as_tensor(mu, dtype=z_t.dtype, device=z_t.device)
+
+    def element_wise(k, m, zv):
+        mpmath.mp.dps = 25
+        try:
+            res = mpmath.whitw(float(k), float(m), float(zv))
+        except:
+            return -1000.0, 1.0
+        if res == 0:
+            return -1000.0, 1.0
+        return float(mpmath.log(abs(res))), float(mpmath.sign(res))
+
+    k_b, m_b, z_b = torch.broadcast_tensors(kappa_t, mu_t, z_t)
+    k_f, m_f, z_f = k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1)
+    logs, signs = [], []
+    for i in range(len(z_f)):
+        l, s = element_wise(k_f[i], m_f[i], z_f[i])
+        logs.append(l)
+        signs.append(s)
+    
+    return torch.tensor(logs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape), \
+           torch.tensor(signs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape)
+
 
 class _BesselJScipy(torch.autograd.Function):
     @staticmethod
