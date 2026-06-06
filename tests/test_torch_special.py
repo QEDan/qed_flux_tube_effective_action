@@ -82,22 +82,7 @@ def test_whittaker_autograd():
     z = torch.tensor(1.1, dtype=torch.float64, requires_grad=True)
     
     log_abs, sign = torch_special.whittaker_m_log(kappa, mu, z)
-    # Autograd requires the function to be traced from the input to output.
-    # whittaker_m_log uses mpmath which breaks the graph.
-    # To test autograd of the *implementation*, we need to use a differentiable 1F1.
-    # Let's test _hyp1f1_series directly.
-    
-    # Actually, for autograd, use the torch_special functions that use autograd.
-    # The fix I made to whittaker_m_log uses mpmath, so it's not differentiable!
-    # I need to use the old whittaker_m (or a differentiable one) for autograd test.
-    
-    # Since I removed whittaker_m, I should add a differentiable log-space Whittaker M for autograd.
-    # As a quick fix for the test: test autograd on _hyp1f1_series_log
-    
-    a = 0.5 + mu - kappa
-    b = 1.0 + 2.0 * mu
-    log_f = torch_special._hyp1f1_series(a, b, z).log()
-    log_f.backward()
+    log_abs.backward()
     
     assert kappa.grad is not None
     assert mu.grad is not None

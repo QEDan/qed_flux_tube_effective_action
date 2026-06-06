@@ -168,36 +168,50 @@ class Renormalizer:
 
     def compute_whittaker_benchmark(self, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
         """
-        Analytic solution for Step Function profile using Whittaker functions.
-        Matches Eq 2.76 / 2.100 of greensfunc.tex.
+        Analytic solution for Step Function profile using vectorized PyTorch Whittaker functions.
         Dimension: [L] (rho-scaled Green's function)
         """
-        from src.python.analytic_step_profile import M_whittaker, W_whittaker
+        from src.python import torch_special
         import mpmath
         
+        chi_t = torch.tensor(chi, dtype=torch.complex128, device=self.device)
         e = 1.0
         F_cal = (e * F) / (constants.TWO_PI)
-        k2 = chi*chi - m*m
+        k2 = chi_t*chi_t - m*m
         
-        # kappa = lambda^2 * k^2 / (4 * F_cal) + (ml - sigma3)/2
-        # mu = ml / 2
-        # z = (F_cal / lambda^2) * rho^2
         kappa = (lambd**2 * k2) / (4.0 * F_cal)
         mu = abs(float(ml)) / 2.0
         
-        rho_np = rho.detach().cpu().numpy()
-        z = (F_cal / lambd**2) * (rho_np**2)
+        z = (F_cal / lambd**2) * (rho**2)
         
         # G_radial = (lambda^2 / 2*F_cal) * (Gamma(1/2 + mu - kappa) / ml!) * W * M
-        # We need to handle the Gamma function carefully for poles
-        gamma_factor = complex(mpmath.gamma(0.5 + mu - kappa))
-        denom = float(mpmath.factorial(abs(ml)))
+        # Using torch_special.whittaker_w_log/m_log to get log|W|*sign(W)
+        log_abs_M, sign_M = torch_special.whittaker_m_log(kappa, mu, z)
+        log_abs_W, sign_W = torch_special.whittaker_w_log(kappa, mu, z)
         
-        # Solve for W and M
-        W_vals = W_whittaker(z, kappa, mu)
-        M_vals = M_whittaker(z, kappa, mu)
+        # Gamma(0.5 + mu - kappa). kappa can be complex.
+        # lgamma doesn't support complex in pytorch directly (vml_cpu issue).
+        # Convert to mpmath for this factor.
+        gamma_arg = 0.5 + mu - kappa
+        gamma_val = [complex(mpmath.gamma(complex(v))) for v in gamma_arg.reshape(-1)]
+        gamma_factor = torch.tensor(gamma_val, dtype=torch.complex128, device=self.device).reshape(kappa.shape)
         
-        g_radial = - (lambd**2 / (2.0 * F_cal)) * (gamma_factor / denom) * W_vals * M_vals
+        # log|Gamma|
+        log_gamma = torch.log(torch.abs(gamma_factor) + 1e-300)
+        
+        # Normalization factor
+        # G_radial = - (lambd^2 / (2.0 * F_cal)) * (Gamma(...) / ml!) * W * M
+        denom = float(np.math.factorial(abs(ml)))
+        
+        # log|G_radial| = log|coeff| + log|Gamma| - log(denom) + log|W| + log|M|
+        log_G = torch.log(torch.tensor(lambd**2 / (2.0 * F_cal), device=self.device, dtype=torch.float64)) + log_gamma - \
+                torch.log(torch.tensor(denom, dtype=torch.float64, device=self.device)) + \
+                log_abs_W + log_abs_M
+        
+        # sign(G_radial) = - sign(gamma_factor) * sign(W) * sign(M)
+        sign_G = -1.0 * torch.sign(gamma_factor.real) * sign_W * sign_M
+        
+        g_radial = sign_G * torch.exp(log_G)
         
         # Result is rho * g_radial
-        return torch.from_numpy(rho_np * g_radial).to(self.device).to(torch.complex128)
+        return rho * g_radial

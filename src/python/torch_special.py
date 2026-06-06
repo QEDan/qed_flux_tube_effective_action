@@ -1,9 +1,9 @@
 """
 PyTorch special functions for differentiable step-profile analytics.
 
-Whittaker M/W follow DLMF 13.14.13–14 via confluent hypergeometric functions
-(same route as SciPy's hyp1f1 / hyperu for real arguments). Bessel J/Y use
-torch.special for orders 0 and 1 and standard recurrence for higher integer orders.
+Whittaker M/W follow DLMF 13.14.13–14 via confluent hypergeometric functions.
+This implementation provides vectorized, differentiable versions in log-space
+to support massive resolution increases and auto-diffable effective actions.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Union
 import mpmath
 import numpy as np
 import torch
-from scipy.special import hyp1f1, hyperu, jv, jvp, yv, yvp
+from scipy.special import jv, jvp, yv, yvp, iv, ivp, kv, kvp, ive, kve
 
 Number = Union[float, complex, torch.Tensor]
 
@@ -29,279 +29,254 @@ def _lgamma_torch(z: torch.Tensor) -> torch.Tensor:
     return torch.lgamma(z)
 
 
-def _promote_complex(
-    z: torch.Tensor,
-    *others: torch.Tensor,
-) -> tuple[torch.Tensor, ...]:
-    """Promote real tensors to complex when any operand is complex."""
-    if z.is_complex() or any(o.is_complex() for o in others):
-        z = z.to(torch.complex128)
-        others = tuple(
-            o.to(torch.complex128) if not o.is_complex() else o for o in others
-        )
-    return (z, *others)
-
-
-def _hyp1f1_series(
-    a: torch.Tensor,
-    b: torch.Tensor,
-    z: torch.Tensor,
-    max_terms: int = 256,
-    tol: float = 1e-13,
-) -> torch.Tensor:
+def _logsumexp_signed(logs: torch.Tensor, signs: torch.Tensor, dim: int = 0) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Confluent hypergeometric 1F1(a; b; z) by Kummer series (DLMF 13.2.2).
+    Computes log|sum(signs * exp(logs))| and sign(sum) in a numerically stable way.
     """
-    z, a, b = _promote_complex(z, a, b)
-    term = torch.ones_like(z)
-    total = term.clone()
-    for k in range(1, max_terms + 1):
-        term = term * (a + (k - 1)) / (b + (k - 1)) * z / k
-        total = total + term
-        if k > 8:
-            scale = torch.max(torch.abs(total)).clamp_min(1e-30)
-            if torch.max(torch.abs(term) / scale) < tol:
-                break
-    return total
+    mask_inf = (logs == -float('inf'))
+    if torch.all(mask_inf):
+        return torch.tensor(-float('inf'), dtype=logs.dtype, device=logs.device), \
+               torch.tensor(0.0, dtype=logs.dtype, device=logs.device)
+    
+    temp_logs = torch.where(mask_inf, torch.tensor(-1e30, dtype=logs.dtype, device=logs.device), logs)
+    max_log = torch.max(temp_logs, dim=dim, keepdim=True)[0]
+    
+    scaled_vals = signs * torch.exp(logs - max_log)
+    sum_val = torch.sum(scaled_vals, dim=dim)
+    
+    abs_sum = torch.abs(sum_val)
+    abs_sum_clamped = torch.clamp(abs_sum, min=1e-300)
+    
+    out_log = torch.log(abs_sum_clamped) + max_log.squeeze(dim)
+    out_sign = torch.sign(sum_val)
+    
+    mask_zero = (abs_sum < 1e-300)
+    out_log = torch.where(mask_zero, torch.tensor(-float('inf'), dtype=out_log.dtype, device=out_log.device), out_log)
+    out_sign = torch.where(mask_zero, torch.tensor(0.0, dtype=out_sign.dtype, device=out_sign.device), out_sign)
+    
+    return out_log, out_sign
 
 
 def _hyp1f1_series_log(
     a: torch.Tensor,
     b: torch.Tensor,
     z: torch.Tensor,
-    max_terms: int = 512,
-    tol: float = 1e-13,
-) -> torch.Tensor:
+    max_terms: int = 500,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Fast vectorized log of 1F1(a; b; z) by Kummer series."""
+    a, b, z = torch.broadcast_tensors(a, b, z)
+    shape = z.shape
+    device = z.device
+    
+    ks = torch.arange(max_terms, device=device, dtype=torch.float64)
+    ks_v = ks.view(-1, *(1 for _ in shape))
+    a_v, b_v, z_v = a.unsqueeze(0), b.unsqueeze(0), z.unsqueeze(0)
+    
+    factors_a = a_v + ks_v
+    factors_b = b_v + ks_v
+    
+    log_diff = torch.log(torch.abs(factors_a) + 1e-300) - torch.log(torch.abs(factors_b) + 1e-300)
+    log_prefix = torch.cat([torch.zeros_like(a_v), torch.cumsum(log_diff, dim=0)[:-1]], dim=0)
+    
+    sign_factors = torch.sign(factors_a) * torch.sign(factors_b)
+    sign_prefix = torch.cat([torch.ones_like(a_v), torch.cumprod(sign_factors, dim=0)[:-1]], dim=0)
+    
+    log_terms = log_prefix + ks_v * torch.log(torch.abs(z_v) + 1e-300) - torch.lgamma(ks_v + 1.0)
+    sign_terms = sign_prefix * (torch.sign(z_v)**ks_v)
+    
+    if torch.any(z == 0):
+        log_terms[0] = torch.where(z_v[0] == 0, torch.zeros_like(log_terms[0]), log_terms[0])
+        log_terms[1:] = torch.where(z_v[1:] == 0, torch.tensor(-float('inf'), dtype=z.dtype, device=device), log_terms[1:])
+
+    return _logsumexp_signed(log_terms, sign_terms, dim=0)
+
+
+def _hyperu_series_log(
+    a: torch.Tensor,
+    b: torch.Tensor,
+    z: torch.Tensor,
+    max_terms: int = 500,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Log of confluent hypergeometric 1F1(a; b; z) by Kummer series.
-    Returns (log|1F1|, sign(1F1)).
-    ONLY handles real positive z and real a, b for now.
+    Log of Tricomi's U(a; b; z).
+    Uses epsilon-shift trick for differentiability while maintaining stability.
     """
-    def element_wise(a_val, b_val, z_val):
-        res = mpmath.hyp1f1(float(a_val), float(b_val), float(z_val))
-        if res == 0:
-            return -1000.0, 1.0
-        return float(mpmath.log(abs(res))), float(mpmath.sign(res))
+    eps = 1e-9
+    sin_pi_b = torch.sin(torch.pi * b)
+    is_near_int = torch.abs(sin_pi_b) < 1e-8
+    b_eff = torch.where(is_near_int, b + eps, b)
     
-    # Broadcast a, b, z to common shape
-    a_b, b_b, z_b = torch.broadcast_tensors(a, b, z)
-    a_flat = a_b.reshape(-1)
-    b_flat = b_b.reshape(-1)
-    z_flat = z_b.reshape(-1)
+    def log_gamma_signed(x):
+        l = torch.lgamma(x)
+        s = torch.where(x > 0, torch.ones_like(x), torch.sign(torch.sin(torch.pi * x)))
+        mask_pole = torch.abs(torch.sin(torch.pi * x)) < 1e-15
+        s = torch.where(mask_pole, torch.zeros_like(s), s)
+        return l, s
+
+    lg_b, sg_b = log_gamma_signed(b_eff)
+    lg_1ab, sg_1ab = log_gamma_signed(1.0 + a - b_eff)
+    log_m1, sign_m1 = _hyp1f1_series_log(a, b_eff, z, max_terms=max_terms)
     
-    logs = []
-    signs = []
-    for i in range(len(z_flat)):
-        l, s = element_wise(a_flat[i], b_flat[i], z_flat[i])
-        logs.append(l)
-        signs.append(s)
+    lg_a, sg_a = log_gamma_signed(a)
+    lg_2b, sg_2b = log_gamma_signed(2.0 - b_eff)
+    log_m2, sign_m2 = _hyp1f1_series_log(1.0 + a - b_eff, 2.0 - b_eff, z, max_terms=max_terms)
     
-    return torch.tensor(logs, dtype=z.dtype, device=z.device).reshape(z_b.shape), \
-           torch.tensor(signs, dtype=z.dtype, device=z.device).reshape(z_b.shape)
+    log_t1 = log_m1 - lg_1ab - lg_b
+    sign_t1 = sign_m1 * sg_1ab * sg_b
+    
+    log_t2 = (1.0 - b_eff) * torch.log(z) + log_m2 - lg_a - lg_2b
+    sign_t2 = sign_m2 * sg_a * sg_2b
+    
+    log_diff, sign_diff = _logsumexp_signed(torch.stack([log_t1, log_t2]), 
+                                            torch.stack([sign_t1, -sign_t2]), dim=0)
+    
+    log_sin = torch.log(torch.abs(torch.sin(torch.pi * b_eff)) + 1e-300)
+    sign_sin = torch.sign(torch.sin(torch.pi * b_eff))
+    
+    log_u = torch.log(torch.tensor(torch.pi, dtype=z.dtype, device=z.device)) + log_diff - log_sin
+    sign_u = sign_diff * sign_sin
+    
+    return log_u, sign_u
+
 
 def whittaker_m_log(kappa: Number, mu: Number, z: Number) -> tuple[torch.Tensor, torch.Tensor]:
-    """Returns (log|M|, sign(M)) using mpmath for robustness."""
+    """Returns (log|M|, sign(M)) using mpmath for accuracy, series for grad."""
     z_t = torch.as_tensor(z, dtype=torch.float64)
     kappa_t = torch.as_tensor(kappa, dtype=z_t.dtype, device=z_t.device)
     mu_t = torch.as_tensor(mu, dtype=z_t.dtype, device=z_t.device)
+    
+    if z_t.requires_grad or kappa_t.requires_grad or mu_t.requires_grad:
+        a = 0.5 + mu_t - kappa_t
+        b = 1.0 + 2.0 * mu_t
+        log_f, sign_f = _hyp1f1_series_log(a, b, z_t)
+        log_m = -0.5 * z_t + (mu_t + 0.5) * torch.log(z_t) + log_f
+        return log_m, sign_f
 
+    # High precision fallback for validation
     def element_wise(k, m, zv):
         mpmath.mp.dps = 25
-        try:
-            res = mpmath.whitm(float(k), float(m), float(zv))
-        except:
-            return -1000.0, 1.0
-        if res == 0:
-            return -1000.0, 1.0
+        res = mpmath.whitm(float(k), float(m), float(zv))
         return float(mpmath.log(abs(res))), float(mpmath.sign(res))
 
     k_b, m_b, z_b = torch.broadcast_tensors(kappa_t, mu_t, z_t)
-    k_f, m_f, z_f = k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1)
-    logs, signs = [], []
-    for i in range(len(z_f)):
-        l, s = element_wise(k_f[i], m_f[i], z_f[i])
-        logs.append(l)
-        signs.append(s)
-    
+    logs = [element_wise(k, m, z)[0] for k, m, z in zip(k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1))]
+    signs = [element_wise(k, m, z)[1] for k, m, z in zip(k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1))]
     return torch.tensor(logs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape), \
            torch.tensor(signs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape)
+
 
 def whittaker_w_log(kappa: Number, mu: Number, z: Number) -> tuple[torch.Tensor, torch.Tensor]:
-    """Returns (log|W|, sign(W)) using mpmath for robustness."""
+    """Returns (log|W|, sign(W)) using mpmath for accuracy, series for grad."""
     z_t = torch.as_tensor(z, dtype=torch.float64)
     kappa_t = torch.as_tensor(kappa, dtype=z_t.dtype, device=z_t.device)
     mu_t = torch.as_tensor(mu, dtype=z_t.dtype, device=z_t.device)
 
+    if z_t.requires_grad or kappa_t.requires_grad or mu_t.requires_grad:
+        a = 0.5 + mu_t - kappa_t
+        b = 1.0 + 2.0 * mu_t
+        log_u, sign_u = _hyperu_series_log(a, b, z_t)
+        log_w = -0.5 * z_t + (mu_t + 0.5) * torch.log(z_t) + log_u
+        return log_w, sign_u
+
     def element_wise(k, m, zv):
         mpmath.mp.dps = 25
-        try:
-            res = mpmath.whitw(float(k), float(m), float(zv))
-        except:
-            return -1000.0, 1.0
-        if res == 0:
-            return -1000.0, 1.0
+        res = mpmath.whitw(float(k), float(m), float(zv))
         return float(mpmath.log(abs(res))), float(mpmath.sign(res))
 
     k_b, m_b, z_b = torch.broadcast_tensors(kappa_t, mu_t, z_t)
-    k_f, m_f, z_f = k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1)
-    logs, signs = [], []
-    for i in range(len(z_f)):
-        l, s = element_wise(k_f[i], m_f[i], z_f[i])
-        logs.append(l)
-        signs.append(s)
-    
+    logs = [element_wise(k, m, z)[0] for k, m, z in zip(k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1))]
+    signs = [element_wise(k, m, z)[1] for k, m, z in zip(k_b.reshape(-1), m_b.reshape(-1), z_b.reshape(-1))]
     return torch.tensor(logs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape), \
            torch.tensor(signs, dtype=z_t.dtype, device=z_t.device).reshape(z_b.shape)
 
+
+# --- Bessel Functions with Autograd ---
 
 class _BesselJScipy(torch.autograd.Function):
     @staticmethod
     def forward(ctx, nu: torch.Tensor, z: torch.Tensor):
-        from scipy.special import jv
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
         ctx.save_for_backward(nu, z)
-        out = jv(nu_np, z_np)
-        return torch.as_tensor(out, dtype=z.dtype, device=z.device)
+        return torch.as_tensor(jv(nu_np, z_np), dtype=z.dtype, device=z.device)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        from scipy.special import jvp
         nu, z = ctx.saved_tensors
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
-        dz_np = jvp(nu_np, z_np, 1)
-        dz = grad_output * torch.as_tensor(dz_np, dtype=z.dtype, device=z.device)
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
+        dz = grad_output * torch.as_tensor(jvp(nu_np, z_np, 1), dtype=z.dtype, device=z.device)
         return None, dz
 
 class _BesselYScipy(torch.autograd.Function):
     @staticmethod
     def forward(ctx, nu: torch.Tensor, z: torch.Tensor):
-        from scipy.special import yv
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
         ctx.save_for_backward(nu, z)
-        out = yv(nu_np, z_np)
-        return torch.as_tensor(out, dtype=z.dtype, device=z.device)
+        return torch.as_tensor(yv(nu_np, z_np), dtype=z.dtype, device=z.device)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        from scipy.special import yvp
         nu, z = ctx.saved_tensors
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
-        dz_np = yvp(nu_np, z_np, 1)
-        dz = grad_output * torch.as_tensor(dz_np, dtype=z.dtype, device=z.device)
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
+        dz = grad_output * torch.as_tensor(yvp(nu_np, z_np, 1), dtype=z.dtype, device=z.device)
         return None, dz
 
 class _BesselIScipy(torch.autograd.Function):
     @staticmethod
     def forward(ctx, nu: torch.Tensor, z: torch.Tensor):
-        from scipy.special import iv
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
         ctx.save_for_backward(nu, z)
-        out = iv(nu_np, z_np)
-        return torch.as_tensor(out, dtype=z.dtype, device=z.device)
+        return torch.as_tensor(iv(nu_np, z_np), dtype=z.dtype, device=z.device)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        from scipy.special import ivp
         nu, z = ctx.saved_tensors
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
-        dz_np = ivp(nu_np, z_np, 1)
-        dz = grad_output * torch.as_tensor(dz_np, dtype=z.dtype, device=z.device)
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
+        dz = grad_output * torch.as_tensor(ivp(nu_np, z_np, 1), dtype=z.dtype, device=z.device)
         return None, dz
 
 class _BesselKScipy(torch.autograd.Function):
     @staticmethod
     def forward(ctx, nu: torch.Tensor, z: torch.Tensor):
-        from scipy.special import kv
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
         ctx.save_for_backward(nu, z)
-        out = kv(nu_np, z_np)
-        return torch.as_tensor(out, dtype=z.dtype, device=z.device)
+        return torch.as_tensor(kv(nu_np, z_np), dtype=z.dtype, device=z.device)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        from scipy.special import kvp
         nu, z = ctx.saved_tensors
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
-        dz_np = kvp(nu_np, z_np, 1)
-        dz = grad_output * torch.as_tensor(dz_np, dtype=z.dtype, device=z.device)
+        nu_np, z_np = nu.detach().cpu().numpy(), z.detach().cpu().numpy()
+        dz = grad_output * torch.as_tensor(kvp(nu_np, z_np, 1), dtype=z.dtype, device=z.device)
         return None, dz
-
-class _BesselIKProductScipy(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, nu: torch.Tensor, z: torch.Tensor):
-        from scipy.special import ive, kve
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
-        ctx.save_for_backward(nu, z)
-        
-        # Safe product using scaled functions
-        # For large nu or z, product matches 1 / (2 * sqrt(nu^2 + z^2))
-        # This prevents NaN from 0 * inf
-        # Broadcast to common shape before indexing
-        nu_b, z_b = np.broadcast_arrays(nu_np, z_np)
-        out = ive(nu_b, z_b) * kve(nu_b, z_b)
-        
-        # Handle NaNs (usually from 0 * inf at small z)
-        mask_nan = np.isnan(out)
-        if np.any(mask_nan):
-            # For nu > 0, the limit is 1/(2*nu)
-            # For nu = 0, the limit is inf (logarithmic)
-            # Use asymptotic form 0.5 / sqrt(order^2 + z^2) as a safe proxy
-            safe_val = 0.5 / np.sqrt(nu_b[mask_nan]**2 + z_b[mask_nan]**2 + 1e-15)
-            out[mask_nan] = safe_val
-            
-        return torch.as_tensor(out, dtype=z.dtype, device=z.device)
-
-    @staticmethod
-    def backward(ctx, grad_output: torch.Tensor):
-        # d/dz (I_nu(z) K_nu(z)) = I'_nu K_nu + I_nu K'_nu
-        # I'_nu = I_{nu-1} - nu/z I_nu  (or other identities)
-        # Using scipy's jvp-like approach for derivatives if needed, 
-        # but for now we might not need autograd through this for the validation script.
-        # If needed:
-        from scipy.special import ivp, kvp, iv, kv
-        nu, z = ctx.saved_tensors
-        nu_np = nu.detach().cpu().numpy()
-        z_np = z.detach().cpu().numpy()
-        # ivp * kv + iv * kvp
-        # We can use scaled derivatives too: (ive*exp(z))' = ive' exp + ive exp
-        # But let's just use the direct ones if they don't overflow, 
-        # or better use identities: I_n' = 0.5(I_{n-1} + I_{n+1}), K_n' = -0.5(K_{n-1} + K_{n+1})
-        # Actually scipy has ivp and kvp.
-        d = ivp(nu_np, z_np) * kv(nu_np, z_np) + iv(nu_np, z_np) * kvp(nu_np, z_np)
-        dz = grad_output * torch.as_tensor(d, dtype=z.dtype, device=z.device)
-        return None, dz
-
-def bessel_i_k_product(nu: Number, z: Number) -> torch.Tensor:
-    """Safe product I_nu(z) * K_nu(z) using scaled functions to avoid NaN."""
-    z_t = torch.as_tensor(z, dtype=torch.float64)
-    nu_t = torch.as_tensor(nu, dtype=z_t.dtype, device=z_t.device)
-    return _BesselIKProductScipy.apply(nu_t, z_t)
 
 def bessel_jv(nu: Number, z: Number) -> torch.Tensor:
-    z_t = torch.as_tensor(z, dtype=torch.float64)
-    nu_t = torch.as_tensor(nu, dtype=z_t.dtype, device=z_t.device)
-    return _BesselJScipy.apply(nu_t, z_t)
+    return _BesselJScipy.apply(torch.as_tensor(nu, dtype=torch.float64), torch.as_tensor(z, dtype=torch.float64))
 
 def bessel_yv(nu: Number, z: Number) -> torch.Tensor:
-    z_t = torch.as_tensor(z, dtype=torch.float64)
-    nu_t = torch.as_tensor(nu, dtype=z_t.dtype, device=z_t.device)
-    return _BesselYScipy.apply(nu_t, z_t)
+    return _BesselYScipy.apply(torch.as_tensor(nu, dtype=torch.float64), torch.as_tensor(z, dtype=torch.float64))
 
 def bessel_iv(nu: Number, z: Number) -> torch.Tensor:
-    z_t = torch.as_tensor(z, dtype=torch.float64)
-    nu_t = torch.as_tensor(nu, dtype=z_t.dtype, device=z_t.device)
-    return _BesselIScipy.apply(nu_t, z_t)
+    return _BesselIScipy.apply(torch.as_tensor(nu, dtype=torch.float64), torch.as_tensor(z, dtype=torch.float64))
 
 def bessel_kv(nu: Number, z: Number) -> torch.Tensor:
-    z_t = torch.as_tensor(z, dtype=torch.float64)
-    nu_t = torch.as_tensor(nu, dtype=z_t.dtype, device=z_t.device)
-    return _BesselKScipy.apply(nu_t, z_t)
+    return _BesselKScipy.apply(torch.as_tensor(nu, dtype=torch.float64), torch.as_tensor(z, dtype=torch.float64))
+
+def bessel_i_k_product(nu: Number, z: Number) -> torch.Tensor:
+    """Safe product I_nu(z) * K_nu(z) using scaled functions."""
+    nu_t, z_t = torch.as_tensor(nu, dtype=torch.float64), torch.as_tensor(z, dtype=torch.float64)
+    # Broadcast to common shape
+    nu_b, z_b = np.broadcast_arrays(nu_t.detach().cpu().numpy(), z_t.detach().cpu().numpy())
+    
+    out = ive(nu_b, z_b) * kve(nu_b, z_b)
+    
+    # Handle NaNs from 0 * inf by flattening to 1D
+    mask_nan = np.isnan(out)
+    if np.any(mask_nan):
+        out_flat = out.ravel()
+        nu_flat = nu_b.ravel()
+        z_flat = z_b.ravel()
+        mask_flat = mask_nan.ravel()
+        
+        out_flat[mask_flat] = 0.5 / np.sqrt(nu_flat[mask_flat]**2 + z_flat[mask_flat]**2 + 1e-15)
+        out = out_flat.reshape(out.shape)
+        
+    return torch.as_tensor(out, dtype=z_t.dtype, device=z_t.device)
