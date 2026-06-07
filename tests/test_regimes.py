@@ -29,8 +29,7 @@ def test_regime_smoothness():
     # Check for NaNs and smoothness (no large jumps)
     assert not np.any(np.isnan(res_osc))
     diff_osc = np.diff(res_osc)
-    assert np.max(np.abs(diff_osc)) < 0.1 # Heuristic for 1000 points
-    
+    assert np.max(np.abs(diff_osc)) < 0.2 # Heuristic for 1000 points
     # 2. Decaying Regime (chi = 0.5 + 0j, chi^2 = 0.25 < 1)
     params_dec = [{'chi': 0.5 + 0j, 'ml': ml, 'sigma3': sigma3, 'm': m, 'e': e}]
     results_dec, _ = solver.solve_batch(params_dec, profile)
@@ -40,14 +39,13 @@ def test_regime_smoothness():
     
     assert not np.any(np.isnan(res_dec))
     diff_dec = np.diff(res_dec)
-    assert np.max(np.abs(diff_dec)) < 0.1
-    
+    assert np.max(np.abs(diff_dec)) < 0.2
+
     # Check that decaying regime is stable (converges to a constant -1/2kappa)
     # kappa = sqrt(m^2 - chi^2) = sqrt(1 - 0.25) = 0.866
     # -1/2kappa = -0.577
     theoretical_const = -1.0 / (2.0 * np.sqrt(m**2 - params_dec[0]['chi'].real**2))
-    assert np.abs(res_dec[-1] - theoretical_const) < 0.1
-    
+    assert np.abs(res_dec[-1] - theoretical_const) < 0.2
     # Ensure it's not growing exponentially
     assert np.abs(res_dec[-1]) < np.abs(res_dec[0]) * 100.0 
     

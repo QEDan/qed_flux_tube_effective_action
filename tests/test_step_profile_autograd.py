@@ -7,11 +7,11 @@ def test_step_profile_autograd():
     F_cal = torch.tensor(1.0, dtype=torch.float64, requires_grad=True)
     lambd = torch.tensor(1.0, dtype=torch.float64, requires_grad=True)
     
-    # Run function
-    ea = step_profile_analytic_ea(F_cal, lambd)
+    # Run function with small grid for fast autograd check
+    ea = step_profile_analytic_ea(F_cal, lambd, n_chi=5, n_rho=5, n_ml=2)
     
-    # Mock a loss function
-    loss = ea**2
+    # Mock a loss function (must be real scalar for implicit backward)
+    loss = ea.real**2
     loss.backward()
     
     assert F_cal.grad is not None

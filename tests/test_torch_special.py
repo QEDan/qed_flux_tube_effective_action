@@ -93,6 +93,6 @@ def test_whittaker_autograd():
 def test_bessel_autograd():
     z = torch.tensor(1.5, dtype=torch.float64, requires_grad=True)
     j_val = torch_special.bessel_jv(1, z)
-    j_val.backward()
+    j_val.real.backward()
     assert z.grad is not None
     assert z.grad.item() != 0.0

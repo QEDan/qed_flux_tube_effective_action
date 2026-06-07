@@ -32,7 +32,7 @@ def test_ea_equals_two_pi_density_integral():
 def test_step_profile_density_autograd():
     F_cal = torch.tensor(1.0, dtype=torch.float64, requires_grad=True)
     lambd = torch.tensor(1.0, dtype=torch.float64, requires_grad=True)
-    _, density = step_profile_effective_action_density(F_cal, lambd)
+    _, density = step_profile_effective_action_density(F_cal, lambd, n_chi=5, n_rho=5, n_ml=2)
     loss = density.sum()
     loss.backward()
     assert F_cal.grad is not None

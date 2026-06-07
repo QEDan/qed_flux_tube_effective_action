@@ -79,14 +79,14 @@ def step_profile_mode_integrand(
     
     if Q.ndim == 0:
         log_abs_g_full = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
-        sign_g_full = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
+        sign_g_full = torch.zeros(rho_vals.shape, dtype=cdtype, device=F.device)
         log_abs_g_base = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
-        sign_g_base = torch.zeros(rho_vals.shape, dtype=dtype, device=F.device)
+        sign_g_base = torch.zeros(rho_vals.shape, dtype=cdtype, device=F.device)
     else:
         log_abs_g_full = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
-        sign_g_full = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
+        sign_g_full = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=cdtype, device=F.device)
         log_abs_g_base = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
-        sign_g_base = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=dtype, device=F.device)
+        sign_g_base = torch.zeros((Q.shape[0], rho_vals.shape[0]), dtype=cdtype, device=F.device)
     
     if len(rho_int) > 0:
         if Q.ndim > 0:
@@ -124,14 +124,14 @@ def step_profile_mode_integrand(
         
         if Q.ndim > 0:
             log_abs_g_full[:, interior_mask] = log_abs_g_full_int
-            sign_g_full[:, interior_mask] = sign_g_full_int
+            sign_g_full[:, interior_mask] = sign_g_full_int.to(cdtype)
             log_abs_g_base[:, interior_mask] = log_abs_g_base_int
-            sign_g_base[:, interior_mask] = sign_g_base_int
+            sign_g_base[:, interior_mask] = sign_g_base_int.to(cdtype)
         else:
             log_abs_g_full[interior_mask] = log_abs_g_full_int
-            sign_g_full[interior_mask] = sign_g_full_int
+            sign_g_full[interior_mask] = sign_g_full_int.to(cdtype)
             log_abs_g_base[interior_mask] = log_abs_g_base_int
-            sign_g_base[interior_mask] = sign_g_base_int
+            sign_g_base[interior_mask] = sign_g_base_int.to(cdtype)
     
     g_full = (sign_g_full * torch.exp(log_abs_g_full)).to(cdtype)
     g_base = (sign_g_base * torch.exp(log_abs_g_base)).to(cdtype)
