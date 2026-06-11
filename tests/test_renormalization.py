@@ -31,7 +31,9 @@ def test_uv_subtraction_shape(solver):
     rho = torch.linspace(0.1, 1.0, 10, dtype=torch.float64)
     profile = StepFunctionProfile(rho, lambd=0.5, F=1.0)
     
-    uv_sub = renorm.compute_uv_subtraction(chi, ml, m, rho, profile)
+    # uv_sub = renorm.compute_uv_subtraction(chi, ml, m, rho, profile)
+    e = 1.0
+    uv_sub = renorm.compute_uv_subtraction(chi, ml, m, e, rho, profile)
     assert uv_sub.shape == (2, 10)
     assert torch.all(torch.isfinite(uv_sub))
 
@@ -43,9 +45,10 @@ def test_uv_subtraction_massive_form(solver):
     ml = torch.tensor([0], dtype=torch.int32)
     rho = torch.tensor([1.0], dtype=torch.float64)
     profile = StepFunctionProfile(rho, lambd=0.5, F=1.0)
+    e = 1.0
     
-    uv_sub = renorm.compute_uv_subtraction(chi, ml, m, rho, profile)
-    b2 = renorm.get_b2_term(profile, rho)
+    uv_sub = renorm.compute_uv_subtraction(chi, ml, m, e, rho, profile)
+    b2 = renorm.get_b2_term(profile, rho, e=e)
     
     # Expected: - b2 / (Q^2 + m^2)^2
     expected = - b2 / (Q**2 + m**2)**2

@@ -77,15 +77,22 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
     def __init__(self, solver: Any, device: str = "cpu") -> None:
         self.solver = solver
         self.device = torch.device(device)
+        self.analytic = AnalyticBackgroundStrategy(device=device)
 
     def compute_g0(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any, global_mode: bool = False) -> torch.Tensor:
-        from src.python.profiles import LocalBackgroundProfile, PureGaugeProfile
+        from src.python.profiles import LocalBackgroundProfile, PureGaugeProfile, FieldProfile
+        
+        # If the background profile has NO B field at all (vacuum), use analytic strategy for stability
+        # But if B_vals is present, it means it's an interacting-like profile, so use numerical to cancel errors.
+        is_vacuum = not hasattr(field_profile, 'B_vals') or torch.all(torch.abs(getattr(field_profile, 'B_vals', torch.tensor(0.0))) < 1e-15)
+        
+        if is_vacuum:
+            return self.analytic.compute_g0(chi, ml, m, e, rho, field_profile, global_mode=global_mode)
+            
         if global_mode:
             # Match only asymptotic flux
             F = getattr(field_profile, 'F', 0.0)
             lambd = getattr(field_profile, 'lambd', rho[-1])
-            # Create a profile that is zero in interior and pure gauge in exterior
-            # For simplicity, we use PureGaugeProfile and zero it out in interior
             bg_profile = PureGaugeProfile(rho, F, e=e)
             inner = rho < lambd
             bg_profile.a_phi[inner] = 0.0
@@ -96,7 +103,6 @@ class NumericalBackgroundStrategy(BackgroundStrategy):
         
         batch = []
         for i in range(len(chi)):
-            # Background is spin-independent (B=0), but we must provide a sigma3 for the solver
             batch.append({'chi': chi[i].item(), 'ml': ml[i].item(), 'sigma3': 1, 'm': m, 'e': e})
         results, _ = self.solver.solve_batch(batch, bg_profile)
         return results
@@ -119,7 +125,7 @@ class Renormalizer:
 
 
 
-    def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
+    def compute_uv_subtraction(self, chi: torch.Tensor, ml: torch.Tensor, m: float, e: float, rho: torch.Tensor, field_profile: Any) -> torch.Tensor:
         """
         Computes the robust massive UV subtraction term: b2 / (Q^2 + m^2)^2.
         This matches the proper-time structure and is finite at Q=0.
@@ -127,7 +133,7 @@ class Renormalizer:
         """
         n_batch = len(ml)
         n_rho = len(rho)
-        b2 = self.get_b2_term(field_profile, rho, e=constants.ELECTRON_CHARGE) # (n_rho,)
+        b2 = self.get_b2_term(field_profile, rho, e=e) # (n_rho,)
         
         # Q is i*chi? No, Orchestrator passes chi which is already Euclidean iQ in some places?
         # Actually Orchestrator uses chi_real = abs(complex(c)). 
@@ -139,17 +145,19 @@ class Renormalizer:
         denom = (Q.unsqueeze(-1)**2 + m**2)**2
         res = - b2.unsqueeze(0) / denom
         return res.to(torch.complex128)
-
-    def get_b2_term(self, field_profile: Any, rho: torch.Tensor, e: float = constants.ELECTRON_CHARGE) -> torch.Tensor:
+    def get_b2_term(self, field_profile: Any, rho: torch.Tensor, e: float) -> torch.Tensor:
         """
-        Returns (eB)^2 / 6.0 density.
-        Matches Scalar QED field strength renormalization term.
+        Returns (eB)**2 / 6.0 density.
+        Matches the total Heisenberg-Euler divergence for 2 spin states (summed over sigma3 = +/- 1).
+        This includes both the Pauli term and the Landau level energy shifts.
         """
         _, a_phi, da_phi = field_profile.get_arrays(as_numpy=False)
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
         B_phys = (a_phi / r_safe + da_phi)
         eB = e * B_phys
         return (eB**2 / 6.0).to(torch.complex128)
+
+
 
     def compute_whittaker_benchmark(self, chi: complex, ml: int, sigma3: int, m: float, lambd: float, F: float, rho: torch.Tensor) -> torch.Tensor:
         """

@@ -55,12 +55,13 @@ def test_q_zero_regularity():
     
     chi_zero = torch.tensor([0.0], dtype=torch.complex128)
     ml = torch.tensor([0], dtype=torch.int32)
+    e = constants.ELECTRON_CHARGE
     
-    uv_sub = renorm.compute_uv_subtraction(chi_zero, ml, m, rho, profile)
+    uv_sub = renorm.compute_uv_subtraction(chi_zero, ml, m, e, rho, profile)
     
     assert torch.isfinite(uv_sub)
     # Form: - b2 / (Q^2 + m^2)^2. At Q=0: - b2 / m^4
-    b2 = renorm.get_b2_term(profile, rho)
+    b2 = renorm.get_b2_term(profile, rho, e=e)
     expected = - b2 / (m**4)
     assert torch.allclose(uv_sub.real, expected.real, rtol=1e-5)
 

@@ -24,11 +24,11 @@ def plot_sech2_greens_function_agreement():
     # Solve numerically
     g_num, _ = solver.solve_batch([params], profile)
     g_num_diag = g_num[0].detach().cpu().numpy()
-    
+
     # Analytic Baseline (B=0): Use Vacuum Green's Function G^0
     g_vac, _ = solver.solve_batch([params], Sech2ShellProfile(rho, R=1000.0, B=0.0, lambd=lambd))
     g_vac_diag = g_vac[0].detach().cpu().numpy()
-    
+
     # Residuals
     residual = np.abs(g_num_diag.real - g_vac_diag.real)
     

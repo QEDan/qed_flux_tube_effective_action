@@ -370,12 +370,13 @@ def bessel_kv(nu: Number, z: Number) -> torch.Tensor:
     return _BesselKScipy.apply(nu_t, z_t)
 
 def bessel_i_k_product(nu: Number, z: Number) -> torch.Tensor:
-    """Safe product I_nu(z) * K_nu(z) using differentiable wrappers."""
-    # Use bessel_iv and bessel_kv which are now differentiable
-    # To handle overflows in iv and underflows in kv, we could use the scaled versions,
-    # but for autograd compatibility, we stick to the basic ones or implement a custom autograd for the product.
-    # Actually, iv * kv is usually well-behaved.
-    # However, to be safe, let's implement a custom autograd function for the product if it overflows.
+    """Safe product I_nu(z) * K_nu(z) using scaled Bessel functions to avoid overflow."""
+    # I_nu(z) * K_nu(z) = I_nu(z) * exp(z) * K_nu(z) * exp(-z) = Ive_nu(z) * Kve_nu(z)
+    nu_t = torch.as_tensor(nu, dtype=torch.complex128)
+    z_t = torch.as_tensor(z, dtype=torch.complex128)
     
-    # For now, let's use the basic ones and see if it works.
-    return bessel_iv(nu, z) * bessel_kv(nu, z)
+    # ive and kve are scipy functions, need to wrap them for autograd if necessary
+    # For now, use the scipy functions directly.
+    return torch.as_tensor(ive(nu_t.detach().cpu().numpy().real, z_t.detach().cpu().numpy().real) * 
+                           kve(nu_t.detach().cpu().numpy().real, z_t.detach().cpu().numpy().real), 
+                           dtype=z_t.dtype, device=z_t.device)

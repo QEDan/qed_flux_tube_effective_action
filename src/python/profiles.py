@@ -96,11 +96,15 @@ class StepFunctionProfile(FieldProfile):
             
             # da_phi = pre * (df_lambd / rho - f_lambd / rho^2)
             self.da_phi = pre * (df_lambd / self.rho - f_lambd / (self.rho**2))
+            
+            # B = da_phi + A/rho
+            self.B_vals = self.da_phi + self.a_phi / self.rho
 
     def get_discontinuities(self) -> List[Discontinuity]:
         """
         For a sharp step function, there is a delta-function spike in the potential 
         at rho = lambda, leading to a jump in u'.
+        The magnitude is -e * F / (pi * lambda^2) derived from the boundary condition.
         """
         if self.smooth_width is not None or self.lambd <= 0 or abs(self.F) < 1e-12:
             return []
@@ -243,8 +247,7 @@ class LocalBackgroundProfile(FieldProfile):
         self.da_phi = -self.a_phi / r_safe
 
     def get_discontinuities(self) -> List[Discontinuity]:
-        # Background is usually assumed smooth for renormalization purposes,
-        # but we could inherit discontinuities if they are not B-field related.
-        # For now, return empty as standard renormalization vacuums are smooth.
-        return []
+        # Background must inherit discontinuities from parent to ensure 
+        # that discretization errors and jump conditions cancel correctly.
+        return self.parent.get_discontinuities()
 

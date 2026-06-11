@@ -29,6 +29,9 @@ def test_zero_field_cancellation():
     # Compute effective action
     action, L_eff_rho = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
 
+    # Print a few points to see magnitude
+    print(f"DEBUG: L_eff_rho[0]={L_eff_rho[0].real:.6e}, L_eff_rho[100]={L_eff_rho[100].real:.6e}")
+
     # Calculate integral manually to check
     # Gamma ~ sum (L_eff_rho * rho * drho)
     # Print the sum contribution before final integration

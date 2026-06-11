@@ -126,8 +126,21 @@ class PyTorchSolver:
         k2_eucl = torch.where(is_eucl, k2_ext, torch.tensor(-1.0 + 0j, dtype=k2_ext.dtype, device=k2_ext.device))
         kappa = torch.sqrt(-k2_eucl)
         zm = kappa * rho[-1]
-        u_init_eucl = torch_special.bessel_kv(n_order, zm)
-        du_init_eucl = -0.5 * (torch_special.bessel_kv(n_order - 1, zm) + torch_special.bessel_kv(n_order + 1, zm)) * kappa
+        
+        # Use scaled K Bessel to avoid underflow: K(z) = Kve(z) * exp(-z)
+        from scipy.special import kve as scipy_kve
+        n_order_np = n_order.detach().cpu().numpy()
+        zm_np = zm.detach().cpu().numpy()
+        
+        kve_val = torch.as_tensor(scipy_kve(n_order_np, zm_np), dtype=torch.complex128, device=self.device)
+        # d/dz K(z) = -0.5 * (K_{n-1} + K_{n+1})
+        # d/dz (Kve(z) * exp(-z)) = exp(-z) * (dKve/dz - Kve)
+        # But easier to just use the recurrence on K and then scale
+        kve_m1 = torch.as_tensor(scipy_kve(n_order_np - 1, zm_np), dtype=torch.complex128, device=self.device)
+        kve_p1 = torch.as_tensor(scipy_kve(n_order_np + 1, zm_np), dtype=torch.complex128, device=self.device)
+        
+        u_init_eucl = kve_val # This is u * exp(zm)
+        du_init_eucl = -0.5 * (kve_m1 + kve_p1) * kappa # This is du/dr * exp(zm)
         
         # Minkowski initialization (k^2 = k2_ext)
         k2_mink = torch.where(~is_eucl, k2_ext, torch.tensor(1.0 + 0j, dtype=k2_ext.dtype, device=k2_ext.device))
@@ -143,7 +156,8 @@ class PyTorchSolver:
         state_uinf = torch.stack([u_inf_init, du_inf_init], dim=1)
         norm_inf = torch.norm(state_uinf, dim=1, keepdim=True) + 1e-100
         state_uinf = state_uinf / norm_inf
-        log_acc_uinf = torch.log(norm_inf.squeeze(1))
+        # log_acc_uinf = log(norm_inf) - zm (if Euclidean)
+        log_acc_uinf = torch.where(is_eucl, torch.log(norm_inf.squeeze(1)) - zm.real, torch.log(norm_inf.squeeze(1)))
         
         # Capture the normalized state at rho[-1] for Wronskian calculation
         state_uinf_at_R = state_uinf.clone()
