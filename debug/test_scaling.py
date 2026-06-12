@@ -19,7 +19,7 @@ def test_scaling():
     print("Testing scaling with B...")
     for B in B_range:
         profile = Sech2Profile(rho, B=B, lambd=lambd)
-        action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
+        action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
         print(f"B={B}: Action={action.real.item()}")
 
 if __name__ == "__main__":

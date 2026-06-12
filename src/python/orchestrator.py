@@ -81,7 +81,9 @@ class Orchestrator:
         r_safe = torch.where(rho == 0, torch.tensor(1e-15, device=rho.device), rho)
 
         for i, Q in enumerate(chi_t):
+            print(f"  Computing chi {i+1}/{len(chi_t)}: Q={Q.item():.2f}...", flush=True)
             if lcf_threshold is not None and Q > lcf_threshold:
+                print(f"    Skipping (LCF tail)...", flush=True)
                 continue
 
             batch_params = []
@@ -90,11 +92,15 @@ class Orchestrator:
                     batch_params.append({'chi': 1j * Q, 'ml': ml, 'sigma3': s3, 'm': m, 'e': e})
 
             if batch_params:
+                print(f"    Solving batch of {len(batch_params)} modes...", flush=True)
                 num_results, _ = self.backend.solve_batch(batch_params, field_profile)
                 batch_chi_t = (1j * Q).expand(len(batch_params))
                 batch_ml_t = torch.tensor([float(p['ml']) for p in batch_params], device=self.device, dtype=torch.float64)
+                
+                print(f"    Computing background...", flush=True)
                 num_bg = self.renormalizer.compute_g0(batch_chi_t, batch_ml_t, m, e, rho, field_profile)
-
+                
+                print(f"    Processing results...", flush=True)
                 diff = (num_results - num_bg)
                 diff = torch.where(torch.isfinite(diff), diff, torch.zeros_like(diff))
                 mode_sums[i] = diff.sum(dim=0)
@@ -153,7 +159,7 @@ class Orchestrator:
                 # Wait, dissertation Eq 2.45: L = 1/pi * Integral Q^3 mode_sum.
                 # So if mode_sum is positive, L is positive.
                 
-                local_renorm_sum = (mode_sums[i].real / r_safe) + uv_sub.real
+                local_renorm_sum = (mode_sums[i].real / r_safe) - uv_sub.real
 
             L_eff_rho += local_renorm_sum * chi_measure[i] * norm_factor
 

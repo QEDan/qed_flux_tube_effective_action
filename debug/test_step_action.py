@@ -30,7 +30,7 @@ def test_step_action_small():
     orc = Orchestrator(device="cpu")
     
     print(f"Computing Small-Scale Numerical EA (B={B}, rho_max=2.0)...")
-    action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
+    action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
     
     num_val = action.real.item()
     

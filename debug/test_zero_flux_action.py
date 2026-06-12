@@ -19,7 +19,7 @@ def test_zero_flux_action():
     orc = Orchestrator(device="cpu")
     
     print("Computing Numerical EA for ZeroFluxProfile...")
-    action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
+    action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
     
     print(f"Action: {action.real.item()}")
 

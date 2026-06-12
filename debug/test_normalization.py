@@ -38,7 +38,7 @@ def test_normalization():
     orc = Orchestrator(device="cpu")
     
     print(f"Computing EA for quasi-uniform field B={B}...")
-    action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
+    action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
     
     num_val = action.real.item()
     

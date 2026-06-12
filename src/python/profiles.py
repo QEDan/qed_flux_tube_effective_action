@@ -191,6 +191,40 @@ class WLNFluxTubeProfile(FieldProfile):
         # da_phi = B - A_phi / rho
         self.da_phi = self.B_vals - self.a_phi / r_safe
 
+class Sech2Profile(FieldProfile):
+    def __init__(self, rho: Union[np.ndarray, torch.Tensor], B: float, lambd: float, e: float = constants.ELECTRON_CHARGE) -> None:
+        """
+        Cylindrical Sech^2 profile:
+        B_z(rho) = B * sech^2(rho/lambda)
+        A_phi(rho) = B * lambda * tanh(rho/lambda) - (B * lambda^2 / rho) * ln(cosh(rho/lambda))
+        """
+        super().__init__(rho)
+        self.B = B
+        self.lambd = lambd
+        self.e = e
+        # Total flux F = 2 * pi * B * lambd^2 * ln(2)
+        self.F = 2.0 * constants.PI * B * (lambd**2) * np.log(2.0)
+        self.update()
+
+    def update(self) -> None:
+        r_safe = torch.where(self.rho == 0, torch.tensor(1e-15, device=self.rho.device), self.rho)
+        
+        # B_vals
+        cosh_arg = self.rho / self.lambd
+        self.B_vals = self.B / (torch.cosh(cosh_arg)**2)
+        
+        # a_phi
+        a_phi_naive = self.B * self.lambd * torch.tanh(cosh_arg) - \
+                      self.B * (self.lambd**2) * torch.log(torch.cosh(cosh_arg)) / r_safe
+                      
+        a_phi_taylor = self.B * (self.rho / 2.0 - (self.rho**3) / (4.0 * self.lambd**2) + (self.rho**5) / (9.0 * self.lambd**4))
+        
+        # Use Taylor expansion for small rho (e.g. < 1e-4) to prevent precision issues
+        self.a_phi = torch.where(self.rho < 1e-4, a_phi_taylor, a_phi_naive)
+        
+        # da_phi = B - A_phi / rho
+        self.da_phi = self.B_vals - self.a_phi / r_safe
+
 class MLPProfile(FieldProfile):
     def __init__(self, rho: torch.Tensor, B_vals: torch.Tensor, a_phi: torch.Tensor, e: float = constants.ELECTRON_CHARGE) -> None:
         super().__init__(rho)

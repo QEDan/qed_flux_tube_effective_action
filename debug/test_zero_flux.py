@@ -17,7 +17,7 @@ def exact_zero_flux_ea(B_peak, lambd, m):
     B_safe = np.where(np.abs(B_profile) < 1e-10, 1e-10, B_profile)
     L_eff = (e * B_safe)**2 / (24.0 * np.pi**2) * np.log(m**2 / (e * np.abs(B_safe)))
     
-    return 2.0 * np.pi * np.trapezoid(rho_grid * L_eff, rho_grid)
+    return 2.0 * np.pi * np.trapz(rho_grid * L_eff, rho_grid)
 
 def test_zero_flux_matching():
     lambd = 1.0
@@ -35,7 +35,7 @@ def test_zero_flux_matching():
     orc = Orchestrator(device="cpu")
     
     print("Computing Numerical EA for Zero Flux Profile...")
-    action = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
+    action, _ = orc.compute_effective_action(profile, chi_values, ml_values, sigma3_values, m=m)
     
     num_val = action.real.item()
     ana_val = exact_zero_flux_ea(B, lambd, m)
